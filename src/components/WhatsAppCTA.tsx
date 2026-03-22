@@ -1,6 +1,6 @@
 export default function WhatsAppCTA() {
   const whatsappUrl =
-    "https://wa.me/5500000000000?text=Olá! Gostaria de saber mais sobre os pacotes de viagem da AJS Turismo.";
+    "https://wa.me/5541998348766?text=Olá! Gostaria de saber mais sobre os pacotes de viagem da AJS Turismo.";
 
   return (
     <section id="contato" className="py-16 md:py-20 bg-white">

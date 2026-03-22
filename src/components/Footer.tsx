@@ -19,15 +19,15 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-white/50 text-sm leading-relaxed mb-5">
-              Transformando sonhos em viagens inesquecíveis desde 2013. Confiança,
+              Transformando sonhos em viagens inesquecíveis desde 2016. Confiança,
               qualidade e o melhor preço do mercado.
             </p>
             {/* Social */}
             <div className="flex gap-3">
               {[
-                { Icon: Instagram, href: "#", label: "Instagram" },
-                { Icon: Facebook, href: "#", label: "Facebook" },
-                { Icon: Youtube, href: "#", label: "YouTube" },
+                { Icon: Instagram, href: "https://instagram.com/ajsturismooficial", label: "Instagram" },
+                { Icon: Facebook, href: "https://www.facebook.com/ajsturismo", label: "Facebook" },
+                { Icon: Youtube, href: "https://www.youtube.com/@ajsturismo", label: "YouTube" },
               ].map(({ Icon, href, label }) => (
                 <a
                   key={label}
@@ -95,20 +95,20 @@ export default function Footer() {
               <li className="flex items-start gap-2.5">
                 <MapPin size={15} className="text-gold-400 flex-shrink-0 mt-0.5" />
                 <span className="text-white/50 text-sm">
-                  Rua Exemplo, 123 — Bairro<br />
-                  Cidade, Estado — CEP 00000-000
+                  Rua Pedro Spisla Filho, 215 — Santa Cândida<br />
+                  Curitiba, PR
                 </span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone size={15} className="text-gold-400 flex-shrink-0" />
-                <a href="tel:+5500000000000" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
-                  (00) 00000-0000
+                <a href="tel:+5541998348766" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
+                  (41) 99834-8766
                 </a>
               </li>
               <li className="flex items-center gap-2.5">
                 <Mail size={15} className="text-gold-400 flex-shrink-0" />
-                <a href="mailto:contato@ajsturismo.com.br" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
-                  contato@ajsturismo.com.br
+                <a href="mailto:ajsturismooficial@gmail.com" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
+                  ajsturismooficial@gmail.com
                 </a>
               </li>
             </ul>
@@ -124,10 +124,10 @@ export default function Footer() {
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-white/30 text-xs text-center md:text-left">
             © {new Date().getFullYear()} AJS Turismo. Todos os direitos reservados.
-            CNPJ: 00.000.000/0001-00
+            CNPJ: 28.702.277/0001-85
           </p>
           <div className="flex items-center gap-4 text-white/30 text-xs">
-            <span>Cadastur: 00.000000.00.0001-5</span>
+            <span>Cadastur: 28.702.277/0001-85</span>
             <span>·</span>
             <Link href="/privacidade" className="hover:text-gold-400 transition-colors">
               Privacidade

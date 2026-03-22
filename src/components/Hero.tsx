@@ -118,7 +118,7 @@ export default function Hero() {
               <ArrowRight size={18} />
             </button>
             <a
-              href="https://wa.me/5500000000000?text=Olá! Gostaria de saber mais sobre os pacotes de viagem."
+              href="https://wa.me/5541998348766?text=Olá! Gostaria de saber mais sobre os pacotes de viagem."
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 text-base hover:-translate-y-0.5"

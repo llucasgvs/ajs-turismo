@@ -96,7 +96,7 @@ export default function HowItWorks() {
               Ver Pacotes Agora
             </button>
             <a
-              href="https://wa.me/5500000000000"
+              href="https://wa.me/5541998348766"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary py-3.5 px-8 inline-flex items-center justify-center gap-2"

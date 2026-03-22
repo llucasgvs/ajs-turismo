@@ -59,7 +59,7 @@ export default function WhyUs() {
             </h2>
             <p className="text-gray-500 text-base leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
               Não somos apenas uma agência de viagens. Somos apaixonados por proporcionar
-              experiências únicas e inesquecíveis para cada cliente. Desde 2013 transformando
+              experiências únicas e inesquecíveis para cada cliente. Desde 2016 transformando
               sonhos em realidade.
             </p>
 
@@ -78,7 +78,7 @@ export default function WhyUs() {
             </div>
 
             <a
-              href="https://wa.me/5500000000000"
+              href="https://wa.me/5541998348766"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary inline-flex items-center gap-2"
