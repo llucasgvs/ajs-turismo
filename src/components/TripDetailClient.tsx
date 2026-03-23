@@ -311,10 +311,10 @@ function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
 
           <button type="submit" disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base disabled:opacity-60">
-            {loading ? "Salvando..." : "Enviar pelo WhatsApp"}
+            {loading ? "Salvando..." : "Manifestar interesse pelo WhatsApp"}
           </button>
           <p className="text-center text-xs text-gray-400">
-            Dados salvos para próximas reservas. Abriremos o WhatsApp com tudo preenchido.
+            Seus dados são salvos e abriremos o WhatsApp com tudo preenchido. Nossa equipe entrará em contato para confirmar a reserva.
           </p>
         </form>
       </div>
