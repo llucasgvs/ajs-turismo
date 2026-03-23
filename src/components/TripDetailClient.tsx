@@ -69,11 +69,11 @@ function buildWhatsAppMessage(
   };
 
   let msg =
-    `🧳 *Interesse em reserva — ${trip.title}*\n` +
-    `📍 ${trip.destination}\n` +
-    `🗓️ Saída: ${fmt(trip.departure_date.slice(0, 10))}\n` +
-    `🔢 Código: ${bookingCode}\n\n` +
-    `👤 *Titular:*\n` +
+    `*Interesse em reserva -- ${trip.title}*\n` +
+    `Destino: ${trip.destination}\n` +
+    `Saida: ${fmt(trip.departure_date.slice(0, 10))}\n` +
+    `Codigo: ${bookingCode}\n\n` +
+    `*Titular:*\n` +
     `   Nome: ${user.full_name}\n` +
     `   CPF: ${cpf}\n` +
     `   Nascimento: ${fmt(birthDate)}\n` +
@@ -81,15 +81,15 @@ function buildWhatsAppMessage(
 
   companions.forEach((c, i) => {
     msg +=
-      `\n👥 *Acompanhante ${i + 1}:*\n` +
+      `\n*Acompanhante ${i + 1}:*\n` +
       `   Nome: ${c.full_name}\n` +
       `   CPF: ${c.cpf}\n` +
       `   Nascimento: ${fmt(c.birth_date)}\n`;
   });
 
-  msg += `\n📋 *Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
-  msg += `💰 *Valor estimado:* R$ ${(people * trip.price_per_person).toLocaleString("pt-BR")}`;
-  if (note) msg += `\n\n📝 Observação: ${note}`;
+  msg += `\n*Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
+  msg += `*Valor estimado:* R$ ${(people * trip.price_per_person).toLocaleString("pt-BR")}`;
+  if (note) msg += `\n\nObservacao: ${note}`;
 
   return msg;
 }
@@ -97,30 +97,26 @@ function buildWhatsAppMessage(
 /* ─── BookingModal ─── */
 function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const [user] = useState<StoredUser | null>(getStoredUser);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [phone, setPhone] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [birthDate, setBirthDate] = useState("");
+  const [fullName, setFullName] = useState(user?.full_name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [cpf, setCpf] = useState(user?.cpf || "");
+  const [birthDate, setBirthDate] = useState(user?.birth_date || "");
   const [people, setPeople] = useState(1);
   const [companions, setCompanions] = useState<CompanionForm[]>([]);
   const [note, setNote] = useState("");
 
   useEffect(() => {
-    const u = getStoredUser();
-    if (!u) {
+    if (!user) {
       const redirect = encodeURIComponent(window.location.pathname);
       router.push(`/login?redirect=${redirect}`);
       onClose();
-      return;
     }
-    setUser(u);
-    setPhone(u.phone || "");
-    setCpf(u.cpf || "");
-    setBirthDate(u.birth_date || "");
-  }, [router, onClose]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const needed = people - 1;
@@ -156,7 +152,7 @@ function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       await fetch(`${API}/auth/me`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ phone, cpf, birth_date: birthDate }),
+        body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
       });
 
       const bookingRes = await fetch(`${API}/bookings/`, {
@@ -177,9 +173,8 @@ function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       }
 
       const booking = await bookingRes.json();
-      localStorage.setItem("ajs_user", JSON.stringify({ ...user, phone, cpf, birth_date: birthDate }));
-
-      const msg = buildWhatsAppMessage(trip, user, phone, cpf, birthDate, people, companions, note, booking.booking_code);
+      localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
+      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);
       window.open(`https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
       onClose();
     } catch {
@@ -228,11 +223,12 @@ function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
           <div className="bg-navy-50 rounded-xl p-4 space-y-3">
             <p className="text-xs font-bold text-navy-700 uppercase tracking-wide">Seus dados (titular)</p>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Nome completo</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Nome completo *</label>
               <div className="relative">
                 <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={user.full_name} readOnly
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-500" />
+                <input type="text" required placeholder="Nome completo" value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
               </div>
             </div>
             <div>
