@@ -31,7 +31,8 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("ajs_token", data.access_token);
-      window.location.href = "/dashboard";
+      localStorage.setItem("ajs_user", JSON.stringify(data.user));
+      window.location.href = data.user.is_admin ? "/admin" : "/dashboard";
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
