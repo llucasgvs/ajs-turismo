@@ -9,7 +9,7 @@ export default function WhatsAppFloat() {
   return (
     <div className="whatsapp-float">
       {showTooltip && (
-        <div className="absolute bottom-full right-0 mb-3 bg-white rounded-2xl shadow-card-hover p-4 w-64 animate-fade-up">
+        <div className="absolute bottom-full right-0 mb-3 bg-white rounded-2xl shadow-card-hover p-4 w-56 sm:w-64 animate-fade-up">
           <button
             onClick={() => setShowTooltip(false)}
             className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
@@ -28,7 +28,7 @@ export default function WhatsAppFloat() {
       )}
 
       <a
-        href="https://wa.me/5541998348766?text=Olá! Gostaria de saber mais sobre os pacotes de viagem da AJS Turismo."
+        href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda."
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center justify-center w-14 h-14 bg-[#25D366] hover:bg-[#20BA5A] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"

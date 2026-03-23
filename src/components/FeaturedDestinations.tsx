@@ -102,17 +102,13 @@ export default function FeaturedDestinations() {
                     </p>
                   </div>
 
-                  {dest.id ? (
-                    <Link href={`/viagens/${dest.id}`} className="flex items-center gap-1.5 text-navy-600 hover:text-gold-500 font-semibold text-sm transition-colors group/btn">
-                      Ver pacote
-                      <ArrowRight size={15} className="transition-transform group-hover/btn:translate-x-1" />
-                    </Link>
-                  ) : (
-                    <button className="flex items-center gap-1.5 text-navy-600 hover:text-gold-500 font-semibold text-sm transition-colors group/btn">
-                      Ver pacote
-                      <ArrowRight size={15} className="transition-transform group-hover/btn:translate-x-1" />
-                    </button>
-                  )}
+                  <Link
+                    href={dest.id ? `/viagens/${dest.id}` : "/viagens"}
+                    className="flex items-center gap-1.5 text-navy-600 hover:text-gold-500 font-semibold text-sm transition-colors group/btn"
+                  >
+                    Ver pacote
+                    <ArrowRight size={15} className="transition-transform group-hover/btn:translate-x-1" />
+                  </Link>
                 </div>
               </div>
             </div>

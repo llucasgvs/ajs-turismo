@@ -101,7 +101,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone size={15} className="text-gold-400 flex-shrink-0" />
-                <a href="tel:+5541998348766" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
+                <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20tirar%20uma%20d%C3%BAvida." target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-gold-400 text-sm transition-colors">
                   (41) 99834-8766
                 </a>
               </li>

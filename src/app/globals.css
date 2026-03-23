@@ -132,10 +132,14 @@ body {
   bottom: 24px;
   right: 24px;
   z-index: 1000;
-  animation: pulseGold 2s ease-in-out infinite;
+  border-radius: 9999px;
 }
 
-@keyframes pulseGold {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
-  50% { box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }
+.whatsapp-float > a {
+  animation: waPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes waPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.5); }
+  60% { box-shadow: 0 0 0 14px rgba(37, 211, 102, 0); }
 }

@@ -81,8 +81,8 @@ export default function HowItWorks() {
         </div>
 
         {/* CTA Banner */}
-        <div className="mt-14 md:mt-16 bg-hero-gradient rounded-2xl p-8 md:p-12 text-center">
-          <h3 className="font-display font-black text-2xl md:text-3xl text-white mb-3">
+        <div className="mt-14 md:mt-16 bg-hero-gradient rounded-2xl p-6 sm:p-8 md:p-12 text-center">
+          <h3 className="font-display font-black text-xl sm:text-2xl md:text-3xl text-white mb-3">
             Pronto para começar?
           </h3>
           <p className="text-white/70 mb-8 max-w-xl mx-auto">
@@ -96,7 +96,7 @@ export default function HowItWorks() {
               Ver Pacotes Agora
             </button>
             <a
-              href="https://wa.me/5541998348766"
+              href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20falar%20com%20um%20especialista."
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary py-3.5 px-8 inline-flex items-center justify-center gap-2"

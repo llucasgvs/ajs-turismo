@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Map, LogOut, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList } from "lucide-react";
 import { getUser, logout } from "@/lib/api";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/viagens", label: "Viagens", icon: Map },
+  { href: "/admin/reservas", label: "Reservas", icon: ClipboardList },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

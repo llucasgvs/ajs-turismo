@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X, Phone } from "lucide-react";
+import { Menu, X, MessageCircle } from "lucide-react";
+
+const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20de%20viagem.";
 
 const navLinks = [
   { label: "Destinos", href: "#destinos" },
@@ -18,8 +20,9 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
+    const handleScroll = () => setScrolled(window.scrollY > 40);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -34,8 +37,8 @@ export default function Navbar() {
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? "bg-navy-700/98 backdrop-blur-md shadow-lg py-2"
-            : "bg-transparent py-4"
+            ? "bg-navy-900 shadow-lg py-2"
+            : "bg-gradient-to-b from-black/50 to-transparent py-4"
         }`}
       >
         <div className="container-custom">
@@ -63,7 +66,7 @@ export default function Navbar() {
                 <button
                   key={link.href}
                   onClick={() => handleNavClick(link.href)}
-                  className="text-white/80 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all duration-200 text-sm"
+                  className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
                 >
                   {link.label}
                 </button>
@@ -73,10 +76,12 @@ export default function Navbar() {
             {/* Desktop CTA */}
             <div className="hidden lg:flex items-center gap-3">
               <a
-                href="tel:+5541998348766"
-                className="flex items-center gap-2 text-white/80 hover:text-gold-400 transition-colors text-sm"
+                href={WA_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-white/90 hover:text-gold-400 transition-colors text-sm"
               >
-                <Phone size={15} />
+                <MessageCircle size={15} />
                 <span>(41) 99834-8766</span>
               </a>
               <Link href="/login" className="btn-secondary py-2 px-4 text-sm">
@@ -104,23 +109,25 @@ export default function Navbar() {
             isOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
           }`}
         >
-          <div className="bg-navy-700/98 backdrop-blur-md border-t border-white/10 py-4">
+          <div className="bg-navy-900 border-t border-white/10 py-4">
             <div className="container-custom flex flex-col gap-1">
               {navLinks.map((link) => (
                 <button
                   key={link.href}
                   onClick={() => handleNavClick(link.href)}
-                  className="text-white/80 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
+                  className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
                 >
                   {link.label}
                 </button>
               ))}
               <div className="border-t border-white/10 mt-2 pt-4 flex flex-col gap-3">
                 <a
-                  href="tel:+5541998348766"
-                  className="flex items-center gap-2 text-white/80 px-4 text-sm"
+                  href={WA_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-white/90 px-4 text-sm"
                 >
-                  <Phone size={15} />
+                  <MessageCircle size={15} />
                   <span>(41) 99834-8766</span>
                 </a>
                 <Link href="/login" className="btn-secondary text-center mx-0">

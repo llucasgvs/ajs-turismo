@@ -175,7 +175,7 @@ export default function FeaturedPackages() {
                       <ArrowRight size={16} />
                     </Link>
                   ) : (
-                    <a href="https://wa.me/5541998348766" target="_blank" rel="noopener noreferrer" className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
+                    <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20dispon%C3%ADveis." target="_blank" rel="noopener noreferrer" className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
                       Reservar agora
                       <ArrowRight size={16} />
                     </a>

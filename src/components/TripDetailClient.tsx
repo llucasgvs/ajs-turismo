@@ -95,40 +95,31 @@ function buildWhatsAppMessage(
 }
 
 /* ─── BookingModal ─── */
-function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
-  const router = useRouter();
-  const [user] = useState<StoredUser | null>(getStoredUser);
+// Só é montado quando o usuário já está confirmado (auth check no pai)
+function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [fullName, setFullName] = useState(user?.full_name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [cpf, setCpf] = useState(user?.cpf || "");
-  const [birthDate, setBirthDate] = useState(user?.birth_date || "");
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const [phone, setPhone] = useState(user.phone || "");
+  const [cpf, setCpf] = useState(user.cpf || "");
+  const [birthDate, setBirthDate] = useState(user.birth_date || "");
   const [people, setPeople] = useState(1);
   const [companions, setCompanions] = useState<CompanionForm[]>([]);
   const [note, setNote] = useState("");
-
-  useEffect(() => {
-    if (!user) {
-      const redirect = encodeURIComponent(window.location.pathname);
-      router.push(`/login?redirect=${redirect}`);
-      onClose();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const needed = people - 1;
     setCompanions((prev) => {
       if (prev.length === needed) return prev;
       if (prev.length < needed)
-        return [...prev, ...Array(needed - prev.length).fill({ full_name: "", cpf: "", birth_date: "" })];
+        return [
+          ...prev,
+          ...Array.from({ length: needed - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" })),
+        ];
       return prev.slice(0, needed);
     });
   }, [people]);
-
-  if (!user) return null;
 
   const updateCompanion = (i: number, field: keyof CompanionForm, val: string) =>
     setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
@@ -326,9 +317,18 @@ function BookingModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [showBooking, setShowBooking] = useState(false);
+  const [bookingUser, setBookingUser] = useState<StoredUser | null>(null);
 
   const sold = trip.available_spots === 0 || trip.status === "sold_out";
+
+  const handleOpenBooking = () => {
+    const u = getStoredUser();
+    if (!u) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+    } else {
+      setBookingUser(u);
+    }
+  };
   const allImages = [...(trip.image_url ? [trip.image_url] : []), ...(trip.gallery || [])].filter(Boolean);
   const departureDate = new Date(trip.departure_date);
   const returnDate = new Date(trip.return_date);
@@ -336,7 +336,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {showBooking && <BookingModal trip={trip} onClose={() => setShowBooking(false)} />}
+      {bookingUser && (
+        <BookingModal trip={trip} user={bookingUser} onClose={() => setBookingUser(null)} />
+      )}
 
       {/* Back nav */}
       <div className="bg-white border-b border-gray-100 px-4 py-3">
@@ -505,7 +507,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       className="block text-center text-sm text-emerald-600 hover:text-emerald-700 font-medium">Entrar na lista de espera →</a>
                   </div>
                 ) : (
-                  <button onClick={() => setShowBooking(true)}
+                  <button onClick={() => handleOpenBooking()}
                     className="block w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl text-center transition-colors text-lg">
                     Reservar agora
                   </button>
@@ -518,7 +520,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               <div className="bg-navy-800 rounded-2xl p-5 text-white">
                 <p className="font-bold mb-1 text-sm">Precisa de ajuda?</p>
                 <p className="text-navy-300 text-xs mb-3">Nossa equipe responde em minutos pelo WhatsApp</p>
-                <a href="https://wa.me/5541998348766" target="_blank" rel="noopener noreferrer"
+                <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda%20com%20uma%20viagem." target="_blank" rel="noopener noreferrer"
                   className="block text-center text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors">(41) 99834-8766</a>
               </div>
             </div>
@@ -537,7 +539,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               Entrar na lista de espera
             </a>
           ) : (
-            <button onClick={() => setShowBooking(true)}
+            <button onClick={() => handleOpenBooking()}
               className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-xl transition-colors text-lg">
               Quero reservar agora
             </button>

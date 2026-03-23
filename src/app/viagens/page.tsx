@@ -148,7 +148,7 @@ export default function ViagensPage() {
           <p className="text-lg font-medium mb-2">Não encontrou o que procura?</p>
           <p className="text-navy-300 text-sm mb-6">Fale com nossa equipe e monte o pacote ideal para você</p>
           <a
-            href="https://wa.me/5541998348766"
+            href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20n%C3%A3o%20encontrei%20o%20pacote%20que%20procuro.%20Pode%20me%20ajudar%3F"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-6 py-3 rounded-xl transition-colors"

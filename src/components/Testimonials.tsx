@@ -101,7 +101,7 @@ export default function Testimonials() {
 
         {/* Main testimonial */}
         <div className="max-w-3xl mx-auto">
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-12 text-center relative">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6 sm:p-8 md:p-12 text-center relative">
             {/* Quote icon */}
             <div className="absolute top-6 left-6 text-gold-400/30">
               <Quote size={48} />
@@ -128,7 +128,7 @@ export default function Testimonials() {
               </div>
               <div className="text-left">
                 <p className="text-white font-bold">{t.name}</p>
-                <p className="text-white/50 text-sm">{t.location} · {t.trip} · {t.date}</p>
+                <p className="text-white/50 text-xs sm:text-sm break-words">{t.location} · {t.trip} · {t.date}</p>
               </div>
             </div>
           </div>

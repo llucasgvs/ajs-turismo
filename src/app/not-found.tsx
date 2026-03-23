@@ -39,7 +39,7 @@ export default function NotFound() {
       </div>
 
       <a
-        href="https://wa.me/5541998348766"
+        href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda."
         target="_blank"
         rel="noopener noreferrer"
         className="mt-8 text-sm text-gray-400 hover:text-emerald-600 transition-colors"
