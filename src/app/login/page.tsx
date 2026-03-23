@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "";
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
@@ -32,7 +35,8 @@ export default function LoginPage() {
 
       localStorage.setItem("ajs_token", data.access_token);
       localStorage.setItem("ajs_user", JSON.stringify(data.user));
-      window.location.href = data.user.is_admin ? "/admin" : "/dashboard";
+      const dest = redirectTo || (data.user.is_admin ? "/admin" : "/dashboard");
+      window.location.href = dest;
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
@@ -175,7 +179,10 @@ export default function LoginPage() {
           {/* Register */}
           <p className="text-center text-gray-500 text-sm">
             Ainda não tem conta?{" "}
-            <Link href="/cadastro" className="text-navy-600 hover:text-gold-600 font-bold transition-colors">
+            <Link
+              href={redirectTo ? `/cadastro?redirect=${encodeURIComponent(redirectTo)}` : "/cadastro"}
+              className="text-navy-600 hover:text-gold-600 font-bold transition-colors"
+            >
               Criar conta grátis
             </Link>
           </p>

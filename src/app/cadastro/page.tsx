@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Loader2, Check } from "lucide-react";
 
 export default function CadastroPage() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "";
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -59,7 +62,10 @@ export default function CadastroPage() {
         return;
       }
 
-      setSuccess(true);
+      localStorage.setItem("ajs_token", data.access_token);
+      localStorage.setItem("ajs_user", JSON.stringify(data.user));
+      const dest = redirectTo || (data.user.is_admin ? "/admin" : "/dashboard");
+      window.location.href = dest;
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
