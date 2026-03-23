@@ -109,7 +109,7 @@ export default function CadastroPage() {
         <div className="absolute inset-0 flex flex-col justify-between p-12">
           <Link href="/" className="flex items-center gap-3">
             <div className="relative w-12 h-12">
-              <Image src="/logo2.jpeg" alt="AJS Turismo" fill className="object-contain" />
+              <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
             </div>
             <div>
               <span className="font-display font-black text-white text-2xl">AJS</span>
@@ -142,7 +142,7 @@ export default function CadastroPage() {
       <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-16 xl:px-20 bg-white overflow-y-auto">
         <Link href="/" className="flex items-center gap-3 mb-8 lg:hidden">
           <div className="relative w-10 h-10">
-            <Image src="/logo2.jpeg" alt="AJS Turismo" fill className="object-contain" />
+            <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
           </div>
           <span className="font-display font-black text-navy-700 text-xl">AJS Turismo</span>
         </Link>

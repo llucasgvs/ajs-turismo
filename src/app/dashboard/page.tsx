@@ -34,11 +34,10 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-100 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-9 h-9">
-              <Image src="/logo2.jpeg" alt="AJS" fill className="object-contain" />
+          <Link href="/" className="flex items-center">
+            <div className="relative h-10 w-40">
+              <Image src="/logo2_sem_fundo.png" alt="AJS Turismo" fill className="object-contain object-left" />
             </div>
-            <span className="font-display font-black text-navy-700 text-lg">AJS Turismo</span>
           </Link>
           <button
             onClick={logout}

@@ -43,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-5 border-b border-navy-700">
           <Link href="/admin" className="flex items-center gap-3">
             <div className="relative w-9 h-9 flex-shrink-0">
-              <Image src="/logo2.jpeg" alt="AJS" fill className="object-contain rounded-lg" />
+              <Image src="/icon_ajs.png" alt="AJS" fill className="object-contain rounded-lg" />
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-tight">AJS Turismo</p>

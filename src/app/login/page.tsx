@@ -60,7 +60,7 @@ export default function LoginPage() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
             <div className="relative w-12 h-12">
-              <Image src="/logo2.jpeg" alt="AJS Turismo" fill className="object-contain" />
+              <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
             </div>
             <div>
               <span className="font-display font-black text-white text-2xl">AJS</span>
@@ -83,10 +83,11 @@ export default function LoginPage() {
         {/* Mobile logo */}
         <Link href="/" className="flex items-center gap-3 mb-10 lg:hidden">
           <div className="relative w-10 h-10">
-            <Image src="/logo2.jpeg" alt="AJS Turismo" fill className="object-contain" />
+            <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
           </div>
           <div>
-            <span className="font-display font-black text-navy-700 text-xl">AJS Turismo</span>
+            <span className="font-display font-black text-navy-700 text-xl">AJS</span>
+            <span className="text-gold-500 text-xs block tracking-[0.2em] uppercase -mt-1">Turismo</span>
           </div>
         </Link>
 

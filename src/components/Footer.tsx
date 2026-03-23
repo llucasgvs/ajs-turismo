@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <div className="relative w-10 h-10">
-                <Image src="/logo2.jpeg" alt="AJS Turismo" fill className="object-contain" />
+                <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
               </div>
               <div>
                 <span className="font-display font-black text-white text-xl">AJS</span>

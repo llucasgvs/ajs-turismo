@@ -47,7 +47,7 @@ export default function Navbar() {
             <Link href="/" className="flex items-center gap-3 flex-shrink-0">
               <div className="relative w-10 h-10 md:w-12 md:h-12">
                 <Image
-                  src="/logo2.jpeg"
+                  src="/icon_ajs.png"
                   alt="AJS Turismo"
                   fill
                   className="object-contain"
