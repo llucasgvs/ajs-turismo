@@ -11,11 +11,10 @@ import { useLoading } from "@/components/LoadingProvider";
 const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20de%20viagem.";
 
 const navLinks = [
-  { label: "Destinos", href: "#destinos" },
-  { label: "Pacotes", href: "#pacotes" },
-  { label: "Como Funciona", href: "#como-funciona" },
-  { label: "Depoimentos", href: "#depoimentos" },
-  { label: "Contato", href: "#contato" },
+  { label: "Viagens", href: "/viagens" },
+  { label: "Como Funciona", href: "/#como-funciona" },
+  { label: "Depoimentos", href: "/#depoimentos" },
+  { label: "Contato", href: "/#contato" },
 ];
 
 export default function Navbar() {
@@ -34,8 +33,10 @@ export default function Navbar() {
 
   const handleNavClick = (href: string) => {
     setIsOpen(false);
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+    if (href.startsWith("#")) {
+      const el = document.querySelector(href);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   return (
@@ -79,15 +80,25 @@ export default function Navbar() {
 
             {/* Desktop Nav */}
             <div className="hidden lg:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <button
-                  key={link.href}
-                  onClick={() => handleNavClick(link.href)}
-                  className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
-                >
-                  {link.label}
-                </button>
-              ))}
+              {navLinks.map((link) =>
+                link.href.startsWith("#") ? (
+                  <button
+                    key={link.href}
+                    onClick={() => handleNavClick(link.href)}
+                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
+                  >
+                    {link.label}
+                  </Link>
+                )
+              )}
             </div>
 
             {/* Desktop CTA */}
@@ -143,15 +154,26 @@ export default function Navbar() {
         >
           <div className="bg-navy-900 border-t border-white/10 py-4">
             <div className="container-custom flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <button
-                  key={link.href}
-                  onClick={() => handleNavClick(link.href)}
-                  className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
-                >
-                  {link.label}
-                </button>
-              ))}
+              {navLinks.map((link) =>
+                link.href.startsWith("#") ? (
+                  <button
+                    key={link.href}
+                    onClick={() => handleNavClick(link.href)}
+                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsOpen(false)}
+                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
+                  >
+                    {link.label}
+                  </Link>
+                )
+              )}
               <div className="border-t border-white/10 mt-2 pt-4 flex flex-col gap-3">
                 {user ? (
                   <>

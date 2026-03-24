@@ -225,7 +225,7 @@ export default function ViagensPage() {
             {!loading && (
               <p className="text-gray-500 text-sm">
                 <span className="font-bold text-navy-700">{filtered.length}</span>{" "}
-                viagem{filtered.length !== 1 ? "s" : ""} encontrada{filtered.length !== 1 ? "s" : ""}
+                {filtered.length !== 1 ? "viagens" : "viagem"} encontrada{filtered.length !== 1 ? "s" : ""}
                 {search && (
                   <span> para <strong>&ldquo;{search}&rdquo;</strong></span>
                 )}

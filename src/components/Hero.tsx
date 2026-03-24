@@ -110,13 +110,13 @@ export default function Hero() {
               isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <button
-              onClick={() => document.querySelector("#pacotes")?.scrollIntoView({ behavior: "smooth" })}
+            <Link
+              href="/viagens"
               className="btn-primary flex items-center justify-center gap-2 py-4 px-8 text-base"
             >
-              Ver Pacotes Disponíveis
+              Ver Viagens Disponíveis
               <ArrowRight size={18} />
-            </button>
+            </Link>
             <a
               href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20de%20viagem."
               target="_blank"

@@ -89,12 +89,12 @@ export default function HowItWorks() {
             Mais de 5.000 famílias já viajaram com a AJS Turismo. Junte-se a eles!
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => document.querySelector("#pacotes")?.scrollIntoView({ behavior: "smooth" })}
+            <a
+              href="/viagens"
               className="btn-primary py-3.5 px-8 inline-flex items-center justify-center gap-2"
             >
-              Ver Pacotes Agora
-            </button>
+              Ver Viagens Agora
+            </a>
             <a
               href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20falar%20com%20um%20especialista."
               target="_blank"
