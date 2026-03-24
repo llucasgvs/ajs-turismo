@@ -20,14 +20,17 @@ interface Booking {
   final_amount: number;
   status: string;
   created_at: string;
+  trip_title?: string;
+  trip_destination?: string;
+  trip_departure_date?: string;
 }
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700" },
-  pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700" },
-  confirmed:  { label: "Confirmado", color: "bg-emerald-100 text-emerald-700" },
-  cancelled:  { label: "Cancelado",  color: "bg-red-100 text-red-700" },
-  completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600" },
+const STATUS_LABEL: Record<string, { label: string; color: string; border: string }> = {
+  interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700",    border: "border-l-amber-400" },
+  pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700",      border: "border-l-blue-400" },
+  confirmed:  { label: "Confirmado", color: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-400" },
+  cancelled:  { label: "Cancelado",  color: "bg-red-100 text-red-700",        border: "border-l-red-400" },
+  completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600",      border: "border-l-gray-300" },
 };
 
 const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20minha%20reserva.";
@@ -179,26 +182,61 @@ export default function Dashboard() {
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="p-4 md:p-5 flex flex-col gap-3">
               {bookings.map((b) => {
-                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
+                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+                const departureDate = (() => {
+                  if (!b.trip_departure_date) return null;
+                  const d = new Date(b.trip_departure_date);
+                  if (isNaN(d.getTime())) return null;
+                  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+                })();
+                const isInteresse = b.status === "interesse";
                 return (
-                  <div key={b.id} className="p-4 md:p-5 flex items-start gap-3">
-                    <div className="w-9 h-9 bg-navy-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Calendar size={16} className="text-navy-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-mono text-xs text-navy-500 font-semibold tracking-wide">{b.booking_code}</p>
-                        <span className={`shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full ${st.color}`}>
-                          {st.label}
-                        </span>
+                  <div key={b.id} className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 transition-all duration-200 hover:bg-white hover:shadow-md hover:-translate-y-0.5 cursor-default`}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <p className="font-bold text-navy-800 text-sm truncate">
+                          {b.trip_title ?? "Viagem"}
+                        </p>
+                        {b.trip_destination && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                            <MapPin size={10} />
+                            {b.trip_destination}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-gray-400 text-xs">{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
-                        <span className="font-bold text-navy-700 text-sm">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
-                      </div>
+                      <span className={`shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full ${st.color}`}>
+                        {st.label}
+                      </span>
                     </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+                      <span className="font-mono text-navy-400">{b.booking_code}</span>
+                      {departureDate && (
+                        <>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Calendar size={10} />
+                            {departureDate}
+                          </span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
+                      {!isInteresse && (
+                        <>
+                          <span>·</span>
+                          <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {isInteresse && (
+                      <p className="mt-2 text-xs text-amber-600">
+                        Aguardando confirmação pela equipe AJS
+                      </p>
+                    )}
                   </div>
                 );
               })}
