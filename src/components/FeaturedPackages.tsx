@@ -95,95 +95,100 @@ export default function FeaturedPackages() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {displayed.map((pkg, i) => (
-            <div key={pkg.id || i} className="card flex flex-col">
-              <div className="relative h-52 overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pkg.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"}
-                  alt={pkg.title}
-                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          {displayed.map((pkg, i) => {
+            const inner = (
+              <>
+                <div className="relative h-52 overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pkg.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"}
+                    alt={pkg.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                {pkg.tag && (
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gold-500 text-navy-900">
-                    <Star size={11} fill="currentColor" />
-                    {pkg.tag}
-                  </div>
-                )}
-
-                <div className="absolute bottom-3 left-3 right-3">
-                  <h3 className="font-display font-black text-xl text-white">{pkg.title}</h3>
-                  <div className="flex items-center gap-1.5 text-white/80 text-sm">
-                    <MapPin size={12} />
-                    {pkg.destination}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 flex flex-col flex-1">
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
-                    <Clock size={11} />
-                    {pkg.duration_nights + 1} dias / {pkg.duration_nights} noites
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
-                    <Users size={11} />
-                    Mín. {pkg.min_group_size} {pkg.min_group_size === 1 ? "pessoa" : "pessoas"}
-                  </div>
-                </div>
-
-                <ul className="space-y-2 mb-5 flex-1">
-                  {pkg.includes.slice(0, 4).map((item, j) => (
-                    <li key={j} className="flex items-start gap-2 text-gray-600 text-sm">
-                      <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="border-t border-gray-100 pt-4">
-                  <div className="flex items-end justify-between mb-3">
-                    <div>
-                      {pkg.original_price && (
-                        <p className="text-xs text-gray-400 line-through">
-                          R$ {pkg.original_price.toLocaleString("pt-BR")}
-                        </p>
-                      )}
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xs text-gray-500">a partir de</span>
-                        <span className="font-display font-black text-2xl text-navy-700">
-                          R$ {pkg.price_per_person.toLocaleString("pt-BR")}
-                        </span>
-                      </div>
-                      <p className="text-xs text-emerald-600 font-medium">
-                        ou {pkg.max_installments}x de R${" "}
-                        {Math.ceil(pkg.price_per_person / pkg.max_installments).toLocaleString("pt-BR")} sem juros
-                      </p>
+                  {pkg.tag && (
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gold-500 text-navy-900">
+                      <Star size={11} fill="currentColor" />
+                      {pkg.tag}
                     </div>
-                    {pkg.original_price && (
-                      <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-lg">
-                        -{Math.round((1 - pkg.price_per_person / pkg.original_price) * 100)}% OFF
-                      </div>
-                    )}
+                  )}
+
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <h3 className="font-display font-black text-xl text-white">{pkg.title}</h3>
+                    <div className="flex items-center gap-1.5 text-white/80 text-sm">
+                      <MapPin size={12} />
+                      {pkg.destination}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 flex flex-col flex-1">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
+                      <Clock size={11} />
+                      {pkg.duration_nights + 1} dias / {pkg.duration_nights} noites
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
+                      <Users size={11} />
+                      Mín. {pkg.min_group_size} {pkg.min_group_size === 1 ? "pessoa" : "pessoas"}
+                    </div>
                   </div>
 
-                  {pkg.id ? (
-                    <Link href={`/viagens/${pkg.id}`} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-                      Ver pacote completo
+                  <ul className="space-y-2 mb-5 flex-1">
+                    {pkg.includes.slice(0, 4).map((item, j) => (
+                      <li key={j} className="flex items-start gap-2 text-gray-600 text-sm">
+                        <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-end justify-between mb-3">
+                      <div>
+                        {pkg.original_price && (
+                          <p className="text-xs text-gray-400 line-through">
+                            R$ {pkg.original_price.toLocaleString("pt-BR")}
+                          </p>
+                        )}
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs text-gray-500">a partir de</span>
+                          <span className="font-display font-black text-2xl text-navy-700">
+                            R$ {pkg.price_per_person.toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-600 font-medium">
+                          ou {pkg.max_installments}x de R${" "}
+                          {Math.ceil(pkg.price_per_person / pkg.max_installments).toLocaleString("pt-BR")} sem juros
+                        </p>
+                      </div>
+                      {pkg.original_price && (
+                        <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-lg">
+                          -{Math.round((1 - pkg.price_per_person / pkg.original_price) * 100)}% OFF
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
+                      {pkg.id ? "Ver pacote completo" : "Reservar agora"}
                       <ArrowRight size={16} />
-                    </Link>
-                  ) : (
-                    <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20dispon%C3%ADveis." target="_blank" rel="noopener noreferrer" className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-                      Reservar agora
-                      <ArrowRight size={16} />
-                    </a>
-                  )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              </>
+            );
+
+            return pkg.id ? (
+              <Link key={pkg.id || i} href={`/viagens/${pkg.id}`} className="card flex flex-col group cursor-pointer">
+                {inner}
+              </Link>
+            ) : (
+              <a key={i} href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20dispon%C3%ADveis." target="_blank" rel="noopener noreferrer" className="card flex flex-col group cursor-pointer">
+                {inner}
+              </a>
+            );
+          })}
         </div>
 
         <p className="text-center text-gray-400 text-sm mt-8">

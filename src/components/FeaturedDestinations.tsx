@@ -60,7 +60,11 @@ export default function FeaturedDestinations() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
           {displayed.map((dest, i) => (
-            <div key={dest.id || i} className="card group cursor-pointer">
+            <Link
+              key={dest.id || i}
+              href={dest.id ? `/viagens/${dest.id}` : "/viagens"}
+              className="card group cursor-pointer block"
+            >
               <div className="relative h-52 sm:h-56 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -102,16 +106,13 @@ export default function FeaturedDestinations() {
                     </p>
                   </div>
 
-                  <Link
-                    href={dest.id ? `/viagens/${dest.id}` : "/viagens"}
-                    className="flex items-center gap-1.5 text-navy-600 hover:text-gold-500 font-semibold text-sm transition-colors group/btn"
-                  >
+                  <span className="flex items-center gap-1.5 text-navy-600 group-hover:text-gold-500 font-semibold text-sm transition-colors">
                     Ver pacote
-                    <ArrowRight size={15} className="transition-transform group-hover/btn:translate-x-1" />
-                  </Link>
+                    <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
