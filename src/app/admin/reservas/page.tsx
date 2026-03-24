@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil } from "lucide-react";
 import { getToken } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -55,11 +55,12 @@ function buildWaUrl(phone: string, name: string, code: string) {
 }
 
 /* ─── Booking Detail Modal ─── */
-function BookingDetailModal({ booking, trip, onClose, onConfirm, onCancel, actionLoading }: {
+function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, actionLoading }: {
   booking: Booking;
   trip: Trip | undefined;
   onClose: () => void;
   onConfirm: (code: string) => void;
+  onEdit: (booking: Booking) => void;
   onCancel: (code: string) => void;
   actionLoading: string | null;
 }) {
@@ -203,13 +204,17 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onCancel, actio
           <div className="p-4 border-t border-gray-100 flex gap-2">
             {booking.status === "interesse" && (
               <button onClick={() => { onConfirm(booking.booking_code); onClose(); }} disabled={isLoading}
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50">
-                <Check size={15} /> Confirmar reserva
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
+                <Check size={14} /> Confirmar
               </button>
             )}
+            <button onClick={() => { onEdit(booking); onClose(); }} disabled={isLoading}
+              className="flex-1 flex items-center justify-center gap-2 border border-navy-300 text-navy-700 bg-navy-50 hover:bg-navy-100 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
+              <Pencil size={14} /> Editar
+            </button>
             <button onClick={() => { onCancel(booking.booking_code); onClose(); }} disabled={isLoading}
-              className={`flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 ${booking.status === "interesse" ? "px-5" : "flex-1"}`}>
-              <X size={15} /> Cancelar
+              className="flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
+              <X size={14} />
             </button>
           </div>
         )}
@@ -217,6 +222,235 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onCancel, actio
     </div>
   );
 }
+
+/* ─── Edit Booking Modal ─── */
+function EditBookingModal({ booking, onClose, onSaved }: {
+  booking: Booking;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  type Companion = { full_name: string; cpf: string; birth_date: string };
+
+  const parsedCompanions: Companion[] = (() => {
+    try { return booking.travelers_info ? JSON.parse(booking.travelers_info) : []; }
+    catch { return []; }
+  })();
+
+  const [price, setPrice] = useState(String(booking.price_per_person));
+  const [discount, setDiscount] = useState(String(booking.discount_amount || ""));
+  const [paymentMethod, setPaymentMethod] = useState(booking.payment_method || "whatsapp");
+  const [notes, setNotes] = useState(booking.notes || "");
+  const [phone, setPhone] = useState(booking.traveler_phone || "");
+  const [people, setPeople] = useState(booking.num_travelers);
+  const [companions, setCompanions] = useState<Companion[]>(
+    parsedCompanions.length > 0
+      ? parsedCompanions
+      : Array.from({ length: Math.max(0, booking.num_travelers - 1) }, () => ({ full_name: "", cpf: "", birth_date: "" }))
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const formatCPF = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  };
+
+  const formatPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  };
+
+  const changePeople = (n: number) => {
+    const clamped = Math.max(1, n);
+    setPeople(clamped);
+    setCompanions((prev) => {
+      const need = clamped - 1;
+      if (need > prev.length) return [...prev, ...Array.from({ length: need - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" }))];
+      return prev.slice(0, need);
+    });
+  };
+
+  const updateCompanion = (i: number, field: keyof Companion, value: string) => {
+    setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
+  };
+
+  const priceNum = parseFloat(price) || 0;
+  const discNum = parseFloat(discount) || 0;
+  const total = priceNum * people - discNum;
+  const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0) || people !== booking.num_travelers;
+
+  const PAYMENT_LABEL: Record<string, string> = {
+    whatsapp: "Presencial / WhatsApp", pix: "PIX", transfer: "Transferência", credit_card: "Cartão de crédito",
+  };
+
+  const handleSave = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/bookings/${booking.booking_code}/edit`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await import("@/lib/api")).getToken()}` },
+        body: JSON.stringify({
+          price_per_person: priceNum !== booking.price_per_person ? priceNum : undefined,
+          discount_amount: discNum,
+          payment_method: paymentMethod,
+          notes: notes || null,
+          traveler_phone: phone || undefined,
+          num_travelers: people,
+          companions: companions.map((c) => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date || undefined })),
+        }),
+      });
+      if (!res.ok) { const e = await res.json(); setError(e.detail || "Erro ao salvar."); return; }
+      onSaved();
+      onClose();
+    } catch { setError("Erro de conexão."); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h3 className="font-bold text-navy-800 text-base flex items-center gap-2"><Pencil size={15} /> Editar Reserva</h3>
+            <p className="text-xs text-gray-400 font-mono mt-0.5">{booking.booking_code} · {booking.traveler_name || `Usuário #${booking.user_id}`}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
+
+          {/* Preço + Desconto */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Preço / pessoa</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
+                  className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${priceNum !== booking.price_per_person ? "border-amber-300 bg-amber-50" : "border-gray-200"}`} />
+              </div>
+              {priceNum !== booking.price_per_person && <p className="text-[10px] text-amber-600 mt-1">Original: R$ {booking.price_per_person.toLocaleString("pt-BR")}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Desconto <span className="text-gray-400 font-normal normal-case">(R$)</span></label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                <input type="number" min="0" step="0.01" placeholder="0" value={discount} onChange={(e) => setDiscount(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* Pessoas + Pagamento */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pessoas</label>
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
+                <button type="button" onClick={() => changePeople(people - 1)}
+                  className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                <span className="flex-1 text-center font-bold text-sm text-navy-800">{people}</span>
+                <button type="button" onClick={() => changePeople(people + 1)}
+                  className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pagamento</label>
+              <div className="relative">
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer">
+                  {Object.entries(PAYMENT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* Telefone */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Telefone do titular</label>
+            <div className="relative">
+              <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="tel" placeholder="(41) 99999-9999" value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+            </div>
+          </div>
+
+          {/* Acompanhantes */}
+          {companions.length > 0 && (
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Users size={11} /> Acompanhantes ({companions.length})
+              </label>
+              {companions.map((c, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400">Acompanhante {i + 1}</p>
+                  <div className="relative">
+                    <User size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="text" placeholder="Nome completo" value={c.full_name}
+                      onChange={(e) => updateCompanion(i, "full_name", e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <CreditCard size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="text" inputMode="numeric" placeholder="CPF" value={c.cpf}
+                        onChange={(e) => updateCompanion(i, "cpf", formatCPF(e.target.value))}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                    </div>
+                    <div className="relative">
+                      <Cake size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="date" value={c.birth_date}
+                        onChange={(e) => updateCompanion(i, "birth_date", e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Observações */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Observações</label>
+            <div className="relative">
+              <FileText size={13} className="absolute left-3 top-3 text-gray-400" />
+              <textarea rows={2} placeholder="Observações (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)}
+                className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 resize-none" />
+            </div>
+          </div>
+
+          {/* Total */}
+          <div className={`rounded-xl px-4 py-3 flex items-center justify-between text-sm ${changed ? "bg-amber-50 border border-amber-200" : "bg-navy-50"}`}>
+            <span className="text-gray-500">{people} × R$ {priceNum.toLocaleString("pt-BR")}{discNum > 0 ? ` − R$ ${discNum.toLocaleString("pt-BR")}` : ""}</span>
+            <span className="font-black text-navy-800 text-base">R$ {total.toLocaleString("pt-BR")}</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-500 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={loading}
+            className="flex-1 bg-navy-800 hover:bg-navy-700 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Salvando...</> : <><Check size={15} /> Salvar alterações</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ─── External Sale Modal ─── */
 function ExternalSaleModal({ trips, onClose, onSaved }: {
@@ -554,6 +788,7 @@ export default function AdminReservasPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showExternal, setShowExternal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [tripFilter, setTripFilter] = useState<string>("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -586,11 +821,13 @@ export default function AdminReservasPage() {
   }, []);
 
   const confirm = async (code: string) => {
+    // Used only from BookingDetailModal (no price adjust)
     setActionLoading(code);
     try {
       await fetch(`${API}/bookings/${code}/confirm`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({}),
       });
       fetchBookings();
     } finally {
@@ -647,9 +884,18 @@ export default function AdminReservasPage() {
           booking={selectedBooking}
           trip={tripMap[selectedBooking.trip_id]}
           onClose={() => setSelectedBooking(null)}
-          onConfirm={confirm}
+          onConfirm={(code) => { confirm(code); setSelectedBooking(null); }}
+          onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
           onCancel={cancel}
           actionLoading={actionLoading}
+        />
+      )}
+
+      {editTarget && (
+        <EditBookingModal
+          booking={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={fetchBookings}
         />
       )}
 
@@ -765,20 +1011,22 @@ export default function AdminReservasPage() {
                     <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                   </div>
                   {/* Actions */}
-                  {(b.status === "interesse" || ["interesse", "confirmed", "pending"].includes(b.status)) && (
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  {["interesse", "confirmed", "pending"].includes(b.status) && (
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {b.status === "interesse" && (
                         <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
-                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
                           <Check size={11} /> Confirmar
                         </button>
                       )}
-                      {["interesse", "confirmed", "pending"].includes(b.status) && (
-                        <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
-                          className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                          <X size={11} /> Cancelar
-                        </button>
-                      )}
+                      <button onClick={() => setEditTarget(b)} disabled={isLoading}
+                        className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                        <Pencil size={11} /> Editar
+                      </button>
+                      <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
+                        className="flex items-center justify-center border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 rounded-lg transition-colors disabled:opacity-50">
+                        <X size={11} />
+                      </button>
                     </div>
                   )}
                 </div>
