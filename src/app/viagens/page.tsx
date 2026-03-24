@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
-  MapPin, Clock, Search, ArrowRight, SlidersHorizontal,
+  MapPin, Clock, Search, ArrowRight,
   X, Star, Users, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check,
 } from "lucide-react";
 
@@ -30,27 +30,11 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WA_URL =
   "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20n%C3%A3o%20encontrei%20o%20pacote%20que%20procuro.%20Pode%20me%20ajudar%3F";
 
-const CATEGORIES = [
-  { value: "", label: "Todos", icon: "🌎", match: [] },
-  { value: "praia", label: "Praia", icon: "🏖️", match: ["praia", "nordeste"] },
-  { value: "serra", label: "Serra", icon: "⛰️", match: ["serra"] },
-  { value: "aventura", label: "Aventura", icon: "🧗", match: ["aventura"] },
-  { value: "cultural", label: "Cultural", icon: "🏛️", match: ["cultural"] },
-  { value: "internacional", label: "Internacional", icon: "✈️", match: ["internacional"] },
-];
-
 const SORT_OPTIONS = [
   { value: "date_asc", label: "Mais próximos" },
   { value: "price_asc", label: "Menor preço" },
   { value: "price_desc", label: "Maior preço" },
   { value: "discount", label: "Maior desconto" },
-];
-
-const DURATION_OPTIONS = [
-  { value: "", label: "Qualquer duração" },
-  { value: "1-5", label: "Até 5 dias" },
-  { value: "6-8", label: "6 a 8 dias" },
-  { value: "9-99", label: "9 dias ou mais" },
 ];
 
 function sortTrips(trips: Trip[], sort: string): Trip[] {
@@ -73,19 +57,16 @@ export default function ViagensPage() {
   const [filtered, setFiltered] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
   const [sort, setSort] = useState("date_asc");
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [durationFilter, setDurationFilter] = useState("");
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [calViewMode, setCalViewMode] = useState<"datas" | "meses">("datas");
   const [calMonth, setCalMonth] = useState(() => {
     const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() };
   });
   const [showWhenPicker, setShowWhenPicker] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const whenRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +79,34 @@ export default function ViagensPage() {
       if (d) map[d] = (map[d] || 0) + 1;
     });
     return map;
+  }, [trips]);
+
+  const tripsByMonth = useMemo(() => {
+    const map: Record<string, number> = {};
+    trips.forEach((t) => {
+      const m = t.departure_date?.slice(0, 7);
+      if (m) map[m] = (map[m] || 0) + 1;
+    });
+    return map;
+  }, [trips]);
+
+  const nextMonths = useMemo(() => {
+    const months: { key: string; label: string }[] = [];
+    // Encontra o mês da última viagem cadastrada
+    const lastTripMonth = trips.reduce((last, t) => {
+      const m = t.departure_date?.slice(0, 7);
+      return m && m > last ? m : last;
+    }, "");
+    if (!lastTripMonth) return months;
+    const d = new Date();
+    d.setDate(1);
+    const end = new Date(lastTripMonth + "-01");
+    while (d <= end) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      months.push({ key, label: `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}` });
+      d.setMonth(d.getMonth() + 1);
+    }
+    return months;
   }, [trips]);
 
   const fetchTrips = useCallback(() => {
@@ -114,7 +123,6 @@ export default function ViagensPage() {
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilters(false);
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSortMenu(false);
       if (whenRef.current && !whenRef.current.contains(e.target as Node)) setShowWhenPicker(false);
     };
@@ -124,10 +132,6 @@ export default function ViagensPage() {
 
   useEffect(() => {
     let result = trips;
-    if (category) {
-      const match = CATEGORIES.find((c) => c.value === category)?.match ?? [category];
-      result = result.filter((t) => match.includes(t.category));
-    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -137,17 +141,10 @@ export default function ViagensPage() {
           (t.short_description || "").toLowerCase().includes(q)
       );
     }
-    if (durationFilter) {
-      const [min, max] = durationFilter.split("-").map(Number);
-      result = result.filter((t) => {
-        const days = t.duration_nights + 1;
-        return days >= min && days <= max;
-      });
-    }
     if (selectedDate) result = result.filter((t) => t.departure_date?.slice(0, 10) === selectedDate);
-    if (onlyAvailable) result = result.filter((t) => t.available_spots > 0 && t.status !== "sold_out");
+    if (selectedMonth) result = result.filter((t) => t.departure_date?.slice(0, 7) === selectedMonth);
     setFiltered(sortTrips(result, sort));
-  }, [trips, category, search, sort, durationFilter, selectedDate, onlyAvailable]);
+  }, [trips, search, sort, selectedDate, selectedMonth]);
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -157,17 +154,13 @@ export default function ViagensPage() {
 
   const clearFilters = () => {
     setSearch("");
-    setCategory("");
     setSort("date_asc");
-    setDurationFilter("");
     setSelectedDate("");
-    setOnlyAvailable(false);
+    setSelectedMonth("");
   };
 
-  const activeFilterCount = [category, durationFilter, selectedDate, onlyAvailable ? "1" : ""].filter(Boolean).length;
-  const hasFilters = !!(search || category || durationFilter || selectedDate || onlyAvailable);
+  const hasFilters = !!(search || selectedDate || selectedMonth);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
-  const durationLabelShort = DURATION_OPTIONS.find((o) => o.value === durationFilter)?.label;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden">
@@ -241,15 +234,17 @@ export default function ViagensPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Quando</p>
-                <p className={`text-sm font-medium truncate ${selectedDate ? "text-navy-800" : "text-gray-400"}`}>
+                <p className={`text-sm font-medium truncate ${(selectedDate || selectedMonth) ? "text-navy-800" : "text-gray-400"}`}>
                   {selectedDate
                     ? new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })
+                    : selectedMonth
+                    ? `${MONTHS_PT[parseInt(selectedMonth.split("-")[1]) - 1]} ${selectedMonth.split("-")[0]}`
                     : "Selecionar data"}
                 </p>
               </div>
-              {selectedDate ? (
+              {(selectedDate || selectedMonth) ? (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedDate(""); }}
+                  onClick={(e) => { e.stopPropagation(); setSelectedDate(""); setSelectedMonth(""); }}
                   className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
                 >
                   <X size={11} className="text-gray-500" />
@@ -259,81 +254,120 @@ export default function ViagensPage() {
               )}
             </button>
 
-            {/* Calendar dropdown — fora do overflow */}
+            {/* Calendar dropdown — mobile first */}
             {showWhenPicker && (
-              <div className="absolute left-0 top-full mt-3 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-gray-100 z-50 p-5 w-80">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-gray-100 z-50 p-4 sm:left-0 sm:right-auto sm:w-80">
+
+                {/* Tabs: Datas / Meses */}
+                <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
                   <button
-                    onClick={() => setCalMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setCalViewMode("datas")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${calViewMode === "datas" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500"}`}
                   >
-                    <ChevronLeft size={16} />
+                    Datas
                   </button>
-                  <span className="text-sm font-black text-navy-900 tracking-tight">
-                    {MONTHS_PT[calMonth.month]} {calMonth.year}
-                  </span>
                   <button
-                    onClick={() => setCalMonth(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setCalViewMode("meses")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${calViewMode === "meses" ? "bg-white text-navy-900 shadow-sm" : "text-gray-500"}`}
                   >
-                    <ChevronRight size={16} />
+                    Meses
                   </button>
                 </div>
 
-                {/* Week days */}
-                <div className="grid grid-cols-7 mb-2">
-                  {WEEK_DAYS.map((d, i) => (
-                    <div key={i} className="text-center text-[10px] font-black text-gray-400 uppercase tracking-wider py-1">{d}</div>
-                  ))}
-                </div>
-
-                {/* Days grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {getCalendarDays(calMonth.year, calMonth.month).map((day, i) => {
-                    if (!day) return <div key={i} />;
-                    const dateStr = toDateStr(calMonth.year, calMonth.month, day);
-                    const count = tripsByDate[dateStr] || 0;
-                    const isSelected = selectedDate === dateStr;
-                    const isPast = dateStr < today;
-                    const hasTrips = count > 0 && !isPast;
-                    return (
+                {calViewMode === "datas" ? (
+                  <>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-3">
                       <button
-                        key={i}
-                        disabled={!hasTrips}
-                        onClick={() => { setSelectedDate(isSelected ? "" : dateStr); setShowWhenPicker(false); }}
-                        title={hasTrips ? `${count} viagem${count > 1 ? "s" : ""} disponível${count > 1 ? "s" : ""}` : undefined}
-                        className={`relative flex flex-col items-center justify-center rounded-xl aspect-square text-xs font-semibold transition-all duration-150 ${
-                          isSelected
-                            ? "bg-navy-800 text-white shadow-md scale-105"
-                            : hasTrips
-                            ? "text-navy-800 hover:bg-navy-50 cursor-pointer"
-                            : isPast
-                            ? "text-gray-200 cursor-default"
-                            : "text-gray-300 cursor-default"
-                        }`}
+                        onClick={() => setCalMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
                       >
-                        {day}
-                        {hasTrips && (
-                          <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-gold-400" : "bg-gold-500"}`} />
-                        )}
+                        <ChevronLeft size={16} />
                       </button>
-                    );
-                  })}
-                </div>
+                      <span className="text-sm font-black text-navy-900 tracking-tight">
+                        {MONTHS_PT[calMonth.month]} {calMonth.year}
+                      </span>
+                      <button
+                        onClick={() => setCalMonth(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                    {/* Week days */}
+                    <div className="grid grid-cols-7 mb-1">
+                      {WEEK_DAYS.map((d, i) => (
+                        <div key={i} className="text-center text-[10px] font-black text-gray-400 uppercase tracking-wider py-1">{d}</div>
+                      ))}
+                    </div>
+                    {/* Days grid */}
+                    <div className="grid grid-cols-7 gap-0.5">
+                      {getCalendarDays(calMonth.year, calMonth.month).map((day, i) => {
+                        if (!day) return <div key={i} />;
+                        const dateStr = toDateStr(calMonth.year, calMonth.month, day);
+                        const count = tripsByDate[dateStr] || 0;
+                        const isSelected = selectedDate === dateStr;
+                        const isPast = dateStr < today;
+                        const hasTrips = count > 0 && !isPast;
+                        return (
+                          <button
+                            key={i}
+                            disabled={!hasTrips}
+                            onClick={() => { setSelectedDate(isSelected ? "" : dateStr); setSelectedMonth(""); setShowWhenPicker(false); }}
+                            className={`relative flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-semibold transition-all duration-150 ${
+                              isSelected ? "bg-navy-800 text-white shadow-sm" :
+                              hasTrips ? "text-navy-800 hover:bg-navy-50 cursor-pointer" :
+                              isPast ? "text-gray-200 cursor-default" : "text-gray-300 cursor-default"
+                            }`}
+                          >
+                            {day}
+                            {hasTrips && (
+                              <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? "bg-gold-400" : "bg-gold-500"}`} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold-500 flex-shrink-0" />
+                      <span className="text-xs text-gray-400">Dias com saídas disponíveis</span>
+                    </div>
+                  </>
+                ) : (
+                  /* Meses grid */
+                  <div className="grid grid-cols-2 gap-2">
+                    {nextMonths.map(({ key, label }) => {
+                      const count = tripsByMonth[key] || 0;
+                      const isSelected = selectedMonth === key;
+                      return (
+                        <button
+                          key={key}
+                          disabled={count === 0}
+                          onClick={() => { setSelectedMonth(isSelected ? "" : key); setSelectedDate(""); setShowWhenPicker(false); }}
+                          className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all ${
+                            isSelected ? "bg-navy-800 border-navy-800 text-white" :
+                            count > 0 ? "border-gray-200 hover:border-navy-300 hover:bg-navy-50 text-navy-800" :
+                            "border-gray-100 text-gray-300 cursor-default"
+                          }`}
+                        >
+                          <span className="text-xs font-bold leading-tight">{label}</span>
+                          {count > 0 && (
+                            <span className={`text-[10px] mt-0.5 ${isSelected ? "text-gold-300" : "text-gold-500"}`}>
+                              {count} viagem{count > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                {/* Legend */}
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
-                  <span className="w-2 h-2 rounded-full bg-gold-500 flex-shrink-0" />
-                  <span className="text-xs text-gray-400">Dias com viagens disponíveis</span>
-                </div>
-
-                {selectedDate && (
+                {(selectedDate || selectedMonth) && (
                   <button
-                    onClick={() => setSelectedDate("")}
-                    className="mt-2 w-full text-center text-xs text-gray-400 hover:text-red-500 transition-colors py-1"
+                    onClick={() => { setSelectedDate(""); setSelectedMonth(""); }}
+                    className="mt-3 w-full text-center text-xs text-gray-400 hover:text-red-500 transition-colors py-1"
                   >
-                    Limpar data selecionada
+                    Limpar seleção
                   </button>
                 )}
               </div>
@@ -356,104 +390,19 @@ export default function ViagensPage() {
       {/* ── MAIN CONTENT ── */}
       <main className="flex-1 w-full container-custom py-8">
 
-        {/* ── Filter bar: Filtros + Sort sempre visíveis ── */}
-        <div className="flex items-center justify-between gap-3 mb-4">
-          {/* Filtros button */}
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border transition-all ${
-                activeFilterCount > 0
-                  ? "bg-navy-900 text-white border-navy-900 shadow-sm"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm"
-              }`}
-            >
-              <SlidersHorizontal size={14} />
-              Filtros
-              {activeFilterCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-white text-navy-900 text-xs font-black flex items-center justify-center leading-none">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-
-            {/* Filter dropdown */}
-            {showFilters && (
-              <div className="absolute left-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 w-80 max-w-[calc(100vw-2rem)] p-5 overflow-y-auto max-h-[80vh]">
-                {/* Category */}
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Categoria</p>
-                <div className="flex flex-wrap gap-1.5 mb-5">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.value}
-                      onClick={() => setCategory(cat.value)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                        category === cat.value
-                          ? "bg-navy-900 text-white border-navy-900"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <span>{cat.icon}</span>{cat.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Duration */}
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Duração</p>
-                <div className="flex flex-col gap-1.5 mb-5">
-                  {DURATION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setDurationFilter(opt.value)}
-                      className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-sm transition-all ${
-                        durationFilter === opt.value
-                          ? "bg-navy-50 text-navy-800 font-semibold"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {opt.label}
-                      {durationFilter === opt.value && <Check size={14} className="text-navy-700" />}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Only available */}
-                <div className="border-t border-gray-100 pt-4">
-                  <button
-                    onClick={() => setOnlyAvailable(!onlyAvailable)}
-                    className="flex items-center justify-between w-full"
-                  >
-                    <span className="text-sm font-medium text-gray-700">Apenas com vagas disponíveis</span>
-                    <div className={`w-10 h-6 rounded-full transition-all duration-200 relative flex-shrink-0 ${onlyAvailable ? "bg-navy-800" : "bg-gray-200"}`}>
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${onlyAvailable ? "left-5" : "left-1"}`} />
-                    </div>
-                  </button>
-                </div>
-
-                {activeFilterCount > 0 && (
-                  <button
-                    onClick={() => { setCategory(""); setDurationFilter(""); setSelectedDate(""); setOnlyAvailable(false); }}
-                    className="mt-4 w-full text-center text-sm text-red-500 hover:text-red-600 font-medium py-2"
-                  >
-                    Limpar filtros avançados
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
+        {/* ── Filter bar: Sort ── */}
+        <div className="flex items-center mb-4">
           {/* Sort button */}
-          <div className="relative flex-shrink-0" ref={sortRef}>
+          <div className="relative" ref={sortRef}>
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all whitespace-nowrap"
             >
               <ChevronDown size={14} className={`transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
-              <span className="hidden sm:inline">{sortLabel}</span>
-              <span className="sm:hidden">Ordenar</span>
+              {sortLabel}
             </button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[180px] overflow-hidden">
+              <div className="absolute left-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[180px] overflow-hidden">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -474,14 +423,8 @@ export default function ViagensPage() {
         </div>
 
         {/* Active filter chips */}
-        {(category || durationFilter || onlyAvailable) && (
+        {(selectedDate || selectedMonth) && (
           <div className="flex items-center gap-2 flex-wrap mb-4 pt-1">
-            {category && (
-              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                {CATEGORIES.find(c => c.value === category)?.icon} {CATEGORIES.find(c => c.value === category)?.label}
-                <button onClick={() => setCategory("")}><X size={11} /></button>
-              </span>
-            )}
             {selectedDate && (
               <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
                 <Calendar size={10} />
@@ -489,16 +432,11 @@ export default function ViagensPage() {
                 <button onClick={() => setSelectedDate("")}><X size={11} /></button>
               </span>
             )}
-            {durationFilter && (
+            {selectedMonth && (
               <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                {durationLabelShort}
-                <button onClick={() => setDurationFilter("")}><X size={11} /></button>
-              </span>
-            )}
-            {onlyAvailable && (
-              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                Com vagas
-                <button onClick={() => setOnlyAvailable(false)}><X size={11} /></button>
+                <Calendar size={10} />
+                {MONTHS_PT[parseInt(selectedMonth.split("-")[1]) - 1]} {selectedMonth.split("-")[0]}
+                <button onClick={() => setSelectedMonth("")}><X size={11} /></button>
               </span>
             )}
           </div>

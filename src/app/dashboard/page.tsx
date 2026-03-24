@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { LogOut, User, MapPin, Calendar, ChevronRight } from "lucide-react";
+import { LogOut, User, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 
 interface StoredUser {
@@ -30,9 +30,13 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600" },
 };
 
+const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20minha%20reserva.";
+
 export default function Dashboard() {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const u = getUser();
@@ -46,7 +50,17 @@ export default function Dashboard() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   if (!user) return null;
+
+  const firstName = user.full_name.split(" ")[0];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,13 +76,63 @@ export default function Dashboard() {
               <span className="text-gold-500 text-[10px] font-semibold tracking-[0.2em] uppercase -mt-0.5">Turismo</span>
             </div>
           </Link>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
-          >
-            <LogOut size={15} />
-            <span className="hidden sm:inline">Sair</span>
-          </button>
+
+          {/* Menu dropdown */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm transition-all text-sm font-medium text-gray-700"
+            >
+              {showMenu ? <X size={16} /> : <Menu size={16} />}
+              <span className="hidden sm:inline">{firstName}</span>
+              <div className="w-7 h-7 rounded-full bg-navy-100 flex items-center justify-center">
+                <User size={14} className="text-navy-600" />
+              </div>
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 w-56 overflow-hidden">
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-bold text-navy-800 truncate">{user.full_name}</p>
+                  <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="py-1.5">
+                  <Link
+                    href="/viagens"
+                    onClick={() => setShowMenu(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Search size={15} className="text-gray-400 flex-shrink-0" />
+                    Explorar viagens
+                  </Link>
+                  <a
+                    href={WA_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShowMenu(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <MessageCircle size={15} className="text-green-500 flex-shrink-0" />
+                    Entrar em contato
+                  </a>
+                </div>
+
+                {/* Logout */}
+                <div className="border-t border-gray-100 py-1.5">
+                  <button
+                    onClick={() => { setShowMenu(false); logout(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut size={15} className="flex-shrink-0" />
+                    Sair da conta
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
