@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-const SESSION_KEY = "ajs_waf_seen";
 const CLOSED_KEY = "ajs_waf_closed";
 
 export default function WhatsAppFloat({ bottomOffset = 0 }: { bottomOffset?: number }) {
@@ -16,16 +15,10 @@ export default function WhatsAppFloat({ bottomOffset = 0 }: { bottomOffset?: num
       setVisible(false);
       return;
     }
-    // Tooltip: só mostra 1x por sessão, após 40s na página
-    if (sessionStorage.getItem(SESSION_KEY)) return;
+    // Tooltip: aparece após 40s na página
     const timer = setTimeout(() => setShowTooltip(true), 40_000);
     return () => clearTimeout(timer);
   }, []);
-
-  const dismissTooltip = () => {
-    setShowTooltip(false);
-    sessionStorage.setItem(SESSION_KEY, "1");
-  };
 
   const closeFloat = () => {
     setShowTooltip(false);
@@ -42,7 +35,7 @@ export default function WhatsAppFloat({ bottomOffset = 0 }: { bottomOffset?: num
       {showTooltip && (
         <div className="absolute bottom-full right-0 mb-3 bg-white rounded-2xl shadow-card-hover p-4 w-56 sm:w-64 animate-fade-up">
           <button
-            onClick={dismissTooltip}
+            onClick={closeFloat}
             className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
           >
             <X size={14} />
@@ -56,15 +49,6 @@ export default function WhatsAppFloat({ bottomOffset = 0 }: { bottomOffset?: num
           <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white rotate-45 shadow-sm" />
         </div>
       )}
-
-      {/* Botão X para fechar o float */}
-      <button
-        onClick={closeFloat}
-        className="absolute -top-1.5 -left-1.5 w-5 h-5 bg-gray-500 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-md transition-colors z-10"
-        aria-label="Fechar"
-      >
-        <X size={10} />
-      </button>
 
       <a
         href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda."
