@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   MapPin, Clock, Search, ArrowRight, SlidersHorizontal,
-  X, Star, Users, Calendar, ChevronDown, Plane,
+  X, Star, Users, Calendar, ChevronDown, Plane, Check,
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Navbar from "@/components/Navbar";
@@ -17,13 +16,12 @@ const WA_URL =
   "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20n%C3%A3o%20encontrei%20o%20pacote%20que%20procuro.%20Pode%20me%20ajudar%3F";
 
 const CATEGORIES = [
-  { value: "", label: "Todos", icon: "🌎" },
-  { value: "praia", label: "Praia", icon: "🏖️" },
-  { value: "nordeste", label: "Nordeste", icon: "☀️" },
-  { value: "serra", label: "Serra", icon: "⛰️" },
-  { value: "aventura", label: "Aventura", icon: "🧗" },
-  { value: "cultural", label: "Cultural", icon: "🏛️" },
-  { value: "internacional", label: "Internacional", icon: "✈️" },
+  { value: "", label: "Todos", icon: "🌎", match: [] },
+  { value: "praia", label: "Praia", icon: "🏖️", match: ["praia", "nordeste"] },
+  { value: "serra", label: "Serra", icon: "⛰️", match: ["serra"] },
+  { value: "aventura", label: "Aventura", icon: "🧗", match: ["aventura"] },
+  { value: "cultural", label: "Cultural", icon: "🏛️", match: ["cultural"] },
+  { value: "internacional", label: "Internacional", icon: "✈️", match: ["internacional"] },
 ];
 
 const SORT_OPTIONS = [
@@ -31,6 +29,13 @@ const SORT_OPTIONS = [
   { value: "price_asc", label: "Menor preço" },
   { value: "price_desc", label: "Maior preço" },
   { value: "discount", label: "Maior desconto" },
+];
+
+const DURATION_OPTIONS = [
+  { value: "", label: "Qualquer duração" },
+  { value: "1-5", label: "Até 5 dias" },
+  { value: "6-8", label: "6 a 8 dias" },
+  { value: "9-99", label: "9 dias ou mais" },
 ];
 
 function sortTrips(trips: Trip[], sort: string): Trip[] {
@@ -53,10 +58,15 @@ export default function ViagensPage() {
   const [filtered, setFiltered] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState("date_asc");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [durationFilter, setDurationFilter] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
 
   const fetchTrips = useCallback(() => {
     setLoading(true);
@@ -69,9 +79,22 @@ export default function ViagensPage() {
 
   useEffect(() => { fetchTrips(); }, [fetchTrips]);
 
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilters(false);
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSortMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   useEffect(() => {
     let result = trips;
-    if (category) result = result.filter((t) => t.category === category);
+    if (category) {
+      const match = CATEGORIES.find((c) => c.value === category)?.match ?? [category];
+      result = result.filter((t) => match.includes(t.category));
+    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -81,23 +104,35 @@ export default function ViagensPage() {
           (t.short_description || "").toLowerCase().includes(q)
       );
     }
+    if (durationFilter) {
+      const [min, max] = durationFilter.split("-").map(Number);
+      result = result.filter((t) => {
+        const days = t.duration_nights + 1;
+        return days >= min && days <= max;
+      });
+    }
+    if (onlyAvailable) result = result.filter((t) => t.available_spots > 0 && t.status !== "sold_out");
     setFiltered(sortTrips(result, sort));
-  }, [trips, category, search, sort]);
+  }, [trips, category, search, sort, durationFilter, onlyAvailable]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(val), 300);
   };
 
   const clearFilters = () => {
     setSearch("");
-    setSearchInput("");
     setCategory("");
     setSort("date_asc");
+    setDurationFilter("");
+    setOnlyAvailable(false);
   };
 
-  const hasFilters = search || category;
+  const activeFilterCount = [category, durationFilter, onlyAvailable ? "1" : ""].filter(Boolean).length;
+  const hasFilters = !!(search || category || durationFilter || onlyAvailable);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
+  const durationLabelShort = DURATION_OPTIONS.find((o) => o.value === durationFilter)?.label;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden">
@@ -105,7 +140,6 @@ export default function ViagensPage() {
 
       {/* ── HERO ── */}
       <section className="relative pt-20 overflow-hidden">
-        {/* Background */}
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -115,8 +149,6 @@ export default function ViagensPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-900/80 to-navy-900" />
         </div>
-
-        {/* Decorative dots */}
         <div
           className="absolute inset-0 opacity-5"
           style={{
@@ -124,13 +156,11 @@ export default function ViagensPage() {
             backgroundSize: "32px 32px",
           }}
         />
-
         <div className="relative container-custom py-16 md:py-20 text-center">
           <div className="inline-flex items-center gap-2 bg-gold-500/20 border border-gold-500/30 text-gold-400 text-xs font-semibold px-4 py-2 rounded-full mb-6">
             <Plane size={12} />
             Saindo de Curitiba — PR
           </div>
-
           <h1 className="font-display font-black text-4xl md:text-6xl text-white mb-4 leading-tight">
             Explore Nossas <span className="text-gold-400">Viagens</span>
           </h1>
@@ -138,80 +168,141 @@ export default function ViagensPage() {
             Pacotes completos com os melhores destinos nacionais e internacionais. Preços acessíveis, atendimento personalizado e parcelamento em até 12x sem juros.
           </p>
 
-          {/* Search bar */}
-          <form
-            onSubmit={handleSearch}
-            className="flex flex-col sm:flex-row gap-2 max-w-2xl mx-auto"
-          >
-            <div className="relative flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-              <input
-                className="w-full pl-11 pr-4 py-3.5 bg-transparent text-white placeholder-white/50 text-sm focus:outline-none"
-                placeholder="Buscar destino, pacote ou categoria..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn-primary px-6 py-3.5 text-sm flex items-center justify-center gap-2"
-            >
-              <Search size={15} />
-              Buscar
-            </button>
-          </form>
+          {/* Live search */}
+          <div className="relative max-w-2xl mx-auto">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
+            <input
+              className="w-full pl-11 pr-12 py-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl text-white placeholder-white/50 text-sm focus:outline-none focus:border-gold-400/60 focus:bg-white/15 transition-all"
+              placeholder="Buscar destino, pacote ou categoria..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-b from-transparent to-gray-50" />
       </section>
 
       {/* ── MAIN CONTENT ── */}
-      <main className="flex-1 w-full container-custom py-10">
+      <main className="flex-1 w-full container-custom py-8">
 
-        {/* Filters bar — pills + sort na mesma linha com scroll horizontal */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 w-full min-w-0">
-          <SlidersHorizontal size={15} className="text-gray-400 flex-shrink-0" />
-          {CATEGORIES.map((cat) => (
+        {/* ── Filter bar: Filtros + Sort sempre visíveis ── */}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          {/* Filtros button */}
+          <div className="relative" ref={filterRef}>
             <button
-              key={cat.value}
-              onClick={() => setCategory(cat.value)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                category === cat.value
-                  ? "bg-navy-800 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:bg-navy-50 hover:text-navy-700 border border-gray-200"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border transition-all ${
+                activeFilterCount > 0
+                  ? "bg-navy-900 text-white border-navy-900 shadow-sm"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm"
               }`}
             >
-              <span>{cat.icon}</span>
-              {cat.label}
+              <SlidersHorizontal size={14} />
+              Filtros
+              {activeFilterCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-white text-navy-900 text-xs font-black flex items-center justify-center leading-none">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-          ))}
 
-          {/* Divider */}
-          <div className="w-px h-5 bg-gray-200 flex-shrink-0 mx-1" />
+            {/* Filter dropdown */}
+            {showFilters && (
+              <div className="absolute left-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 w-80 max-w-[calc(100vw-2rem)] p-5 overflow-y-auto max-h-[80vh]">
+                {/* Category */}
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Categoria</p>
+                <div className="flex flex-wrap gap-1.5 mb-5">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setCategory(cat.value)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                        category === cat.value
+                          ? "bg-navy-900 text-white border-navy-900"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <span>{cat.icon}</span>{cat.label}
+                    </button>
+                  ))}
+                </div>
 
-          {/* Sort */}
-          <div className="relative flex-shrink-0">
+                {/* Duration */}
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Duração</p>
+                <div className="flex flex-col gap-1.5 mb-5">
+                  {DURATION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setDurationFilter(opt.value)}
+                      className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-sm transition-all ${
+                        durationFilter === opt.value
+                          ? "bg-navy-50 text-navy-800 font-semibold"
+                          : "text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {opt.label}
+                      {durationFilter === opt.value && <Check size={14} className="text-navy-700" />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Only available */}
+                <div className="border-t border-gray-100 pt-4">
+                  <button
+                    onClick={() => setOnlyAvailable(!onlyAvailable)}
+                    className="flex items-center justify-between w-full"
+                  >
+                    <span className="text-sm font-medium text-gray-700">Apenas com vagas disponíveis</span>
+                    <div className={`w-10 h-6 rounded-full transition-all duration-200 relative flex-shrink-0 ${onlyAvailable ? "bg-navy-800" : "bg-gray-200"}`}>
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${onlyAvailable ? "left-5" : "left-1"}`} />
+                    </div>
+                  </button>
+                </div>
+
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => { setCategory(""); setDurationFilter(""); setOnlyAvailable(false); }}
+                    className="mt-4 w-full text-center text-sm text-red-500 hover:text-red-600 font-medium py-2"
+                  >
+                    Limpar filtros avançados
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sort button */}
+          <div className="relative flex-shrink-0" ref={sortRef}>
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
-              className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-full hover:border-navy-300 transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all whitespace-nowrap"
             >
-              {sortLabel}
-              <ChevronDown size={13} className={`transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
+              <ChevronDown size={14} className={`transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
+              <span className="hidden sm:inline">{sortLabel}</span>
+              <span className="sm:hidden">Ordenar</span>
             </button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[160px] overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[180px] overflow-hidden">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => { setSort(opt.value); setShowSortMenu(false); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between gap-3 ${
                       sort === opt.value
-                        ? "bg-navy-50 text-navy-700 font-semibold"
+                        ? "bg-navy-50 text-navy-800 font-semibold"
                         : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     {opt.label}
+                    {sort === opt.value && <Check size={13} className="text-navy-700 flex-shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -219,29 +310,45 @@ export default function ViagensPage() {
           </div>
         </div>
 
-        {/* Active filters + count */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3 flex-wrap">
-            {!loading && (
-              <p className="text-gray-500 text-sm">
-                <span className="font-bold text-navy-700">{filtered.length}</span>{" "}
-                {filtered.length !== 1 ? "viagens" : "viagem"} encontrada{filtered.length !== 1 ? "s" : ""}
-                {search && (
-                  <span> para <strong>&ldquo;{search}&rdquo;</strong></span>
-                )}
-              </p>
+        {/* Active filter chips */}
+        {(category || durationFilter || onlyAvailable) && (
+          <div className="flex items-center gap-2 flex-wrap mb-4 pt-1">
+            {category && (
+              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                {CATEGORIES.find(c => c.value === category)?.icon} {CATEGORIES.find(c => c.value === category)?.label}
+                <button onClick={() => setCategory("")}><X size={11} /></button>
+              </span>
             )}
+            {durationFilter && (
+              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                {durationLabelShort}
+                <button onClick={() => setDurationFilter("")}><X size={11} /></button>
+              </span>
+            )}
+            {onlyAvailable && (
+              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                Com vagas
+                <button onClick={() => setOnlyAvailable(false)}><X size={11} /></button>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Count row */}
+        {!loading && (
+          <div className="flex items-center gap-3 py-2 mb-4 border-b border-gray-200">
+            <p className="text-sm text-gray-500">
+              <span className="font-bold text-navy-800">{filtered.length}</span>{" "}
+              {filtered.length !== 1 ? "viagens" : "viagem"} encontrada{filtered.length !== 1 ? "s" : ""}
+              {search && <span> para <strong>&ldquo;{search}&rdquo;</strong></span>}
+            </p>
             {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-medium bg-red-50 px-3 py-1 rounded-full transition-colors"
-              >
-                <X size={11} />
-                Limpar filtros
+              <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors">
+                Limpar tudo
               </button>
             )}
           </div>
-        </div>
+        )}
 
         {/* Grid */}
         {loading ? (
@@ -327,7 +434,6 @@ function TripCard({ trip }: { trip: Trip }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
 
-        {/* Top-left: tag badge */}
         {trip.tag && (
           <div className="absolute top-2.5 left-2.5">
             <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-xs font-bold px-2.5 py-1 rounded-full">
@@ -337,7 +443,6 @@ function TripCard({ trip }: { trip: Trip }) {
           </div>
         )}
 
-        {/* Top-right: status + discount */}
         <div className="absolute top-2.5 right-2.5 flex flex-col gap-1 items-end">
           {sold ? (
             <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">Esgotado</span>
@@ -349,7 +454,6 @@ function TripCard({ trip }: { trip: Trip }) {
           )}
         </div>
 
-        {/* Bottom-left: destination pill */}
         <div className="absolute bottom-2.5 left-2.5">
           <div className="inline-flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 max-w-[180px]">
             <MapPin size={10} className="text-gold-400 flex-shrink-0" />
@@ -360,7 +464,6 @@ function TripCard({ trip }: { trip: Trip }) {
 
       {/* Body */}
       <div className="p-4 flex flex-col flex-1">
-        {/* Title — in body for proper width constraint */}
         <h3 className="font-display font-black text-sm text-navy-800 leading-snug line-clamp-2 mb-1.5">
           {trip.title}
         </h3>
@@ -371,7 +474,6 @@ function TripCard({ trip }: { trip: Trip }) {
           </p>
         )}
 
-        {/* Info pills */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           <span className="inline-flex items-center gap-1 bg-navy-50 text-navy-600 text-xs font-medium px-2.5 py-1 rounded-full">
             <Clock size={10} />
@@ -387,7 +489,6 @@ function TripCard({ trip }: { trip: Trip }) {
           </span>
         </div>
 
-        {/* Price + CTA */}
         <div className="mt-auto flex items-end justify-between pt-2 border-t border-gray-100">
           <div>
             {trip.original_price && (
@@ -436,10 +537,7 @@ function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () 
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         {hasFilters && (
-          <button
-            onClick={onClear}
-            className="btn-secondary py-2.5 px-6 text-sm"
-          >
+          <button onClick={onClear} className="btn-secondary py-2.5 px-6 text-sm">
             Limpar filtros
           </button>
         )}
