@@ -1,11 +1,26 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   MapPin, Clock, Search, ArrowRight, SlidersHorizontal,
-  X, Star, Users, Calendar, ChevronDown, Plane, Check,
+  X, Star, Users, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check,
 } from "lucide-react";
+
+const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
+
+function getCalendarDays(year: number, month: number): (number | null)[] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: (number | null)[] = Array(firstDay).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+  return days;
+}
+
+function toDateStr(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 import type { Trip } from "@/types/trip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -64,9 +79,26 @@ export default function ViagensPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [durationFilter, setDurationFilter] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [calMonth, setCalMonth] = useState(() => {
+    const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() };
+  });
+  const [showWhenPicker, setShowWhenPicker] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+  const whenRef = useRef<HTMLDivElement>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const tripsByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    trips.forEach((t) => {
+      const d = t.departure_date?.slice(0, 10);
+      if (d) map[d] = (map[d] || 0) + 1;
+    });
+    return map;
+  }, [trips]);
 
   const fetchTrips = useCallback(() => {
     setLoading(true);
@@ -84,6 +116,7 @@ export default function ViagensPage() {
     const handler = (e: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilters(false);
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSortMenu(false);
+      if (whenRef.current && !whenRef.current.contains(e.target as Node)) setShowWhenPicker(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -111,9 +144,10 @@ export default function ViagensPage() {
         return days >= min && days <= max;
       });
     }
+    if (selectedDate) result = result.filter((t) => t.departure_date?.slice(0, 10) === selectedDate);
     if (onlyAvailable) result = result.filter((t) => t.available_spots > 0 && t.status !== "sold_out");
     setFiltered(sortTrips(result, sort));
-  }, [trips, category, search, sort, durationFilter, onlyAvailable]);
+  }, [trips, category, search, sort, durationFilter, selectedDate, onlyAvailable]);
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -126,11 +160,12 @@ export default function ViagensPage() {
     setCategory("");
     setSort("date_asc");
     setDurationFilter("");
+    setSelectedDate("");
     setOnlyAvailable(false);
   };
 
-  const activeFilterCount = [category, durationFilter, onlyAvailable ? "1" : ""].filter(Boolean).length;
-  const hasFilters = !!(search || category || durationFilter || onlyAvailable);
+  const activeFilterCount = [category, durationFilter, selectedDate, onlyAvailable ? "1" : ""].filter(Boolean).length;
+  const hasFilters = !!(search || category || durationFilter || selectedDate || onlyAvailable);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
   const durationLabelShort = DURATION_OPTIONS.find((o) => o.value === durationFilter)?.label;
 
@@ -139,7 +174,7 @@ export default function ViagensPage() {
       <Navbar />
 
       {/* ── HERO ── */}
-      <section className="relative pt-20 overflow-hidden">
+      <section className="relative pt-20 overflow-hidden pb-20">
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -156,7 +191,7 @@ export default function ViagensPage() {
             backgroundSize: "32px 32px",
           }}
         />
-        <div className="relative container-custom py-16 md:py-20 text-center">
+        <div className="relative container-custom py-12 md:py-16 text-center">
           <div className="inline-flex items-center gap-2 bg-gold-500/20 border border-gold-500/30 text-gold-400 text-xs font-semibold px-4 py-2 rounded-full mb-6">
             <Plane size={12} />
             Saindo de Curitiba — PR
@@ -164,31 +199,159 @@ export default function ViagensPage() {
           <h1 className="font-display font-black text-4xl md:text-6xl text-white mb-4 leading-tight">
             Explore Nossas <span className="text-gold-400">Viagens</span>
           </h1>
-          <p className="text-navy-200 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-            Pacotes completos com os melhores destinos nacionais e internacionais. Preços acessíveis, atendimento personalizado e parcelamento em até 12x sem juros.
+          <p className="text-navy-300 text-base md:text-lg max-w-xl mx-auto">
+            Destinos nacionais e internacionais com parcelamento em até 12x sem juros.
           </p>
+        </div>
+      </section>
 
-          {/* Live search */}
-          <div className="relative max-w-2xl mx-auto">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
-            <input
-              className="w-full pl-11 pr-12 py-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl text-white placeholder-white/50 text-sm focus:outline-none focus:border-gold-400/60 focus:bg-white/15 transition-all"
-              placeholder="Buscar destino, pacote ou categoria..."
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
+      {/* ── Search bar flutuante ── */}
+      <div className="relative z-30 -mt-8 container-custom px-4">
+        <div className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.18)] border border-gray-100 flex flex-col sm:flex-row">
+
+          {/* Destino */}
+          <div className="flex-1 flex items-center gap-3 px-6 py-5 border-b sm:border-b-0 sm:border-r border-gray-100">
+            <div className="w-9 h-9 rounded-xl bg-navy-50 flex items-center justify-center flex-shrink-0">
+              <Search size={15} className="text-navy-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Destino</p>
+              <input
+                className="w-full text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none bg-transparent"
+                placeholder="Para onde você quer ir?"
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
             {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
-              >
-                <X size={15} />
+              <button onClick={() => setSearch("")} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors">
+                <X size={11} className="text-gray-500" />
               </button>
             )}
           </div>
+
+          {/* Quando */}
+          <div className="relative flex-1 sm:border-r border-gray-100" ref={whenRef}>
+            <button
+              onClick={() => setShowWhenPicker(!showWhenPicker)}
+              className="w-full flex items-center gap-3 px-6 py-5 text-left"
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${selectedDate ? "bg-gold-500/15" : "bg-navy-50"}`}>
+                <Calendar size={15} className={selectedDate ? "text-gold-600" : "text-navy-600"} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Quando</p>
+                <p className={`text-sm font-medium truncate ${selectedDate ? "text-navy-800" : "text-gray-400"}`}>
+                  {selectedDate
+                    ? new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })
+                    : "Selecionar data"}
+                </p>
+              </div>
+              {selectedDate ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedDate(""); }}
+                  className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
+                >
+                  <X size={11} className="text-gray-500" />
+                </button>
+              ) : (
+                <ChevronDown size={14} className={`text-gray-400 transition-transform flex-shrink-0 ${showWhenPicker ? "rotate-180" : ""}`} />
+              )}
+            </button>
+
+            {/* Calendar dropdown — fora do overflow */}
+            {showWhenPicker && (
+              <div className="absolute left-0 top-full mt-3 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-gray-100 z-50 p-5 w-80">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setCalMonth(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-sm font-black text-navy-900 tracking-tight">
+                    {MONTHS_PT[calMonth.month]} {calMonth.year}
+                  </span>
+                  <button
+                    onClick={() => setCalMonth(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                {/* Week days */}
+                <div className="grid grid-cols-7 mb-2">
+                  {WEEK_DAYS.map((d, i) => (
+                    <div key={i} className="text-center text-[10px] font-black text-gray-400 uppercase tracking-wider py-1">{d}</div>
+                  ))}
+                </div>
+
+                {/* Days grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {getCalendarDays(calMonth.year, calMonth.month).map((day, i) => {
+                    if (!day) return <div key={i} />;
+                    const dateStr = toDateStr(calMonth.year, calMonth.month, day);
+                    const count = tripsByDate[dateStr] || 0;
+                    const isSelected = selectedDate === dateStr;
+                    const isPast = dateStr < today;
+                    const hasTrips = count > 0 && !isPast;
+                    return (
+                      <button
+                        key={i}
+                        disabled={!hasTrips}
+                        onClick={() => { setSelectedDate(isSelected ? "" : dateStr); setShowWhenPicker(false); }}
+                        title={hasTrips ? `${count} viagem${count > 1 ? "s" : ""} disponível${count > 1 ? "s" : ""}` : undefined}
+                        className={`relative flex flex-col items-center justify-center rounded-xl aspect-square text-xs font-semibold transition-all duration-150 ${
+                          isSelected
+                            ? "bg-navy-800 text-white shadow-md scale-105"
+                            : hasTrips
+                            ? "text-navy-800 hover:bg-navy-50 cursor-pointer"
+                            : isPast
+                            ? "text-gray-200 cursor-default"
+                            : "text-gray-300 cursor-default"
+                        }`}
+                      >
+                        {day}
+                        {hasTrips && (
+                          <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-gold-400" : "bg-gold-500"}`} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+                  <span className="w-2 h-2 rounded-full bg-gold-500 flex-shrink-0" />
+                  <span className="text-xs text-gray-400">Dias com viagens disponíveis</span>
+                </div>
+
+                {selectedDate && (
+                  <button
+                    onClick={() => setSelectedDate("")}
+                    className="mt-2 w-full text-center text-xs text-gray-400 hover:text-red-500 transition-colors py-1"
+                  >
+                    Limpar data selecionada
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Buscar button */}
+          <div className="flex items-center p-3">
+            <button
+              onClick={() => setShowWhenPicker(false)}
+              className="w-full sm:w-auto btn-primary flex items-center justify-center gap-2 px-7 py-4 rounded-xl text-sm font-black tracking-wide"
+            >
+              <Search size={15} />
+              Buscar
+            </button>
+          </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-b from-transparent to-gray-50" />
-      </section>
+      </div>
 
       {/* ── MAIN CONTENT ── */}
       <main className="flex-1 w-full container-custom py-8">
@@ -269,7 +432,7 @@ export default function ViagensPage() {
 
                 {activeFilterCount > 0 && (
                   <button
-                    onClick={() => { setCategory(""); setDurationFilter(""); setOnlyAvailable(false); }}
+                    onClick={() => { setCategory(""); setDurationFilter(""); setSelectedDate(""); setOnlyAvailable(false); }}
                     className="mt-4 w-full text-center text-sm text-red-500 hover:text-red-600 font-medium py-2"
                   >
                     Limpar filtros avançados
@@ -317,6 +480,13 @@ export default function ViagensPage() {
               <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
                 {CATEGORIES.find(c => c.value === category)?.icon} {CATEGORIES.find(c => c.value === category)?.label}
                 <button onClick={() => setCategory("")}><X size={11} /></button>
+              </span>
+            )}
+            {selectedDate && (
+              <span className="inline-flex items-center gap-1.5 bg-navy-50 border border-navy-100 text-navy-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                <Calendar size={10} />
+                {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                <button onClick={() => setSelectedDate("")}><X size={11} /></button>
               </span>
             )}
             {durationFilter && (
