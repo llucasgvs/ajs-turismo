@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight, ArrowLeft, Phone, User, CreditCard, Cake } from "lucide-react";
+import Link from "next/link";
+import {
+  MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight,
+  ArrowLeft, Phone, User, CreditCard, Cake, Share2, AlertTriangle,
+  Shield, Headphones, Award, Camera, Sun, Mountain, Waves,
+  TreePine, Globe, Plane, Utensils, CheckCheck, Star,
+} from "lucide-react";
 import type { Trip } from "@/types/trip";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import WhatsAppFloat from "@/components/WhatsAppFloat";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -17,24 +26,13 @@ type StoredUser = {
   birth_date: string | null;
   is_admin: boolean;
 };
-
-type CompanionForm = {
-  full_name: string;
-  cpf: string;
-  birth_date: string;
-};
+type CompanionForm = { full_name: string; cpf: string; birth_date: string };
 
 /* ─── helpers ─── */
 function getStoredUser(): StoredUser | null {
-  try {
-    const raw = localStorage.getItem("ajs_user");
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  try { return JSON.parse(localStorage.getItem("ajs_user") || "null"); } catch { return null; }
 }
-
-function getToken(): string | null {
-  return localStorage.getItem("ajs_token");
-}
+function getToken(): string | null { return localStorage.getItem("ajs_token"); }
 
 function formatCPF(val: string) {
   const d = val.replace(/\D/g, "").slice(0, 11);
@@ -43,7 +41,6 @@ function formatCPF(val: string) {
   if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
-
 function formatPhone(val: string) {
   const d = val.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 2) return d;
@@ -52,22 +49,11 @@ function formatPhone(val: string) {
 }
 
 function buildWhatsAppMessage(
-  trip: Trip,
-  user: StoredUser,
-  phone: string,
-  cpf: string,
-  birthDate: string,
-  people: number,
-  companions: CompanionForm[],
-  note: string,
-  bookingCode: string,
-): string {
-  const fmt = (d: string) => {
-    if (!d) return "-";
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
-  };
-
+  trip: Trip, user: StoredUser, phone: string, cpf: string,
+  birthDate: string, people: number, companions: CompanionForm[],
+  note: string, bookingCode: string,
+) {
+  const fmt = (d: string) => { if (!d) return "-"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; };
   let msg =
     `*Interesse em reserva -- ${trip.title}*\n` +
     `Destino: ${trip.destination}\n` +
@@ -78,28 +64,410 @@ function buildWhatsAppMessage(
     `   CPF: ${cpf}\n` +
     `   Nascimento: ${fmt(birthDate)}\n` +
     `   Tel: ${phone}\n`;
-
   companions.forEach((c, i) => {
-    msg +=
-      `\n*Acompanhante ${i + 1}:*\n` +
-      `   Nome: ${c.full_name}\n` +
-      `   CPF: ${c.cpf}\n` +
-      `   Nascimento: ${fmt(c.birth_date)}\n`;
+    msg += `\n*Acompanhante ${i + 1}:*\n   Nome: ${c.full_name}\n   CPF: ${c.cpf}\n   Nascimento: ${fmt(c.birth_date)}\n`;
   });
-
   msg += `\n*Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
   msg += `*Valor estimado:* R$ ${(people * trip.price_per_person).toLocaleString("pt-BR")}`;
   if (note) msg += `\n\nObservacao: ${note}`;
-
   return msg;
 }
 
-/* ─── BookingModal ─── */
-// Só é montado quando o usuário já está confirmado (auth check no pai)
+/* ─── destination highlights ─── */
+type HL = { icon: React.ElementType; label: string; sub: string };
+function getHighlights(trip: Trip): HL[] {
+  const cat = (trip.category || "").toLowerCase();
+  const dest = (trip.destination || "").toLowerCase();
+  if (cat === "praia" || ["maceió", "fortaleza", "natal", "maceio", "florianópolis", "florianopolis", "ilhéus"].some(k => dest.includes(k)))
+    return [
+      { icon: Waves, label: "Praias", sub: "Água cristalina" },
+      { icon: Sun, label: "Clima", sub: "Sol e calor" },
+      { icon: Utensils, label: "Gastronomia", sub: "Frutos do mar" },
+      { icon: Camera, label: "Paisagens", sub: "Vistas únicas" },
+    ];
+  if (cat === "serra" || ["gramado", "canela", "campos do jordão", "petrópolis", "petropolis"].some(k => dest.includes(k)))
+    return [
+      { icon: Mountain, label: "Montanhas", sub: "Paisagens verdes" },
+      { icon: TreePine, label: "Natureza", sub: "Trilhas e parques" },
+      { icon: Utensils, label: "Gastronomia", sub: "Chocolate e fondue" },
+      { icon: Camera, label: "Arquitetura", sub: "Estilo europeu" },
+    ];
+  if (cat === "internacional")
+    return [
+      { icon: Globe, label: "Cultura", sub: "Experiência única" },
+      { icon: Utensils, label: "Gastronomia", sub: "Culinária local" },
+      { icon: Camera, label: "Turismo", sub: "Pontos icônicos" },
+      { icon: Plane, label: "Destino", sub: "Internacional" },
+    ];
+  if (cat === "aventura")
+    return [
+      { icon: Mountain, label: "Aventura", sub: "Adrenalina garantida" },
+      { icon: TreePine, label: "Ecoturismo", sub: "Contato com natureza" },
+      { icon: Waves, label: "Atividades", sub: "Esportes radicais" },
+      { icon: Camera, label: "Experiência", sub: "Inesquecível" },
+    ];
+  return [
+    { icon: Sun, label: "Clima", sub: "Temperatura agradável" },
+    { icon: Utensils, label: "Gastronomia", sub: "Culinária regional" },
+    { icon: Camera, label: "Turismo", sub: "Pontos históricos" },
+    { icon: Globe, label: "Cultura", sub: "História e tradição" },
+  ];
+}
+
+/* ═══════════════════════════════════════════
+   1. Gallery Modal (full-screen)
+═══════════════════════════════════════════ */
+function GalleryModal({ images, startIndex, onClose }: { images: string[]; startIndex: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIndex);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") setIdx(i => (i - 1 + images.length) % images.length);
+      if (e.key === "ArrowRight") setIdx(i => (i + 1) % images.length);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [images.length, onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
+        <span className="text-white/60 text-sm font-medium">{idx + 1} / {images.length}</span>
+        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Main image */}
+      <div className="flex-1 flex items-center justify-center relative px-14 min-h-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={images[idx]} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+        {images.length > 1 && (
+          <>
+            <button onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors">
+              <ChevronLeft size={22} />
+            </button>
+            <button onClick={() => setIdx(i => (i + 1) % images.length)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-colors">
+              <ChevronRight size={22} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Thumbnails */}
+      {images.length > 1 && (
+        <div className="flex gap-2 px-4 py-3 overflow-x-auto flex-shrink-0">
+          {images.map((img, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${i === idx ? "border-gold-400" : "border-white/20 opacity-60 hover:opacity-100"}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   2. Photo Grid (Airbnb-style)
+═══════════════════════════════════════════ */
+function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number) => void }) {
+  if (images.length === 0) return <div className="w-full h-72 sm:h-[480px] bg-navy-800 rounded-2xl" />;
+
+  return (
+    <div className="relative">
+      {/* Mobile: single large image */}
+      <div className="sm:hidden relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={images[0]} alt="" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        {images.length > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpen(0); }}
+            className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm text-navy-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow"
+          >
+            <Camera size={12} /> Ver {images.length} fotos
+          </button>
+        )}
+      </div>
+
+      {/* Desktop: 1 large + up to 4 small grid */}
+      <div className="hidden sm:grid grid-cols-4 grid-rows-2 gap-2 h-[480px] rounded-2xl overflow-hidden">
+        {/* Large left */}
+        <div className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpen(0)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={images[0]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+        </div>
+        {/* 4 small right — fill with placeholders if < 5 images */}
+        {[1, 2, 3, 4].map((pos) => {
+          const img = images[pos];
+          const isLast = pos === 4 && images.length > 5;
+          return img ? (
+            <div key={pos} className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(pos)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              {isLast && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                  <span className="text-white font-bold text-xl">+{images.length - 5}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div key={pos} className="bg-navy-100" />
+          );
+        })}
+      </div>
+
+      {/* "Ver todas as fotos" overlay button */}
+      {images.length > 1 && (
+        <button
+          onClick={() => onOpen(0)}
+          className="hidden sm:flex absolute bottom-3 right-3 items-center gap-2 bg-white text-navy-800 text-sm font-semibold px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200"
+        >
+          <Camera size={14} /> Ver todas as fotos
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   3. Scarcity Banner
+═══════════════════════════════════════════ */
+function ScarcityBanner({ spots }: { spots: number }) {
+  if (spots <= 0 || spots > 5) return null;
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3">
+      <AlertTriangle size={18} className="text-orange-500 flex-shrink-0" />
+      <p className="text-orange-700 text-sm font-semibold">
+        Apenas {spots} {spots === 1 ? "vaga disponível" : "vagas disponíveis"}! Reserve agora para garantir seu lugar.
+      </p>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   4. Trust Block
+═══════════════════════════════════════════ */
+function TrustBlock() {
+  const items = [
+    { icon: Award, title: "10+ anos de experiência", desc: "Mais de uma década levando viajantes com segurança e qualidade" },
+    { icon: Shield, title: "Pagamento seguro", desc: "Parcele em até 12x sem juros com total segurança" },
+    { icon: Headphones, title: "Suporte via WhatsApp", desc: "Nossa equipe responde em minutos, antes e durante a viagem" },
+    { icon: Users, title: "+5.000 viajantes felizes", desc: "Avaliação média de 4.9 estrelas pelos nossos clientes" },
+  ];
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <h3 className="font-display font-black text-lg text-navy-800 mb-5">Por que reservar com a AJS?</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {items.map(({ icon: Icon, title, desc }) => (
+          <div key={title} className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Icon size={18} className="text-navy-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-navy-800 text-sm leading-tight">{title}</p>
+              <p className="text-gray-400 text-xs leading-relaxed mt-0.5">{desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   5. Destination Highlights
+═══════════════════════════════════════════ */
+function DestinationHighlights({ trip }: { trip: Trip }) {
+  const highlights = getHighlights(trip);
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <h3 className="font-display font-black text-lg text-navy-800 mb-5">O que você vai encontrar</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {highlights.map(({ icon: Icon, label, sub }) => (
+          <div key={label} className="flex flex-col items-center text-center gap-2 p-4 bg-gray-50 rounded-xl">
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+              <Icon size={20} className="text-navy-600" />
+            </div>
+            <p className="font-semibold text-navy-800 text-xs leading-tight">{label}</p>
+            <p className="text-gray-400 text-[11px] leading-tight">{sub}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   6. Related Trips
+═══════════════════════════════════════════ */
+function RelatedCard({ trip }: { trip: Trip }) {
+  const depDate = new Date(trip.departure_date);
+  return (
+    <Link href={`/viagens/${trip.id}`}
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-gold-300 hover:-translate-y-0.5 flex flex-col"
+    >
+      <div className="relative h-40 overflow-hidden flex-shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={trip.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80"}
+          alt={trip.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5">
+          <MapPin size={9} className="text-gold-400 flex-shrink-0" />
+          <span className="text-white text-[10px] font-medium truncate max-w-[120px]">{trip.destination}</span>
+        </div>
+        {trip.tag && (
+          <div className="absolute top-2 left-2">
+            <span className="bg-gold-500 text-navy-900 text-[10px] font-bold px-2 py-0.5 rounded-full">{trip.tag}</span>
+          </div>
+        )}
+      </div>
+      <div className="p-3 flex flex-col flex-1">
+        <h4 className="font-display font-black text-xs text-navy-800 line-clamp-2 mb-2 leading-snug">{trip.title}</h4>
+        <div className="mt-auto flex items-end justify-between">
+          <div>
+            <p className="text-[10px] text-gray-400">a partir de</p>
+            <p className="font-black text-base text-navy-700 leading-tight">R$ {trip.price_per_person.toLocaleString("pt-BR")}</p>
+          </div>
+          <span className="text-[10px] text-navy-500 font-medium">
+            {depDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function RelatedTrips({ currentId, category }: { currentId: number; category: string }) {
+  const [trips, setTrips] = useState<Trip[]>([]);
+
+  useEffect(() => {
+    fetch(`${API}/trips/?limit=20`)
+      .then(r => r.json())
+      .then((data: Trip[]) => {
+        if (!Array.isArray(data)) return;
+        const related = data
+          .filter(t => t.id !== currentId && t.is_active !== false)
+          .sort((a, b) => (b.category === category ? 1 : 0) - (a.category === category ? 1 : 0))
+          .slice(0, 4);
+        setTrips(related);
+      })
+      .catch(() => {});
+  }, [currentId, category]);
+
+  if (!trips.length) return null;
+
+  return (
+    <div className="py-8">
+      <h2 className="font-display font-black text-2xl text-navy-800 mb-6">Você também pode gostar</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {trips.map(trip => <RelatedCard key={trip.id} trip={trip} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   7. Share Button
+═══════════════════════════════════════════ */
+function ShareButton({ title }: { title: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = () => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({ title, url: window.location.href }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }).catch(() => {});
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-100"
+    >
+      {copied
+        ? <><CheckCheck size={15} className="text-emerald-500" /><span className="text-emerald-600">Link copiado!</span></>
+        : <><Share2 size={15} /><span>Compartilhar</span></>
+      }
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   8. Sticky Mobile CTA
+═══════════════════════════════════════════ */
+function StickyMobileCTA({
+  trip, sold, onBook, whatsappFallback,
+}: { trip: Trip; sold: boolean; onBook: () => void; whatsappFallback: string }) {
+  return (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
+      <div className="flex-1 min-w-0">
+        {trip.original_price && (
+          <p className="text-xs text-gray-400 line-through leading-none">
+            R$ {trip.original_price.toLocaleString("pt-BR")}
+          </p>
+        )}
+        <p className="font-display font-black text-xl text-navy-700 leading-tight">
+          R$ {trip.price_per_person.toLocaleString("pt-BR")}
+        </p>
+        <p className="text-[11px] text-emerald-600 font-medium">
+          {trip.max_installments}x de R$ {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} s/juros
+        </p>
+      </div>
+      {sold ? (
+        <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
+          className="flex-shrink-0 bg-gray-200 text-gray-600 font-bold px-5 py-3 rounded-xl text-sm">
+          Lista de espera
+        </a>
+      ) : (
+        <button onClick={onBook}
+          className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-all">
+          Reservar agora
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   9. Info Stat
+═══════════════════════════════════════════ */
+function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
+  icon: React.ReactNode; label: string; value: string; valueClass?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5 text-gray-400 text-xs">{icon}{label}</div>
+      <p className={`font-bold text-sm ${valueClass}`}>{value}</p>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   10. Booking Modal
+═══════════════════════════════════════════ */
 function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [fullName, setFullName] = useState(user.full_name || "");
   const [phone, setPhone] = useState(user.phone || "");
   const [cpf, setCpf] = useState(user.cpf || "");
@@ -109,20 +477,22 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
   const [note, setNote] = useState("");
 
   useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  useEffect(() => {
     const needed = people - 1;
-    setCompanions((prev) => {
-      if (prev.length === needed) return prev;
-      if (prev.length < needed)
-        return [
-          ...prev,
-          ...Array.from({ length: needed - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" })),
-        ];
-      return prev.slice(0, needed);
-    });
+    setCompanions(prev =>
+      prev.length === needed ? prev :
+      prev.length < needed
+        ? [...prev, ...Array.from({ length: needed - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" }))]
+        : prev.slice(0, needed)
+    );
   }, [people]);
 
   const updateCompanion = (i: number, field: keyof CompanionForm, val: string) =>
-    setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
+    setCompanions(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,53 +505,33 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
       if (c.cpf.replace(/\D/g, "").length < 11) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
       if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); return; }
     }
-
     setLoading(true);
     try {
       const token = getToken();
-
       await fetch(`${API}/auth/me`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
       });
-
       const bookingRes = await fetch(`${API}/bookings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          trip_id: trip.id,
-          num_travelers: people,
-          companions: companions.map((c) => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })),
-          notes: note || undefined,
-        }),
+        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined }),
       });
-
-      if (!bookingRes.ok) {
-        const err = await bookingRes.json();
-        setError(err.detail || "Erro ao criar reserva.");
-        return;
-      }
-
+      if (!bookingRes.ok) { const err = await bookingRes.json(); setError(err.detail || "Erro ao criar reserva."); return; }
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);
       window.open(`https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
       onClose();
-    } catch {
-      setError("Erro de conexão. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Erro de conexão. Tente novamente."); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <h3 className="font-display font-black text-navy-800 text-lg">Reservar viagem</h3>
@@ -192,66 +542,40 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
           </button>
         </div>
 
-        {/* Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-          {/* Nº pessoas */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
             <div className="flex items-center gap-4">
-              <button type="button" onClick={() => setPeople((p) => Math.max(1, p - 1))}
+              <button type="button" onClick={() => setPeople(p => Math.max(1, p - 1))}
                 className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">−</button>
               <span className="flex-1 text-center font-bold text-navy-800 text-xl">{people}</span>
-              <button type="button" onClick={() => setPeople((p) => Math.min(trip.available_spots || 50, p + 1))}
+              <button type="button" onClick={() => setPeople(p => Math.min(trip.available_spots || 50, p + 1))}
                 className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
             </div>
           </div>
 
-          {/* Titular */}
           <div className="bg-navy-50 rounded-xl p-4 space-y-3">
             <p className="text-xs font-bold text-navy-700 uppercase tracking-wide">Seus dados (titular)</p>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Nome completo *</label>
-              <div className="relative">
-                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="text" required placeholder="Nome completo" value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+            {[
+              { label: "Nome completo *", icon: User, type: "text", placeholder: "Nome completo", value: fullName, onChange: (v: string) => setFullName(v), fmt: (v: string) => v },
+              { label: "Telefone / WhatsApp *", icon: Phone, type: "tel", placeholder: "(41) 99999-9999", value: phone, onChange: (v: string) => setPhone(formatPhone(v)), fmt: (v: string) => v },
+              { label: "CPF *", icon: CreditCard, type: "text", placeholder: "000.000.000-00", value: cpf, onChange: (v: string) => setCpf(formatCPF(v)), fmt: (v: string) => v },
+              { label: "Data de nascimento *", icon: Cake, type: "date", placeholder: "", value: birthDate, onChange: (v: string) => setBirthDate(v), fmt: (v: string) => v },
+            ].map(({ label, icon: Icon, type, placeholder, value, onChange }) => (
+              <div key={label}>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
+                <div className="relative">
+                  <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type={type} required placeholder={placeholder} value={value}
+                    onChange={e => onChange(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Telefone / WhatsApp *</label>
-              <div className="relative">
-                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="tel" required placeholder="(41) 99999-9999" value={phone}
-                  onChange={(e) => setPhone(formatPhone(e.target.value))}
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">CPF *</label>
-              <div className="relative">
-                <CreditCard size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="text" required placeholder="000.000.000-00" value={cpf}
-                  onChange={(e) => setCpf(formatCPF(e.target.value))}
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Data de nascimento *</label>
-              <div className="relative">
-                <Cake size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="date" required value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Acompanhantes */}
           {companions.map((c, i) => (
             <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3">
               <p className="text-xs font-bold text-navy-700 uppercase tracking-wide flex items-center gap-2">
@@ -260,44 +584,38 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Nome completo *</label>
                 <input type="text" required placeholder="Nome completo" value={c.full_name}
-                  onChange={(e) => updateCompanion(i, "full_name", e.target.value)}
+                  onChange={e => updateCompanion(i, "full_name", e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">CPF *</label>
                   <input type="text" required placeholder="000.000.000-00" value={c.cpf}
-                    onChange={(e) => updateCompanion(i, "cpf", formatCPF(e.target.value))}
+                    onChange={e => updateCompanion(i, "cpf", formatCPF(e.target.value))}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Nascimento *</label>
                   <input type="date" required value={c.birth_date}
-                    onChange={(e) => updateCompanion(i, "birth_date", e.target.value)}
+                    onChange={e => updateCompanion(i, "birth_date", e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
             </div>
           ))}
 
-          {/* Observação */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Observação <span className="font-normal text-gray-400">(opcional)</span>
             </label>
             <textarea rows={2} placeholder="Ex: preciso de quarto duplo, tenho crianças..." value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={e => setNote(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 resize-none" />
           </div>
 
-          {/* Resumo */}
           <div className="bg-navy-50 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm text-navy-600 font-medium">
-              {people} × R$ {trip.price_per_person.toLocaleString("pt-BR")}
-            </span>
-            <span className="font-black text-navy-800 text-lg">
-              R$ {(people * trip.price_per_person).toLocaleString("pt-BR")}
-            </span>
+            <span className="text-sm text-navy-600 font-medium">{people} × R$ {trip.price_per_person.toLocaleString("pt-BR")}</span>
+            <span className="font-black text-navy-800 text-lg">R$ {(people * trip.price_per_person).toLocaleString("pt-BR")}</span>
           </div>
 
           <button type="submit" disabled={loading}
@@ -305,7 +623,7 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
             {loading ? "Salvando..." : "Manifestar interesse pelo WhatsApp"}
           </button>
           <p className="text-center text-xs text-gray-400">
-            Seus dados são salvos e abriremos o WhatsApp com tudo preenchido. Nossa equipe entrará em contato para confirmar a reserva.
+            Seus dados são salvos e abriremos o WhatsApp com tudo preenchido. Nossa equipe confirmará a reserva.
           </p>
         </form>
       </div>
@@ -313,250 +631,292 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
   );
 }
 
-/* ─── Main ─── */
+/* ═══════════════════════════════════════════
+   11. Main Component
+═══════════════════════════════════════════ */
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
-  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryStart, setGalleryStart] = useState(0);
   const [bookingUser, setBookingUser] = useState<StoredUser | null>(null);
 
   const sold = trip.available_spots === 0 || trip.status === "sold_out";
+  const lowStock = !sold && trip.available_spots > 0 && trip.available_spots <= 5;
+  const discount = trip.original_price
+    ? Math.round((1 - trip.price_per_person / trip.original_price) * 100)
+    : null;
 
-  const handleOpenBooking = () => {
+  const allImages = [...(trip.image_url ? [trip.image_url] : []), ...(trip.gallery || [])].filter(Boolean);
+  const departureDate = new Date(trip.departure_date);
+  const returnDate = new Date(trip.return_date);
+  const whatsappFallback = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no pacote *${trip.title}* — ${trip.destination}.`)}`;
+
+  const handleOpenBooking = useCallback(() => {
     const u = getStoredUser();
     if (!u) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
     } else {
       setBookingUser(u);
     }
-  };
-  const allImages = [...(trip.image_url ? [trip.image_url] : []), ...(trip.gallery || [])].filter(Boolean);
-  const departureDate = new Date(trip.departure_date);
-  const returnDate = new Date(trip.return_date);
-  const whatsappFallback = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no pacote *${trip.title}* — ${trip.destination}.`)}`;
+  }, [router]);
+
+  const openGallery = useCallback((idx: number) => {
+    setGalleryStart(idx);
+    setGalleryOpen(true);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
+      <Navbar />
+
+      {/* Gallery Modal */}
+      {galleryOpen && allImages.length > 0 && (
+        <GalleryModal images={allImages} startIndex={galleryStart} onClose={() => setGalleryOpen(false)} />
+      )}
+
+      {/* Booking Modal */}
       {bookingUser && (
         <BookingModal trip={trip} user={bookingUser} onClose={() => setBookingUser(null)} />
       )}
 
-      {/* Back nav */}
-      <div className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="max-w-6xl mx-auto">
-          <button onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors">
-            <ArrowLeft size={16} /> Voltar para viagens
-          </button>
+      {/* Sticky Mobile CTA */}
+      <StickyMobileCTA trip={trip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />
+
+      <div className="flex-1 pt-16 pb-24 lg:pb-0">
+        {/* ── Top bar: back + share ── */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-16 z-20">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <button onClick={() => router.back()}
+              className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors">
+              <ArrowLeft size={16} /> Voltar para viagens
+            </button>
+            <ShareButton title={trip.title} />
+          </div>
         </div>
-      </div>
 
-      {/* Hero */}
-      <div className="relative bg-navy-900 h-72 sm:h-96 overflow-hidden">
-        {allImages.length > 0 ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={allImages[galleryIndex]} alt={trip.title} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            {allImages.length > 1 && (
-              <>
-                <button onClick={() => setGalleryIndex((i) => (i - 1 + allImages.length) % allImages.length)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 transition-colors">
-                  <ChevronLeft size={20} />
-                </button>
-                <button onClick={() => setGalleryIndex((i) => (i + 1) % allImages.length)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 transition-colors">
-                  <ChevronRight size={20} />
-                </button>
-                <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-1.5">
-                  {allImages.map((_, i) => (
-                    <button key={i} onClick={() => setGalleryIndex(i)}
-                      className={`w-2 h-2 rounded-full ${i === galleryIndex ? "bg-gold-400" : "bg-white/50"}`} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        ) : <div className="w-full h-full bg-navy-800" />}
-
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-6 pt-10">
-          <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto px-4 pt-6 pb-8 w-full">
+          {/* Title + badges (mobile) */}
+          <div className="mb-4">
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              {trip.tag && <span className="bg-gold-500 text-navy-900 text-xs font-bold px-3 py-1 rounded-full">{trip.tag}</span>}
+              {trip.tag && (
+                <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-xs font-bold px-3 py-1 rounded-full">
+                  <Star size={9} fill="currentColor" /> {trip.tag}
+                </span>
+              )}
               {sold && <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">Esgotado</span>}
-              {!sold && trip.available_spots <= 5 && <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">Últimas {trip.available_spots} vagas!</span>}
+              {lowStock && !sold && <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">Últimas vagas!</span>}
+              {discount && discount > 0 && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">-{discount}% OFF</span>}
             </div>
-            <h1 className="font-display font-black text-3xl sm:text-4xl text-white leading-tight">{trip.title}</h1>
-            <div className="flex items-center gap-1.5 text-white/80 text-sm mt-1">
-              <MapPin size={14} className="text-gold-400" /> {trip.destination}
+            <h1 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-navy-900 leading-tight">{trip.title}</h1>
+            <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-1.5">
+              <MapPin size={14} className="text-gold-500" /> {trip.destination}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {/* Key info */}
-            <div className="bg-white rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm">
-              <InfoStat icon={<Calendar size={18} className="text-gold-500" />} label="Saída"
-                value={departureDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
-              <InfoStat icon={<Calendar size={18} className="text-gold-500" />} label="Retorno"
-                value={returnDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
-              <InfoStat icon={<Clock size={18} className="text-gold-500" />} label="Duração"
-                value={`${trip.duration_nights + 1} dias / ${trip.duration_nights} noites`} />
-              <InfoStat icon={<Users size={18} className="text-gold-500" />} label="Vagas"
-                value={sold ? "Esgotado" : `${trip.available_spots} disponíveis`}
-                valueClass={sold ? "text-red-500" : "text-emerald-600"} />
+          {/* Photo Grid */}
+          <div className="mb-6">
+            <PhotoGrid images={allImages} onOpen={openGallery} />
+          </div>
+
+          {/* Scarcity Banner */}
+          {lowStock && !sold && (
+            <div className="mb-6">
+              <ScarcityBanner spots={trip.available_spots} />
             </div>
+          )}
 
-            {trip.description && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h2 className="font-display font-black text-xl text-navy-800 mb-4">Sobre o pacote</h2>
-                <p className="text-gray-600 leading-relaxed whitespace-pre-line">{trip.description}</p>
+          {/* Main 2-col grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* ── Left column ── */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Key info */}
+              <div className="bg-white rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm">
+                <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
+                  value={departureDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
+                <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
+                  value={returnDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
+                <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
+                  value={`${trip.duration_nights + 1}d / ${trip.duration_nights}n`} />
+                <InfoStat
+                  icon={<Users size={16} className="text-gold-500" />}
+                  label="Vagas"
+                  value={sold ? "Esgotado" : `${trip.available_spots} disponíveis`}
+                  valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
+                />
               </div>
-            )}
 
-            {(trip.includes?.length > 0 || trip.excludes?.length > 0) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {trip.includes?.length > 0 && (
-                  <div className="bg-white rounded-2xl p-5 shadow-sm">
-                    <h3 className="font-display font-bold text-navy-800 mb-4 flex items-center gap-2">
-                      <span className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center"><Check size={12} className="text-emerald-600" /></span>
-                      O que inclui
-                    </h3>
-                    <ul className="space-y-2.5">
-                      {trip.includes.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2 text-gray-600 text-sm">
-                          <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />{item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {trip.excludes?.length > 0 && (
-                  <div className="bg-white rounded-2xl p-5 shadow-sm">
-                    <h3 className="font-display font-bold text-navy-800 mb-4 flex items-center gap-2">
-                      <span className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center"><X size={12} className="text-red-500" /></span>
-                      Não inclui
-                    </h3>
-                    <ul className="space-y-2.5">
-                      {trip.excludes.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2 text-gray-500 text-sm">
-                          <X size={14} className="text-red-400 flex-shrink-0 mt-0.5" />{item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+              {/* Description */}
+              {trip.description && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <h2 className="font-display font-black text-xl text-navy-800 mb-4">Sobre o pacote</h2>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{trip.description}</p>
+                </div>
+              )}
 
-            {trip.itinerary?.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                <h2 className="font-display font-black text-xl text-navy-800 mb-6">Roteiro dia a dia</h2>
-                <div className="space-y-4">
-                  {trip.itinerary.map((day) => (
-                    <div key={day.day} className="flex gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">{day.day}</div>
-                      <div className="flex-1 pb-4 border-b border-gray-100 last:border-0">
-                        <h4 className="font-bold text-navy-800 mb-1">{day.title}</h4>
-                        <p className="text-gray-600 text-sm leading-relaxed">{day.description}</p>
-                      </div>
+              {/* Destination Highlights */}
+              <DestinationHighlights trip={trip} />
+
+              {/* Includes / Excludes */}
+              {(trip.includes?.length > 0 || trip.excludes?.length > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {trip.includes?.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm">
+                      <h3 className="font-display font-bold text-navy-800 mb-4 flex items-center gap-2">
+                        <span className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                          <Check size={13} className="text-emerald-600" />
+                        </span>
+                        O que inclui
+                      </h3>
+                      <ul className="space-y-2.5">
+                        {trip.includes.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-gray-600 text-sm">
+                            <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />{item}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  ))}
+                  )}
+                  {trip.excludes?.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm">
+                      <h3 className="font-display font-bold text-navy-800 mb-4 flex items-center gap-2">
+                        <span className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                          <X size={13} className="text-red-500" />
+                        </span>
+                        Não inclui
+                      </h3>
+                      <ul className="space-y-2.5">
+                        {trip.excludes.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-gray-500 text-sm">
+                            <X size={14} className="text-red-400 flex-shrink-0 mt-0.5" />{item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {allImages.length > 1 && (
-              <div className="bg-white rounded-2xl p-5 shadow-sm">
-                <h2 className="font-display font-bold text-navy-800 mb-4">Galeria de fotos</h2>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {allImages.map((img, i) => (
-                    <button key={i} onClick={() => { setGalleryIndex(i); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      className={`relative h-24 rounded-lg overflow-hidden border-2 transition-colors ${i === galleryIndex ? "border-gold-400" : "border-transparent"}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+              {/* Itinerary */}
+              {trip.itinerary?.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <h2 className="font-display font-black text-xl text-navy-800 mb-6">Roteiro dia a dia</h2>
+                  <div className="space-y-4">
+                    {trip.itinerary.map((day) => (
+                      <div key={day.day} className="flex gap-4">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
+                          {day.day}
+                        </div>
+                        <div className="flex-1 pb-4 border-b border-gray-100 last:border-0">
+                          <h4 className="font-bold text-navy-800 mb-1">{day.title}</h4>
+                          <p className="text-gray-600 text-sm leading-relaxed">{day.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Trust Block */}
+              <TrustBlock />
+
+              {/* Related Trips */}
+              <RelatedTrips currentId={trip.id} category={trip.category} />
+            </div>
+
+            {/* ── Right sidebar (desktop only) ── */}
+            <div className="hidden lg:block lg:col-span-1">
+              <div className="sticky top-32 space-y-4">
+                {/* Price card */}
+                <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1">A partir de</p>
+                  {trip.original_price && (
+                    <p className="text-sm text-gray-400 line-through leading-none">
+                      R$ {trip.original_price.toLocaleString("pt-BR")}
+                    </p>
+                  )}
+                  <p className="font-display font-black text-4xl text-navy-700 leading-tight">
+                    R$ {trip.price_per_person.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-1">por pessoa</p>
+                  <p className="text-sm text-emerald-600 font-semibold mb-4">
+                    {trip.max_installments}x de R$ {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} sem juros
+                  </p>
+
+                  {trip.original_price && discount && discount > 0 && (
+                    <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center mb-4 border border-emerald-100">
+                      Economia de R$ {(trip.original_price - trip.price_per_person).toLocaleString("pt-BR")} por pessoa
+                    </div>
+                  )}
+
+                  {lowStock && !sold && (
+                    <div className="bg-orange-50 text-orange-700 text-xs font-semibold px-3 py-2 rounded-xl text-center mb-4 border border-orange-100 flex items-center justify-center gap-2">
+                      <AlertTriangle size={13} />
+                      Apenas {trip.available_spots} vagas restantes
+                    </div>
+                  )}
+
+                  {sold ? (
+                    <div className="space-y-3">
+                      <div className="bg-gray-100 text-gray-500 font-bold py-3.5 rounded-xl text-center">Pacote esgotado</div>
+                      <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
+                        className="block text-center text-sm text-emerald-600 hover:text-emerald-700 font-semibold py-2 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors">
+                        Entrar na lista de espera →
+                      </a>
+                    </div>
+                  ) : (
+                    <button onClick={handleOpenBooking}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl text-center transition-colors text-lg hover:shadow-lg hover:shadow-emerald-500/20">
+                      Reservar agora
                     </button>
-                  ))}
+                  )}
+
+                  <p className="text-xs text-gray-400 text-center mt-3">
+                    Mín. {trip.min_group_size} {trip.min_group_size === 1 ? "pessoa" : "pessoas"}
+                  </p>
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-4">
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <p className="text-xs text-gray-400 mb-1">A partir de</p>
-                {trip.original_price && <p className="text-sm text-gray-400 line-through">R$ {trip.original_price.toLocaleString("pt-BR")}</p>}
-                <p className="font-display font-black text-4xl text-navy-700">R$ {trip.price_per_person.toLocaleString("pt-BR")}</p>
-                <p className="text-xs text-gray-500 mb-1">por pessoa</p>
-                <p className="text-sm text-emerald-600 font-medium mb-5">
-                  ou {trip.max_installments}x de R$ {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} sem juros
-                </p>
-                {trip.original_price && (
-                  <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center mb-5">
-                    Você economiza R$ {(trip.original_price - trip.price_per_person).toLocaleString("pt-BR")} por pessoa
-                  </div>
-                )}
-                {sold ? (
-                  <div className="text-center">
-                    <div className="bg-gray-100 text-gray-500 font-bold py-3.5 rounded-xl mb-3">Pacote esgotado</div>
-                    <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
-                      className="block text-center text-sm text-emerald-600 hover:text-emerald-700 font-medium">Entrar na lista de espera →</a>
-                  </div>
-                ) : (
-                  <button onClick={() => handleOpenBooking()}
-                    className="block w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl text-center transition-colors text-lg">
-                    Reservar agora
-                  </button>
-                )}
-                <p className="text-xs text-gray-400 text-center mt-3">
-                  Mín. {trip.min_group_size} {trip.min_group_size === 1 ? "pessoa" : "pessoas"}
-                </p>
-              </div>
-
-              <div className="bg-navy-800 rounded-2xl p-5 text-white">
-                <p className="font-bold mb-1 text-sm">Precisa de ajuda?</p>
-                <p className="text-navy-300 text-xs mb-3">Nossa equipe responde em minutos pelo WhatsApp</p>
-                <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda%20com%20uma%20viagem." target="_blank" rel="noopener noreferrer"
-                  className="block text-center text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors">(41) 99834-8766</a>
+                {/* WhatsApp help card */}
+                <div className="bg-navy-800 rounded-2xl p-5 text-white">
+                  <p className="font-bold text-sm mb-1">Precisa de ajuda?</p>
+                  <p className="text-navy-300 text-xs mb-3 leading-relaxed">
+                    Nossa equipe responde em minutos pelo WhatsApp
+                  </p>
+                  <a href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20uma%20viagem."
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    Falar agora
+                  </a>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="bg-navy-800 text-white py-12 px-4 mt-8">
+      {/* Bottom CTA banner */}
+      <div className="bg-navy-800 text-white py-12 px-4 mb-16 lg:mb-0">
         <div className="max-w-2xl mx-auto text-center">
-          <p className="text-lg font-medium mb-2">Pronto para embarcar?</p>
+          <p className="text-lg font-bold mb-2">Pronto para embarcar?</p>
           <p className="text-navy-300 text-sm mb-6">Fale com nossa equipe agora e garanta sua vaga</p>
           {sold ? (
             <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-xl transition-colors text-lg">
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-colors text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
               Entrar na lista de espera
             </a>
           ) : (
-            <button onClick={() => handleOpenBooking()}
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-xl transition-colors text-lg">
+            <button onClick={handleOpenBooking}
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-all text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
               Quero reservar agora
             </button>
           )}
         </div>
       </div>
-    </div>
-  );
-}
 
-function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
-  icon: React.ReactNode; label: string; value: string; valueClass?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-gray-400 text-xs">{icon}{label}</div>
-      <p className={`font-bold text-sm ${valueClass}`}>{value}</p>
+      <Footer />
+      <WhatsAppFloat />
     </div>
   );
 }
