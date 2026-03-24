@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Todas as Viagens — AJS Turismo",
     description:
-      "Pacotes de viagem nacionais saindo de Curitiba. Os melhores destinos com preço justo e parcelamento facilitado.",
+      "Pacotes de viagem nacionais e internacionais saindo de Curitiba. Os melhores destinos com preço justo e parcelamento facilitado.",
     url: `${SITE}/viagens`,
     siteName: "AJS Turismo",
     type: "website",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Todas as Viagens — AJS Turismo",
-    description: "Pacotes nacionais saindo de Curitiba com os melhores preços.",
+    description: "Pacotes nacionais e internacionais saindo de Curitiba com os melhores preços.",
     images: ["/og-image.jpg"],
   },
 };

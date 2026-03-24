@@ -136,7 +136,7 @@ export default function ViagensPage() {
             Explore Nossas <span className="text-gold-400">Viagens</span>
           </h1>
           <p className="text-navy-200 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-            Pacotes completos com os melhores destinos nacionais. Preços acessíveis, atendimento personalizado e parcelamento em até 12x sem juros.
+            Pacotes completos com os melhores destinos nacionais e internacionais. Preços acessíveis, atendimento personalizado e parcelamento em até 12x sem juros.
           </p>
 
           {/* Search bar */}

@@ -53,7 +53,7 @@ export default function FeaturedDestinations() {
             Destinos que Você <span className="text-gold-500">Vai Amar</span>
           </h2>
           <p className="section-subtitle">
-            Explore os melhores destinos nacionais selecionados pela nossa equipe com os
+            Explore os melhores destinos nacionais e internacionais selecionados pela nossa equipe com os
             melhores preços e condições do mercado.
           </p>
         </div>

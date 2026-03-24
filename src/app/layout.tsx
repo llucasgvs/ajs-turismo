@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "AJS Turismo — Pacotes de Viagem Saindo de Curitiba",
     description:
-      "Pacotes completos para os melhores destinos nacionais. Saindo de Curitiba com preço justo e atendimento personalizado.",
+      "Pacotes completos para os melhores destinos nacionais e internacionais. Saindo de Curitiba com preço justo e atendimento personalizado.",
     images: ["/og-image-1.jpg"],
   },
 
@@ -103,7 +103,7 @@ const jsonLd = {
   "@type": "TravelAgency",
   name: "AJS Turismo",
   description:
-    "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes nacionais com atendimento personalizado e parcelamento facilitado.",
+    "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes nacionais e internacionais com atendimento personalizado e parcelamento facilitado.",
   url: SITE,
   logo: `${SITE}/logo_horizontal.png`,
   image: `${SITE}/og-image-1.jpg`,

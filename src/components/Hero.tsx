@@ -101,7 +101,7 @@ export default function Hero() {
             }`}
           >
             Pacotes de viagem incríveis com o melhor custo-benefício do Brasil.
-            Destinos nacionais, atendimento personalizado e muito mais.
+            Destinos nacionais e internacionais, atendimento personalizado e muito mais.
           </p>
 
           {/* CTAs */}
