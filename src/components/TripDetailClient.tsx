@@ -669,7 +669,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
 
       {/* ── Desktop Header — fixed, always visible ── */}
       <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white border-b border-gray-100 shadow-sm items-center px-6">
@@ -871,7 +871,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="space-y-4">
+              <div className="space-y-4 sticky top-20">
                 {/* Price card */}
                 <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
                   <p className="text-xs text-gray-400 mb-1">A partir de</p>
