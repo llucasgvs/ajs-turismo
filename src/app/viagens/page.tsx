@@ -10,7 +10,6 @@ import {
 import type { Trip } from "@/types/trip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import WhatsAppFloat from "@/components/WhatsAppFloat";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -299,7 +298,6 @@ export default function ViagensPage() {
       </section>
 
       <Footer />
-      <WhatsAppFloat />
     </div>
   );
 }

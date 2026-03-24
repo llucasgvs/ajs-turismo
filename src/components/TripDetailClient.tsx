@@ -12,7 +12,6 @@ import {
 import type { Trip } from "@/types/trip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import WhatsAppFloat from "@/components/WhatsAppFloat";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -667,7 +666,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
-      <Navbar />
+      {/* Navbar só no desktop — mobile usa a barra de voltar abaixo */}
+      <div className="hidden lg:block"><Navbar /></div>
 
       {/* Gallery Modal */}
       {galleryOpen && allImages.length > 0 && (
@@ -682,9 +682,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA trip={trip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />
 
-      <div className="flex-1 pt-16 pb-24 lg:pb-0">
+      <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
         {/* ── Top bar: back + share ── */}
-        <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-16 z-20">
+        <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-0 lg:top-16 z-20">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <button onClick={() => router.back()}
               className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors">
@@ -916,7 +916,6 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
       </div>
 
       <Footer />
-      <WhatsAppFloat />
     </div>
   );
 }
