@@ -163,10 +163,10 @@ export default function Hero() {
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 animate-bounce-slow">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => document.querySelector("#destinos")?.scrollIntoView({ behavior: "smooth" })}
-          className="flex flex-col items-center gap-1 text-white/50 hover:text-gold-400 transition-colors"
+          className="flex flex-col items-center gap-1 text-white/50 hover:text-gold-400 transition-colors animate-bounce-slow"
         >
           <span className="text-xs">Explore</span>
           <ChevronDown size={20} />

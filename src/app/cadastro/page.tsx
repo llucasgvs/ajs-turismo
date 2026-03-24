@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Loader2, Check } from "lucide-react";
+import { saveSession } from "@/lib/api";
+import { useLoading } from "@/components/LoadingProvider";
 
 export default function CadastroPage() {
   const searchParams = useSearchParams();
@@ -13,6 +15,7 @@ export default function CadastroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const { show: showLoading } = useLoading();
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -62,9 +65,9 @@ export default function CadastroPage() {
         return;
       }
 
-      localStorage.setItem("ajs_token", data.access_token);
-      localStorage.setItem("ajs_user", JSON.stringify(data.user));
+      saveSession(data.access_token, data.refresh_token, data.user);
       const dest = redirectTo || (data.user.is_admin ? "/admin" : "/dashboard");
+      showLoading();
       window.location.href = dest;
     } catch {
       setError("Erro de conexão. Tente novamente.");

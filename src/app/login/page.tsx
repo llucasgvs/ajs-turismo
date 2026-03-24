@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { saveSession } from "@/lib/api";
+import { useLoading } from "@/components/LoadingProvider";
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -13,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const { show: showLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,9 +36,9 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem("ajs_token", data.access_token);
-      localStorage.setItem("ajs_user", JSON.stringify(data.user));
+      saveSession(data.access_token, data.refresh_token, data.user);
       const dest = redirectTo || (data.user.is_admin ? "/admin" : "/dashboard");
+      showLoading();
       window.location.href = dest;
     } catch {
       setError("Erro de conexão. Tente novamente.");

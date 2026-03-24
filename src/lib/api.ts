@@ -20,10 +20,36 @@ export function getUser(): StoredUser | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+export function saveSession(accessToken: string, refreshToken: string, user: StoredUser) {
+  localStorage.setItem("ajs_token", accessToken);
+  localStorage.setItem("ajs_refresh_token", refreshToken);
+  localStorage.setItem("ajs_user", JSON.stringify(user));
+}
+
 export function logout() {
   localStorage.removeItem("ajs_token");
+  localStorage.removeItem("ajs_refresh_token");
   localStorage.removeItem("ajs_user");
   window.location.href = "/login";
+}
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = localStorage.getItem("ajs_refresh_token");
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem("ajs_token", data.access_token);
+    localStorage.setItem("ajs_refresh_token", data.refresh_token);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -33,5 +59,18 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     ...(options.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(`${API_URL}${path}`, { ...options, headers });
+
+  let res = await fetch(`${API_URL}${path}`, { ...options, headers });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      headers["Authorization"] = `Bearer ${getToken()}`;
+      res = await fetch(`${API_URL}${path}`, { ...options, headers });
+    } else {
+      logout();
+    }
+  }
+
+  return res;
 }
