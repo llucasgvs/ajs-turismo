@@ -30,12 +30,12 @@ type Booking = {
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number };
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700" },
-  pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700" },
-  confirmed:  { label: "Confirmado", color: "bg-emerald-100 text-emerald-700" },
-  cancelled:  { label: "Cancelado",  color: "bg-red-100 text-red-700" },
-  completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600" },
+const STATUS_LABEL: Record<string, { label: string; color: string; border: string }> = {
+  interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700",     border: "border-l-amber-400" },
+  pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700",       border: "border-l-blue-400" },
+  confirmed:  { label: "Confirmado", color: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-400" },
+  cancelled:  { label: "Cancelado",  color: "bg-red-100 text-red-700",         border: "border-l-red-400" },
+  completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600",       border: "border-l-gray-300" },
 };
 
 function fmt(d: string) {
@@ -209,15 +209,14 @@ export default function AdminReservasPage() {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const params = tab !== "all" ? `?booking_status=${tab}` : "";
-      const res = await fetch(`${API}/bookings/admin/all${params}&limit=200`, {
+      const res = await fetch(`${API}/bookings/admin/all?limit=200`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) setBookings(await res.json());
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, []);
 
   useEffect(() => {
     fetchBookings();
@@ -225,7 +224,7 @@ export default function AdminReservasPage() {
 
   useEffect(() => {
     fetch(`${API}/trips/admin-list`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.json()).then(setTrips).catch(() => {});
+      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setTrips(d); }).catch(() => {});
   }, []);
 
   const confirm = async (code: string) => {
@@ -257,7 +256,15 @@ export default function AdminReservasPage() {
 
   const tripMap = Object.fromEntries(trips.map((t) => [t.id, t]));
 
-  const filtered = bookings.filter((b) => {
+  const counts = {
+    interesse: bookings.filter((b) => b.status === "interesse").length,
+    confirmed: bookings.filter((b) => b.status === "confirmed").length,
+    all: bookings.length,
+  };
+
+  const tabBookings = tab === "all" ? bookings : bookings.filter((b) => b.status === tab);
+
+  const filtered = tabBookings.filter((b) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -268,10 +275,10 @@ export default function AdminReservasPage() {
     );
   });
 
-  const tabs: { key: typeof tab; label: string }[] = [
-    { key: "interesse", label: "Interesses" },
-    { key: "confirmed", label: "Confirmadas" },
-    { key: "all",       label: "Todas" },
+  const tabs: { key: typeof tab; label: string; count: number }[] = [
+    { key: "interesse", label: "Interesses", count: counts.interesse },
+    { key: "confirmed", label: "Confirmadas", count: counts.confirmed },
+    { key: "all",       label: "Todas",       count: counts.all },
   ];
 
   return (
@@ -297,18 +304,25 @@ export default function AdminReservasPage() {
       </div>
 
       {/* Tabs + search */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1">
-          {tabs.map(({ key, label }) => (
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex gap-2 w-full sm:w-auto">
+          {tabs.map(({ key, label, count }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                tab === key ? "bg-navy-800 text-white" : "text-gray-500 hover:text-navy-800"
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+                tab === key
+                  ? "bg-navy-800 text-white shadow-sm"
+                  : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
               }`}>
               {label}
+              {count > 0 && (
+                <span className={`min-w-[20px] h-5 flex items-center justify-center rounded-full text-xs font-bold px-1 ${
+                  tab === key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                }`}>{count}</span>
+              )}
             </button>
           ))}
         </div>
-        <div className="relative flex-1 min-w-48">
+        <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Buscar por código, nome, CPF ou viagem..."
             value={search} onChange={(e) => setSearch(e.target.value)}
@@ -327,116 +341,57 @@ export default function AdminReservasPage() {
             <p className="font-medium">Nenhuma reserva encontrada</p>
           </div>
         ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filtered.map((b) => {
-                const trip = tripMap[b.trip_id];
-                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
-                const isLoading = actionLoading === b.booking_code;
-                const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
-                return (
-                  <div key={b.id} className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs text-navy-600 font-semibold">{b.booking_code}</p>
-                        <p className="font-medium text-navy-800 text-sm leading-tight truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</p>
-                        <p className="text-xs text-gray-400">{travelerName}</p>
+          <div className="p-4 flex flex-col gap-3">
+            {filtered.map((b) => {
+              const trip = tripMap[b.trip_id];
+              const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+              const isLoading = actionLoading === b.booking_code;
+              const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
+              return (
+                <div key={b.id} className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="font-mono text-xs text-navy-500 font-semibold">{b.booking_code}</span>
+                        <span className="text-gray-300 hidden sm:inline">·</span>
+                        <span className="font-bold text-navy-800 text-sm truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</span>
+                        {trip?.destination && <span className="text-xs text-gray-400 hidden sm:inline truncate">{trip.destination}</span>}
                       </div>
-                      <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>
-                        {st.label}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+                        <span className="font-medium text-gray-600">{travelerName}</span>
+                        {b.traveler_cpf && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline font-mono">{b.traveler_cpf}</span></>}
+                        {b.traveler_phone && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline">{b.traveler_phone}</span></>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 pt-1">
+                        <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
+                        <span>·</span>
+                        <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
+                        <span>·</span>
+                        <span>{fmt(b.created_at)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
-                      <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
-                      <span>{fmt(b.created_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {b.status === "interesse" && (
-                        <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
-                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                          <Check size={11} /> Confirmar
-                        </button>
-                      )}
-                      {["interesse", "confirmed", "pending"].includes(b.status) && (
-                        <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
-                          className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                          <X size={11} /> Cancelar
-                        </button>
-                      )}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                      <div className="flex items-center gap-2">
+                        {b.status === "interesse" && (
+                          <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
+                            className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                            <Check size={11} /> Confirmar
+                          </button>
+                        )}
+                        {["interesse", "confirmed", "pending"].includes(b.status) && (
+                          <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
+                            className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                            <X size={11} /> Cancelar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Código</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Viagem</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Titular</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pessoas</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filtered.map((b) => {
-                    const trip = tripMap[b.trip_id];
-                    const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
-                    const isLoading = actionLoading === b.booking_code;
-                    const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
-                    return (
-                      <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-4 font-mono text-xs text-navy-700 font-semibold">{b.booking_code}</td>
-                        <td className="px-5 py-4">
-                          <p className="font-medium text-navy-800 leading-tight">{trip?.title ?? `Viagem #${b.trip_id}`}</p>
-                          <p className="text-xs text-gray-400">{trip?.destination}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="font-medium text-navy-800 leading-tight">{travelerName}</p>
-                          {b.traveler_cpf && <p className="text-xs text-gray-400">{b.traveler_cpf}</p>}
-                          {b.traveler_phone && <p className="text-xs text-gray-400">{b.traveler_phone}</p>}
-                        </td>
-                        <td className="px-5 py-4 text-center font-bold text-navy-800">{b.num_travelers}</td>
-                        <td className="px-5 py-4 font-semibold text-navy-800">
-                          R$ {b.final_amount.toLocaleString("pt-BR")}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">{fmt(b.created_at)}</td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2 justify-end">
-                            {b.status === "interesse" && (
-                              <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
-                                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                                <Check size={12} /> Confirmar
-                              </button>
-                            )}
-                            {["interesse", "confirmed", "pending"].includes(b.status) && (
-                              <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
-                                className="flex items-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                                <X size={12} /> Cancelar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

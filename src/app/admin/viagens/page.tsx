@@ -19,11 +19,11 @@ interface Trip {
   category: string;
 }
 
-const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  active: { label: "Ativo", cls: "bg-green-100 text-green-700" },
-  sold_out: { label: "Esgotado", cls: "bg-red-100 text-red-700" },
-  cancelled: { label: "Cancelado", cls: "bg-gray-100 text-gray-600" },
-  completed: { label: "Concluído", cls: "bg-blue-100 text-blue-700" },
+const STATUS_LABEL: Record<string, { label: string; cls: string; border: string }> = {
+  active:    { label: "Ativo",     cls: "bg-green-100 text-green-700",  border: "border-l-green-400" },
+  sold_out:  { label: "Esgotado",  cls: "bg-red-100 text-red-700",      border: "border-l-red-400" },
+  cancelled: { label: "Cancelado", cls: "bg-gray-100 text-gray-600",    border: "border-l-gray-300" },
+  completed: { label: "Concluído", cls: "bg-blue-100 text-blue-700",    border: "border-l-blue-400" },
 };
 
 export default function AdminViagens() {
@@ -102,78 +102,49 @@ export default function AdminViagens() {
             )}
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Viagem</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Vagas</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Preço</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Saída</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((trip) => {
-                const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600" };
-                return (
-                  <tr key={trip.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {trip.is_featured && (
-                          <Star size={13} className="text-gold-500 flex-shrink-0" fill="currentColor" />
-                        )}
-                        <div>
-                          <p className="font-medium text-navy-800 text-sm leading-tight">{trip.title}</p>
-                          <p className="text-gray-400 text-xs mt-0.5">{trip.destination}</p>
+          <div className="p-4 flex flex-col gap-3">
+            {filtered.map((trip) => {
+              const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+              return (
+                <div key={trip.id} className={`rounded-xl border border-gray-100 border-l-4 ${s.border} bg-gray-50 p-4 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-start gap-1.5">
+                        {trip.is_featured && <Star size={12} className="text-gold-500 flex-shrink-0 mt-0.5" fill="currentColor" />}
+                        <div className="min-w-0">
+                          <p className="font-bold text-navy-800 text-sm leading-tight">{trip.title}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{trip.destination}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>
-                        {s.label}
-                      </span>
-                      {!trip.is_active && (
-                        <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-600">
-                          Oculto
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">
-                      {trip.available_spots}/{trip.total_spots}
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="text-navy-700 font-bold text-sm">
-                        R$ {trip.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
-                      {new Date(trip.departure_date).toLocaleDateString("pt-BR")}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2 justify-end">
-                        <Link
-                          href={`/admin/viagens/${trip.id}/editar`}
-                          className="p-2 text-gray-400 hover:text-navy-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil size={15} />
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                        <span>{trip.available_spots}/{trip.total_spots} vagas</span>
+                        <span>·</span>
+                        <span className="font-bold text-navy-700">R$ {trip.price_per_person.toLocaleString("pt-BR")}</span>
+                        <span>·</span>
+                        <span>{new Date(trip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.cls}`}>{s.label}</span>
+                        {!trip.is_active && <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-600">Oculto</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/admin/viagens/${trip.id}/editar`}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-navy-600 bg-navy-50 hover:bg-navy-100 px-3 py-1.5 rounded-lg transition-colors">
+                          <Pencil size={11} /> Editar
                         </Link>
-                        <button
-                          onClick={() => handleDelete(trip.id, trip.title)}
-                          disabled={deleting === trip.id}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Desativar"
-                        >
-                          <Trash2 size={15} />
+                        <button onClick={() => handleDelete(trip.id, trip.title)} disabled={deleting === trip.id}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-red-500 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          <Trash2 size={11} /> Desativar
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

@@ -122,7 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 lg:ml-60 flex flex-col min-h-screen overflow-x-hidden">
         {/* Mobile top bar */}
         <header className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-30">
           <button

@@ -522,6 +522,7 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);
       window.open(`https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
       onClose();
+      window.location.href = "/dashboard";
     } catch { setError("Erro de conexão. Tente novamente."); }
     finally { setLoading(false); }
   };
