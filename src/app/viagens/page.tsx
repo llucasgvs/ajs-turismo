@@ -101,7 +101,7 @@ export default function ViagensPage() {
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden">
       <Navbar />
 
       {/* ── HERO ── */}
@@ -142,20 +142,20 @@ export default function ViagensPage() {
           {/* Search bar */}
           <form
             onSubmit={handleSearch}
-            className="flex gap-2 max-w-2xl mx-auto bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-2"
+            className="flex flex-col sm:flex-row gap-2 max-w-2xl mx-auto"
           >
-            <div className="relative flex-1">
+            <div className="relative flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
               <input
-                className="w-full pl-11 pr-4 py-3 bg-transparent text-white placeholder-white/50 text-sm focus:outline-none"
-                placeholder="Buscar por destino, pacote ou categoria..."
+                className="w-full pl-11 pr-4 py-3.5 bg-transparent text-white placeholder-white/50 text-sm focus:outline-none"
+                placeholder="Buscar destino, pacote ou categoria..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
             <button
               type="submit"
-              className="btn-primary px-6 py-3 text-sm flex items-center gap-2 whitespace-nowrap"
+              className="btn-primary px-6 py-3.5 text-sm flex items-center justify-center gap-2"
             >
               <Search size={15} />
               Buscar
@@ -168,40 +168,40 @@ export default function ViagensPage() {
       </section>
 
       {/* ── MAIN CONTENT ── */}
-      <main className="flex-1 container-custom py-10">
+      <main className="flex-1 w-full container-custom py-10">
 
-        {/* Filters bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
-          {/* Category pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1 min-w-0">
-            <SlidersHorizontal size={15} className="text-gray-400 flex-shrink-0" />
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setCategory(cat.value)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                  category === cat.value
-                    ? "bg-navy-800 text-white shadow-md"
-                    : "bg-white text-gray-600 hover:bg-navy-50 hover:text-navy-700 border border-gray-200"
-                }`}
-              >
-                <span>{cat.icon}</span>
-                {cat.label}
-              </button>
-            ))}
-          </div>
+        {/* Filters bar — pills + sort na mesma linha com scroll horizontal */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 w-full min-w-0">
+          <SlidersHorizontal size={15} className="text-gray-400 flex-shrink-0" />
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setCategory(cat.value)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                category === cat.value
+                  ? "bg-navy-800 text-white shadow-md"
+                  : "bg-white text-gray-600 hover:bg-navy-50 hover:text-navy-700 border border-gray-200"
+              }`}
+            >
+              <span>{cat.icon}</span>
+              {cat.label}
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-gray-200 flex-shrink-0 mx-1" />
 
           {/* Sort */}
           <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
-              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-4 py-2 rounded-full hover:border-navy-300 transition-colors"
+              className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-full hover:border-navy-300 transition-colors whitespace-nowrap"
             >
               {sortLabel}
-              <ChevronDown size={14} className={`transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
+              <ChevronDown size={13} className={`transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
             </button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[170px] overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-xl shadow-lg z-20 min-w-[160px] overflow-hidden">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -320,56 +320,53 @@ function TripCard({ trip }: { trip: Trip }) {
       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col border border-gray-100 hover:border-gold-300 hover:-translate-y-1"
     >
       {/* Image */}
-      <div className="relative h-52 overflow-hidden">
+      <div className="relative h-44 flex-shrink-0 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={trip.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80"}
           alt={trip.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
 
-        {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-          {trip.tag && (
+        {/* Top-left: tag badge */}
+        {trip.tag && (
+          <div className="absolute top-2.5 left-2.5">
             <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-xs font-bold px-2.5 py-1 rounded-full">
               <Star size={9} fill="currentColor" />
               {trip.tag}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
+        {/* Top-right: status + discount */}
+        <div className="absolute top-2.5 right-2.5 flex flex-col gap-1 items-end">
           {sold ? (
-            <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              Esgotado
-            </span>
+            <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">Esgotado</span>
           ) : lowStock ? (
-            <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              Últimas vagas!
-            </span>
+            <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">Últimas vagas!</span>
           ) : null}
           {discount && discount > 0 && (
-            <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              -{discount}%
-            </span>
+            <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">-{discount}%</span>
           )}
         </div>
 
-        {/* Title over image */}
-        <div className="absolute bottom-3 left-3 right-3">
-          <h3 className="font-display font-black text-base text-white leading-tight line-clamp-2">
-            {trip.title}
-          </h3>
-          <div className="flex items-center gap-1 text-white/75 text-xs mt-1">
-            <MapPin size={11} className="text-gold-400" />
-            {trip.destination}
+        {/* Bottom-left: destination pill */}
+        <div className="absolute bottom-2.5 left-2.5">
+          <div className="inline-flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 max-w-[180px]">
+            <MapPin size={10} className="text-gold-400 flex-shrink-0" />
+            <span className="text-white text-xs font-medium truncate">{trip.destination}</span>
           </div>
         </div>
       </div>
 
       {/* Body */}
       <div className="p-4 flex flex-col flex-1">
+        {/* Title — in body for proper width constraint */}
+        <h3 className="font-display font-black text-sm text-navy-800 leading-snug line-clamp-2 mb-1.5">
+          {trip.title}
+        </h3>
+
         {trip.short_description && (
           <p className="text-gray-400 text-xs leading-relaxed mb-3 line-clamp-2">
             {trip.short_description}
@@ -377,7 +374,7 @@ function TripCard({ trip }: { trip: Trip }) {
         )}
 
         {/* Info pills */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           <span className="inline-flex items-center gap-1 bg-navy-50 text-navy-600 text-xs font-medium px-2.5 py-1 rounded-full">
             <Clock size={10} />
             {trip.duration_nights + 1}d / {trip.duration_nights}n
@@ -393,32 +390,30 @@ function TripCard({ trip }: { trip: Trip }) {
         </div>
 
         {/* Price + CTA */}
-        <div className="mt-auto">
-          <div className="flex items-end justify-between mb-3">
-            <div>
-              {trip.original_price && (
-                <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
-                  R$ {trip.original_price.toLocaleString("pt-BR")}
-                </p>
-              )}
-              <p className="text-[10px] text-gray-400 leading-none">a partir de</p>
-              <p className="font-display font-black text-2xl text-navy-700 leading-tight">
-                R$ {trip.price_per_person.toLocaleString("pt-BR")}
+        <div className="mt-auto flex items-end justify-between pt-2 border-t border-gray-100">
+          <div>
+            {trip.original_price && (
+              <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
+                R$ {trip.original_price.toLocaleString("pt-BR")}
               </p>
-              <p className="text-[10px] text-emerald-600 font-semibold">
-                {trip.max_installments}x de R${" "}
-                {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} s/ juros
-              </p>
-            </div>
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                sold
-                  ? "bg-gray-100 text-gray-400"
-                  : "bg-navy-800 text-white group-hover:bg-gold-500 group-hover:scale-110"
-              }`}
-            >
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-            </div>
+            )}
+            <p className="text-[10px] text-gray-400 leading-none">a partir de</p>
+            <p className="font-display font-black text-xl text-navy-700 leading-tight">
+              R$ {trip.price_per_person.toLocaleString("pt-BR")}
+            </p>
+            <p className="text-[10px] text-emerald-600 font-semibold">
+              {trip.max_installments}x de R${" "}
+              {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} s/ juros
+            </p>
+          </div>
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+              sold
+                ? "bg-gray-100 text-gray-400"
+                : "bg-navy-800 text-white group-hover:bg-gold-500 group-hover:scale-110"
+            }`}
+          >
+            <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
           </div>
         </div>
       </div>
