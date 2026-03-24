@@ -348,21 +348,22 @@ export default function AdminReservasPage() {
               const isLoading = actionLoading === b.booking_code;
               const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
               return (
-                <div key={b.id} className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                <div key={b.id} className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                  {/* Info + badge */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         <span className="font-mono text-xs text-navy-500 font-semibold">{b.booking_code}</span>
                         <span className="text-gray-300 hidden sm:inline">·</span>
                         <span className="font-bold text-navy-800 text-sm truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</span>
-                        {trip?.destination && <span className="text-xs text-gray-400 hidden sm:inline truncate">{trip.destination}</span>}
+                        {trip?.destination && <span className="text-xs text-gray-400 hidden sm:inline">{trip.destination}</span>}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
-                        <span className="font-medium text-gray-600">{travelerName}</span>
+                        <span className="font-medium text-gray-600 truncate">{travelerName}</span>
                         {b.traveler_cpf && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline font-mono">{b.traveler_cpf}</span></>}
                         {b.traveler_phone && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline">{b.traveler_phone}</span></>}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 pt-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 pt-0.5">
                         <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
                         <span>·</span>
                         <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
@@ -370,24 +371,25 @@ export default function AdminReservasPage() {
                         <span>{fmt(b.created_at)}</span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
-                      <div className="flex items-center gap-2">
-                        {b.status === "interesse" && (
-                          <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
-                            className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                            <Check size={11} /> Confirmar
-                          </button>
-                        )}
-                        {["interesse", "confirmed", "pending"].includes(b.status) && (
-                          <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
-                            className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                            <X size={11} /> Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                   </div>
+                  {/* Actions */}
+                  {(b.status === "interesse" || ["interesse", "confirmed", "pending"].includes(b.status)) && (
+                    <div className="flex items-center gap-2">
+                      {b.status === "interesse" && (
+                        <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
+                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          <Check size={11} /> Confirmar
+                        </button>
+                      )}
+                      {["interesse", "confirmed", "pending"].includes(b.status) && (
+                        <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
+                          className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          <X size={11} /> Cancelar
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
