@@ -285,7 +285,7 @@ export default function AdminReservasPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap gap-3 items-start justify-between">
         <div>
           <h1 className="text-2xl font-black text-navy-900">Reservas</h1>
           <p className="text-gray-500 text-sm mt-0.5">Interesses e vendas confirmadas</p>
@@ -316,7 +316,7 @@ export default function AdminReservasPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (desktop) / Cards (mobile) */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -327,78 +327,116 @@ export default function AdminReservasPage() {
             <p className="font-medium">Nenhuma reserva encontrada</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Código</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Viagem</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Titular</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pessoas</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map((b) => {
-                  const trip = tripMap[b.trip_id];
-                  const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
-                  const isLoading = actionLoading === b.booking_code;
-                  const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
-                  return (
-                    <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-4 font-mono text-xs text-navy-700 font-semibold">{b.booking_code}</td>
-                      <td className="px-5 py-4">
-                        <p className="font-medium text-navy-800 leading-tight">{trip?.title ?? `Viagem #${b.trip_id}`}</p>
-                        <p className="text-xs text-gray-400">{trip?.destination}</p>
-                      </td>
-                      <td className="px-5 py-4">
-                        <p className="font-medium text-navy-800 leading-tight">{travelerName}</p>
-                        {b.traveler_cpf && <p className="text-xs text-gray-400">{b.traveler_cpf}</p>}
-                        {b.traveler_phone && <p className="text-xs text-gray-400">{b.traveler_phone}</p>}
-                      </td>
-                      <td className="px-5 py-4 text-center font-bold text-navy-800">{b.num_travelers}</td>
-                      <td className="px-5 py-4 font-semibold text-navy-800">
-                        R$ {b.final_amount.toLocaleString("pt-BR")}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>
-                          {st.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">{fmt(b.created_at)}</td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 justify-end">
-                          {b.status === "interesse" && (
-                            <button
-                              onClick={() => confirm(b.booking_code)}
-                              disabled={isLoading}
-                              title="Confirmar venda"
-                              className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                              <Check size={12} />
-                              Confirmar
-                            </button>
-                          )}
-                          {["interesse", "confirmed", "pending"].includes(b.status) && (
-                            <button
-                              onClick={() => cancel(b.booking_code)}
-                              disabled={isLoading}
-                              title="Cancelar"
-                              className="flex items-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                              <X size={12} />
-                              Cancelar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {filtered.map((b) => {
+                const trip = tripMap[b.trip_id];
+                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
+                const isLoading = actionLoading === b.booking_code;
+                const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
+                return (
+                  <div key={b.id} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs text-navy-600 font-semibold">{b.booking_code}</p>
+                        <p className="font-medium text-navy-800 text-sm leading-tight truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                        <p className="text-xs text-gray-400">{travelerName}</p>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>
+                        {st.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
+                      <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
+                      <span>{fmt(b.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {b.status === "interesse" && (
+                        <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
+                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          <Check size={11} /> Confirmar
+                        </button>
+                      )}
+                      {["interesse", "confirmed", "pending"].includes(b.status) && (
+                        <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
+                          className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                          <X size={11} /> Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Código</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Viagem</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Titular</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pessoas</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.map((b) => {
+                    const trip = tripMap[b.trip_id];
+                    const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600" };
+                    const isLoading = actionLoading === b.booking_code;
+                    const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
+                    return (
+                      <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-4 font-mono text-xs text-navy-700 font-semibold">{b.booking_code}</td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium text-navy-800 leading-tight">{trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                          <p className="text-xs text-gray-400">{trip?.destination}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium text-navy-800 leading-tight">{travelerName}</p>
+                          {b.traveler_cpf && <p className="text-xs text-gray-400">{b.traveler_cpf}</p>}
+                          {b.traveler_phone && <p className="text-xs text-gray-400">{b.traveler_phone}</p>}
+                        </td>
+                        <td className="px-5 py-4 text-center font-bold text-navy-800">{b.num_travelers}</td>
+                        <td className="px-5 py-4 font-semibold text-navy-800">
+                          R$ {b.final_amount.toLocaleString("pt-BR")}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">{fmt(b.created_at)}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2 justify-end">
+                            {b.status === "interesse" && (
+                              <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
+                                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                                <Check size={12} /> Confirmar
+                              </button>
+                            )}
+                            {["interesse", "confirmed", "pending"].includes(b.status) && (
+                              <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
+                                className="flex items-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                                <X size={12} /> Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

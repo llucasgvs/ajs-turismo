@@ -38,7 +38,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-wrap gap-3 items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-display font-black text-navy-800">Dashboard</h1>
           <p className="text-gray-500 text-sm mt-1">Bem-vindo ao painel da AJS Turismo</p>
@@ -53,7 +53,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           { label: "Total de Viagens", value: stats.total, icon: Map, color: "text-navy-600", bg: "bg-navy-50" },
           { label: "Ativas com Vagas", value: stats.active, icon: Activity, color: "text-green-600", bg: "bg-green-50" },
@@ -90,12 +90,24 @@ export default function AdminDashboard() {
         ) : (
           <div className="divide-y divide-gray-50">
             {trips.slice(0, 5).map((trip) => (
-              <div key={trip.id} className="flex items-center justify-between px-6 py-4">
+              <div key={trip.id} className="flex items-center justify-between px-4 md:px-6 py-4 gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-navy-800 text-sm truncate">{trip.title}</p>
                   <p className="text-gray-400 text-xs">{trip.destination}</p>
+                  <div className="flex items-center gap-2 mt-1 md:hidden">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      trip.status === "active" ? "bg-green-100 text-green-700" :
+                      trip.status === "sold_out" ? "bg-red-100 text-red-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>
+                      {trip.status === "active" ? "Ativo" : trip.status === "sold_out" ? "Esgotado" : trip.status}
+                    </span>
+                    <span className="text-navy-700 font-bold text-xs">
+                      R$ {trip.price_per_person.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 ml-4">
+                <div className="hidden md:flex items-center gap-4">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     trip.status === "active" ? "bg-green-100 text-green-700" :
                     trip.status === "sold_out" ? "bg-red-100 text-red-700" :
@@ -106,13 +118,13 @@ export default function AdminDashboard() {
                   <p className="text-navy-700 font-bold text-sm whitespace-nowrap">
                     R$ {trip.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
-                  <Link
-                    href={`/admin/viagens/${trip.id}/editar`}
-                    className="text-xs text-navy-500 hover:text-gold-600 font-medium transition-colors"
-                  >
-                    Editar
-                  </Link>
                 </div>
+                <Link
+                  href={`/admin/viagens/${trip.id}/editar`}
+                  className="text-xs text-navy-500 hover:text-gold-600 font-medium transition-colors whitespace-nowrap"
+                >
+                  Editar
+                </Link>
               </div>
             ))}
           </div>
