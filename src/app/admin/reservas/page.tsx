@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown } from "lucide-react";
 import { getToken } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -29,6 +29,7 @@ type Booking = {
   cancelled_at: string | null;
   discount_amount: number;
   installments: number;
+  is_external: boolean;
 };
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number };
@@ -91,12 +92,16 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onCancel, actio
       <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button onClick={copyCode} className="flex items-center gap-1.5 font-mono text-sm text-navy-700 font-bold hover:text-gold-600 transition-colors group">
               {booking.booking_code}
               {codeCopied ? <CheckCheck size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-300 group-hover:text-gold-500 transition-colors" />}
             </button>
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+            {booking.is_external
+              ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700"><Store size={10} /> Externo</span>
+              : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"><Globe size={10} /> Via Site</span>
+            }
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
             <X size={18} />
@@ -219,16 +224,39 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  type Companion = { full_name: string; cpf: string; birth_date: string };
+
   const [tripId, setTripId] = useState("");
-  const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [birth, setBirth] = useState("");
   const [people, setPeople] = useState(1);
+  const [companions, setCompanions] = useState<Companion[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("whatsapp");
   const [notes, setNotes] = useState("");
+  const [priceOverride, setPriceOverride] = useState("");
+  const [showPriceOverride, setShowPriceOverride] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cpfStatus, setCpfStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  const [autoFilled, setAutoFilled] = useState(false);
+  const cpfTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const changePeople = (n: number) => {
+    const max = selectedTrip?.available_spots ?? 99;
+    const clamped = Math.max(1, Math.min(n, max));
+    setPeople(clamped);
+    setCompanions((prev) => {
+      const need = clamped - 1;
+      if (need > prev.length) return [...prev, ...Array.from({ length: need - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" }))];
+      return prev.slice(0, need);
+    });
+  };
+
+  const updateCompanion = (i: number, field: keyof Companion, value: string) => {
+    setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
+  };
 
   const formatCPF = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 11);
@@ -238,11 +266,53 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
   };
 
+  const formatPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  };
+
+  const handleCpfChange = (v: string) => {
+    const formatted = formatCPF(v);
+    setCpf(formatted);
+    setAutoFilled(false);
+    const clean = formatted.replace(/\D/g, "");
+    if (clean.length < 11) { setCpfStatus("idle"); return; }
+    setCpfStatus("loading");
+    if (cpfTimer.current) clearTimeout(cpfTimer.current);
+    cpfTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API}/bookings/admin/lookup-cpf?cpf=${clean}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const d = await res.json();
+        if (d.found) {
+          setCpfStatus("found");
+          setName(d.full_name || "");
+          setPhone(d.phone ? formatPhone(d.phone) : "");
+          setBirth(d.birth_date ? d.birth_date.slice(0, 10) : "");
+          setAutoFilled(true);
+        } else {
+          setCpfStatus("not_found");
+          setAutoFilled(false);
+        }
+      } catch {
+        setCpfStatus("idle");
+      }
+    }, 400);
+  };
+
+  const selectedTrip = trips.find((t) => String(t.id) === tripId);
+  const effectivePrice = priceOverride ? parseFloat(priceOverride) || 0 : (selectedTrip?.price_per_person || 0);
+  const total = effectivePrice * people;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!tripId) { setError("Selecione a viagem."); return; }
     if (cpf.replace(/\D/g, "").length < 11) { setError("CPF inválido."); return; }
+    if (!name.trim()) { setError("Informe o nome do titular."); return; }
 
     setLoading(true);
     try {
@@ -254,9 +324,15 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           traveler_name: name,
           traveler_cpf: cpf,
           traveler_phone: phone,
-          traveler_birth_date: birth,
+          traveler_birth_date: birth || undefined,
           num_travelers: people,
+          companions: companions.filter((c) => c.full_name.trim()).map((c) => ({
+            full_name: c.full_name,
+            cpf: c.cpf,
+            birth_date: c.birth_date || undefined,
+          })),
           payment_method: paymentMethod,
+          price_override: priceOverride ? parseFloat(priceOverride) : undefined,
           notes: notes || undefined,
         }),
       });
@@ -275,90 +351,192 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-bold text-navy-800 text-lg">Nova Venda Externa</h3>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-navy-800 text-base">Nova Venda Externa</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Walk-in · WhatsApp · Presencial</p>
+          </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
             <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
+          {/* 1. Viagem */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Viagem *</label>
-            <select required value={tripId} onChange={(e) => setTripId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400">
-              <option value="">Selecione...</option>
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>{t.title} — {t.destination} ({t.available_spots} vagas)</option>
-              ))}
-            </select>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Viagem</label>
+            <div className="relative">
+              <select required value={tripId} onChange={(e) => setTripId(e.target.value)}
+                className="w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer">
+                <option value="">Selecione a viagem...</option>
+                {trips.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.available_spots} vagas · R$ {t.price_per_person.toLocaleString("pt-BR")})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            {selectedTrip && (
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                <MapPin size={10} /> {selectedTrip.destination}
+                <span className="mx-1">·</span>
+                <span className="font-semibold text-navy-600">R$ {selectedTrip.price_per_person.toLocaleString("pt-BR")} / pessoa</span>
+                <span className="mx-1">·</span>
+                {selectedTrip.available_spots} vagas
+              </p>
+            )}
           </div>
 
-          <div className="bg-navy-50 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-bold text-navy-700 uppercase tracking-wide">Dados do titular</p>
+          {/* 2. CPF com lookup */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">CPF do Titular</label>
+            <div className="relative">
+              <CreditCard size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" inputMode="numeric" placeholder="000.000.000-00"
+                value={cpf} onChange={(e) => handleCpfChange(e.target.value)}
+                className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {cpfStatus === "loading" && <Loader2 size={14} className="text-gray-400 animate-spin" />}
+                {cpfStatus === "found" && <Check size={14} className="text-emerald-500" />}
+              </div>
+            </div>
+            {cpfStatus === "found" && (
+              <p className="mt-1.5 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <Check size={11} /> Cliente encontrado — dados preenchidos automaticamente
+              </p>
+            )}
+            {cpfStatus === "not_found" && (
+              <p className="mt-1.5 text-xs text-gray-400">Novo cliente — preencha os dados abaixo</p>
+            )}
+          </div>
+
+          {/* 3. Dados pessoais */}
+          <div className="space-y-3">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Dados do Titular</label>
             <div className="relative">
               <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input required type="text" placeholder="Nome completo" value={name} onChange={(e) => setName(e.target.value)}
-                className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              <input type="text" placeholder="Nome completo" value={name} onChange={(e) => { setName(e.target.value); setAutoFilled(false); }}
+                className={`w-full pl-8 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${autoFilled ? "border-emerald-300 bg-emerald-50" : "border-gray-200"}`} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <CreditCard size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input required type="text" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))}
-                  className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-              </div>
               <div className="relative">
                 <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input required type="tel" placeholder="(41) 99999-9999" value={phone} onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                <input type="tel" placeholder="(41) 99999-9999" value={phone}
+                  onChange={(e) => { setPhone(formatPhone(e.target.value)); setAutoFilled(false); }}
+                  className={`w-full pl-8 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${autoFilled && phone ? "border-emerald-300 bg-emerald-50" : "border-gray-200"}`} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <div className="relative">
                 <Cake size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input required type="date" value={birth} onChange={(e) => setBirth(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Users size={13} className="text-gray-400 flex-shrink-0" />
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setPeople((p) => Math.max(1, p - 1))}
-                    className="w-8 h-8 border border-gray-200 rounded-lg flex items-center justify-center font-bold">−</button>
-                  <span className="w-6 text-center font-bold text-sm">{people}</span>
-                  <button type="button" onClick={() => setPeople((p) => p + 1)}
-                    className="w-8 h-8 border border-gray-200 rounded-lg flex items-center justify-center font-bold">+</button>
-                </div>
+                <input type="date" value={birth} onChange={(e) => { setBirth(e.target.value); setAutoFilled(false); }}
+                  className={`w-full pl-8 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${autoFilled && birth ? "border-emerald-300 bg-emerald-50" : "border-gray-200"}`} />
               </div>
             </div>
+            <p className="text-[10px] text-gray-400">Data de nascimento é opcional</p>
           </div>
 
+          {/* 4. Quantidade + Pagamento */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Forma de pagamento</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400">
-                <option value="whatsapp">WhatsApp / Presencial</option>
-                <option value="pix">PIX</option>
-                <option value="transfer">Transferência</option>
-                <option value="credit_card">Cartão de crédito</option>
-              </select>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pessoas</label>
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
+                <button type="button" onClick={() => changePeople(people - 1)}
+                  className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                <span className="flex-1 text-center font-bold text-sm text-navy-800">{people}</span>
+                <button type="button" onClick={() => changePeople(people + 1)}
+                  className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pagamento</label>
+              <div className="relative">
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer">
+                  <option value="whatsapp">Presencial / WA</option>
+                  <option value="pix">PIX</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="credit_card">Cartão</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
 
+          {/* 4b. Acompanhantes */}
+          {companions.length > 0 && (
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Users size={11} /> Acompanhantes ({companions.length})
+              </label>
+              {companions.map((c, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400">Acompanhante {i + 1}</p>
+                  <div className="relative">
+                    <User size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="text" placeholder="Nome completo *" value={c.full_name}
+                      onChange={(e) => updateCompanion(i, "full_name", e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <CreditCard size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="text" inputMode="numeric" placeholder="CPF *" value={c.cpf}
+                        onChange={(e) => updateCompanion(i, "cpf", formatCPF(e.target.value))}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                    </div>
+                    <div className="relative">
+                      <Cake size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="date" value={c.birth_date}
+                        onChange={(e) => updateCompanion(i, "birth_date", e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 5. Preço (override) */}
+          <div>
+            <button type="button" onClick={() => setShowPriceOverride((v) => !v)}
+              className="text-xs text-navy-500 hover:text-navy-700 underline underline-offset-2 transition-colors">
+              {showPriceOverride ? "Usar preço padrão da viagem" : "Alterar preço por pessoa?"}
+            </button>
+            {showPriceOverride && (
+              <div className="relative mt-2">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                <input type="number" min="0" step="0.01" placeholder={String(selectedTrip?.price_per_person || "0")}
+                  value={priceOverride} onChange={(e) => setPriceOverride(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-amber-300 bg-amber-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
+            )}
+          </div>
+
+          {/* 6. Obs */}
           <div className="relative">
             <FileText size={13} className="absolute left-3 top-3 text-gray-400" />
             <textarea rows={2} placeholder="Observações (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)}
               className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 resize-none" />
           </div>
 
+          {/* Resumo + Submit */}
+          {selectedTrip && (
+            <div className="bg-navy-50 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
+              <span className="text-gray-500">{people} pessoa{people !== 1 ? "s" : ""} × R$ {effectivePrice.toLocaleString("pt-BR")}</span>
+              <span className="font-black text-navy-800 text-base">R$ {total.toLocaleString("pt-BR")}</span>
+            </div>
+          )}
+
           <button type="submit" disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60">
-            {loading ? "Salvando..." : "Registrar Venda Confirmada"}
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Salvando...</> : "Confirmar Venda"}
           </button>
         </form>
       </div>
@@ -563,6 +741,10 @@ export default function AdminReservasPage() {
                           {b.booking_code}
                           {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
                         </button>
+                        {b.is_external
+                          ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
+                          : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>
+                        }
                         <span className="text-gray-300 hidden sm:inline">·</span>
                         <span className="font-bold text-navy-800 text-sm truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</span>
                         {trip?.destination && <span className="text-xs text-gray-400 hidden sm:inline">{trip.destination}</span>}
