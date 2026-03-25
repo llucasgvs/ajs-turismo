@@ -353,22 +353,35 @@ function RelatedCard({ trip }: { trip: Trip }) {
   );
 }
 
-function RelatedTrips({ currentId, category }: { currentId: number; category: string }) {
+function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: number; currentTemplateId: number | null; category: string }) {
   const [trips, setTrips] = useState<Trip[]>([]);
 
   useEffect(() => {
-    fetch(`${API}/trips/?limit=20`)
+    fetch(`${API}/trips/?limit=50`)
       .then(r => r.json())
       .then((data: Trip[]) => {
         if (!Array.isArray(data)) return;
+        // Exclude current trip's template, keep only one trip per template (earliest date), prioritize same category
+        const seen = new Set<number | null>();
         const related = data
-          .filter(t => t.id !== currentId && t.is_active !== false)
-          .sort((a, b) => (b.category === category ? 1 : 0) - (a.category === category ? 1 : 0))
+          .filter(t => t.id !== currentId && t.is_active !== false && t.template_id !== currentTemplateId)
+          .sort((a, b) => {
+            // Same category first, then by departure date
+            const catA = a.category === category ? 1 : 0;
+            const catB = b.category === category ? 1 : 0;
+            if (catB !== catA) return catB - catA;
+            return new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime();
+          })
+          .filter(t => {
+            if (seen.has(t.template_id)) return false;
+            seen.add(t.template_id);
+            return true;
+          })
           .slice(0, 4);
         setTrips(related);
       })
       .catch(() => {});
-  }, [currentId, category]);
+  }, [currentId, currentTemplateId, category]);
 
   if (!trips.length) return null;
 
@@ -1089,7 +1102,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               <TrustBlock />
 
               {/* Related Trips */}
-              <RelatedTrips currentId={trip.id} category={trip.category} />
+              <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />
             </div>
 
             {/* ── Right sidebar (desktop only) ── */}
