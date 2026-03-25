@@ -2,84 +2,59 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, Clock, Users, Star, ArrowRight, Check } from "lucide-react";
-import type { Trip } from "@/types/trip";
+import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-const FALLBACK = [
-  {
-    id: 0,
-    title: "Maceió Completo",
-    destination: "Maceió, Alagoas",
-    duration_nights: 4,
-    min_group_size: 2,
-    image_url: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80&fit=crop",
-    original_price: 1899,
-    price_per_person: 1299,
-    tag: "Mais Vendido",
-    max_installments: 10,
-    includes: ["Passagem de ônibus ida e volta", "Hotel 3 estrelas café incluso", "Passeio de barco nas piscinas naturais", "Guia turístico exclusivo"],
-  },
-  {
-    id: 0,
-    title: "Nordeste Incrível",
-    destination: "Fortaleza + Natal, CE/RN",
-    duration_nights: 7,
-    min_group_size: 10,
-    image_url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80&fit=crop",
-    original_price: 2799,
-    price_per_person: 2099,
-    tag: "25% OFF",
-    max_installments: 12,
-    includes: ["Ônibus executivo + refeições", "Hotel 4 estrelas", "City tour em ambas cidades", "Passeio de buggy nas dunas"],
-  },
-  {
-    id: 0,
-    title: "Serra Gaúcha Especial",
-    destination: "Gramado + Canela, RS",
-    duration_nights: 5,
-    min_group_size: 2,
-    image_url: "https://images.unsplash.com/photo-1516939884455-1445c8652f83?w=800&q=80&fit=crop",
-    original_price: 2299,
-    price_per_person: 1899,
-    tag: "Lançamento",
-    max_installments: 12,
-    includes: ["Ônibus leito confortável", "Hotel boutique 4 estrelas", "Ingressos mini mundo + parques", "Café da manhã especial"],
-  },
-];
-
-type PackageItem = {
+interface PublicDate {
   id: number;
+  departure_date: string;
+  price_per_person: number;
+  available_spots: number;
+  status: string;
+}
+
+interface PublicTemplate {
+  id: number;
+  first_trip_id: number;
   title: string;
   destination: string;
-  duration_nights: number;
-  min_group_size: number;
   image_url: string | null;
-  original_price: number | null;
-  price_per_person: number;
   tag: string | null;
-  max_installments: number;
+  is_featured: boolean;
+  short_description: string | null;
   includes: string[];
-};
+  price_from: number;
+  original_price_from: number | null;
+  max_installments: number;
+  dates: PublicDate[];
+}
+
+function fmtDate(d: string) {
+  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
 
 export default function FeaturedPackages() {
-  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [packages, setPackages] = useState<PublicTemplate[]>([]);
 
   useEffect(() => {
-    fetch(`${API}/trips/featured`)
+    fetch(`${API}/templates/public`)
       .then((r) => r.json())
-      .then((data: Trip[]) => {
+      .then((data: PublicTemplate[]) => {
         if (Array.isArray(data) && data.length > 0) {
-          setPackages(data.slice(0, 3));
-        } else {
-          setPackages(FALLBACK);
+          // Prioriza os em destaque, depois pega os 3 primeiros
+          const sorted = [...data].sort((a, b) => {
+            if (a.is_featured && !b.is_featured) return -1;
+            if (!a.is_featured && b.is_featured) return 1;
+            return 0;
+          });
+          setPackages(sorted.slice(0, 3));
         }
       })
-      .catch(() => setPackages(FALLBACK));
+      .catch(() => {});
   }, []);
 
-  const displayed = packages.length > 0 ? packages : FALLBACK;
+  if (packages.length === 0) return null;
 
   return (
     <section id="pacotes" className="py-16 md:py-24 bg-gray-50">
@@ -95,9 +70,15 @@ export default function FeaturedPackages() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {displayed.map((pkg, i) => {
-            const inner = (
-              <>
+          {packages.map((pkg) => {
+            const discount = pkg.original_price_from
+              ? Math.round((1 - pkg.price_from / pkg.original_price_from) * 100)
+              : null;
+            const nextDates = pkg.dates.filter((d) => d.status === "active").slice(0, 2);
+
+            return (
+              <Link key={pkg.id} href={`/viagens/${pkg.first_trip_id}`} className="card flex flex-col group cursor-pointer">
+                {/* Image */}
                 <div className="relative h-52 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -107,86 +88,90 @@ export default function FeaturedPackages() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                  {pkg.tag && (
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gold-500 text-navy-900">
-                      <Star size={11} fill="currentColor" />
-                      {pkg.tag}
-                    </div>
-                  )}
+                  <div className="absolute top-3 left-3 flex gap-1.5">
+                    {pkg.tag && (
+                      <div className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-gold-500 text-navy-900">
+                        <Star size={11} fill="currentColor" /> {pkg.tag}
+                      </div>
+                    )}
+                    {discount && discount > 0 && (
+                      <div className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500 text-white">
+                        -{discount}% OFF
+                      </div>
+                    )}
+                  </div>
 
                   <div className="absolute bottom-3 left-3 right-3">
                     <h3 className="font-display font-black text-xl text-white">{pkg.title}</h3>
                     <div className="flex items-center gap-1.5 text-white/80 text-sm">
-                      <MapPin size={12} />
-                      {pkg.destination}
+                      <MapPin size={12} /> {pkg.destination}
                     </div>
                   </div>
                 </div>
 
+                {/* Body */}
                 <div className="p-5 flex flex-col flex-1">
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
-                      <Clock size={11} />
-                      {pkg.duration_nights + 1} dias / {pkg.duration_nights} noites
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-navy-50 text-navy-600 text-xs font-medium px-3 py-1.5 rounded-full">
-                      <Users size={11} />
-                      Mín. {pkg.min_group_size} {pkg.min_group_size === 1 ? "pessoa" : "pessoas"}
-                    </div>
-                  </div>
-
-                  <ul className="space-y-2 mb-5 flex-1">
+                  {/* Includes */}
+                  <ul className="space-y-2 mb-4 flex-1">
                     {pkg.includes.slice(0, 4).map((item, j) => (
                       <li key={j} className="flex items-start gap-2 text-gray-600 text-sm">
-                        <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" />
-                        {item}
+                        <Check size={14} className="text-emerald-500 flex-shrink-0 mt-0.5" /> {item}
                       </li>
                     ))}
                   </ul>
 
+                  {/* Próximas datas */}
+                  {nextDates.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Próximas saídas</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {nextDates.map((d) => (
+                          <span key={d.id} className="inline-flex items-center gap-1 bg-navy-50 text-navy-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                            <Calendar size={9} /> {fmtDate(d.departure_date)}
+                          </span>
+                        ))}
+                        {pkg.dates.filter((d) => d.status === "active").length > 2 && (
+                          <span className="text-xs text-gold-600 font-semibold px-1 py-1">
+                            +{pkg.dates.filter((d) => d.status === "active").length - 2} datas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Price + CTA */}
                   <div className="border-t border-gray-100 pt-4">
                     <div className="flex items-end justify-between mb-3">
                       <div>
-                        {pkg.original_price && (
+                        {pkg.original_price_from && (
                           <p className="text-xs text-gray-400 line-through">
-                            R$ {pkg.original_price.toLocaleString("pt-BR")}
+                            R$ {pkg.original_price_from.toLocaleString("pt-BR")}
                           </p>
                         )}
                         <div className="flex items-baseline gap-1">
                           <span className="text-xs text-gray-500">a partir de</span>
                           <span className="font-display font-black text-2xl text-navy-700">
-                            R$ {pkg.price_per_person.toLocaleString("pt-BR")}
+                            R$ {pkg.price_from.toLocaleString("pt-BR")}
                           </span>
                         </div>
                         <p className="text-xs text-emerald-600 font-medium">
                           ou {pkg.max_installments}x de R${" "}
-                          {Math.ceil(pkg.price_per_person / pkg.max_installments).toLocaleString("pt-BR")} sem juros
+                          {Math.ceil(pkg.price_from / pkg.max_installments).toLocaleString("pt-BR")} sem juros
                         </p>
                       </div>
-                      {pkg.original_price && (
+                      {discount && discount > 0 && (
                         <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-lg">
-                          -{Math.round((1 - pkg.price_per_person / pkg.original_price) * 100)}% OFF
+                          -{discount}% OFF
                         </div>
                       )}
                     </div>
 
                     <div className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-                      {pkg.id ? "Ver pacote completo" : "Reservar agora"}
-                      <ArrowRight size={16} />
+                      Ver pacote completo <ArrowRight size={16} />
                     </div>
                   </div>
                 </div>
-              </>
-            );
-
-            return pkg.id ? (
-              <Link key={pkg.id || i} href={`/viagens/${pkg.id}`} className="card flex flex-col group cursor-pointer">
-                {inner}
               </Link>
-            ) : (
-              <a key={i} href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20dispon%C3%ADveis." target="_blank" rel="noopener noreferrer" className="card flex flex-col group cursor-pointer">
-                {inner}
-              </a>
             );
           })}
         </div>
