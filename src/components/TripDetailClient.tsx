@@ -999,7 +999,13 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
                     : "—"} />
                 <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
-                  value={`${trip.duration_nights + 1}d / ${trip.duration_nights}n`} />
+                  value={(() => {
+                    const nights = activeTrip.duration_nights;
+                    const days = nights + 1;
+                    if (nights === 0) return "Bate e volta";
+                    if (nights === 1) return `${days} dia / ${nights} noite`;
+                    return `${days} dias / ${nights} noites`;
+                  })()} />
                 <InfoStat
                   icon={<Users size={16} className="text-gold-500" />}
                   label="Vagas"
