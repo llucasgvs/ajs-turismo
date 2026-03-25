@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Fragment } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw } from "lucide-react";
+import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Trip {
@@ -48,7 +48,7 @@ function DeactivateModal({ trip, onClose, onConfirm, loading }: {
               <AlertTriangle size={26} className="text-orange-500" />
             </div>
             <div>
-              <h3 className="font-bold text-navy-800 text-lg">Desativar viagem?</h3>
+              <h3 className="font-bold text-navy-800 text-lg">Ocultar viagem?</h3>
               <p className="text-gray-400 text-sm mt-1">A viagem será ocultada do site.</p>
             </div>
           </div>
@@ -68,8 +68,8 @@ function DeactivateModal({ trip, onClose, onConfirm, loading }: {
             </button>
             <button onClick={onConfirm} disabled={loading}
               className="flex-1 bg-orange-500 hover:bg-orange-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-              Desativar
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <EyeOff size={15} />}
+              Ocultar
             </button>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function AdminViagens() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | "active" | "sold_out">("all");
+  const [tab, setTab] = useState<"all" | "active" | "sold_out" | "hidden" | "completed">("all");
   const [deactivateTarget, setDeactivateTarget] = useState<Trip | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
@@ -142,15 +142,20 @@ export default function AdminViagens() {
   };
 
   const counts = {
-    all: trips.length,
-    active: trips.filter((t) => t.is_active).length,
-    sold_out: trips.filter((t) => t.status === "sold_out" && t.is_active).length,
+    all:       trips.length,
+    active:    trips.filter((t) => t.is_active && t.status === "active").length,
+    sold_out:  trips.filter((t) => t.is_active && t.status === "sold_out").length,
+    hidden:    trips.filter((t) => !t.is_active && t.status !== "completed").length,
+    completed: trips.filter((t) => t.status === "completed").length,
   };
 
   const tabTrips =
-    tab === "all" ? trips :
-    tab === "active" ? trips.filter((t) => t.is_active) :
-    trips.filter((t) => t.status === tab);
+    tab === "all"       ? trips :
+    tab === "active"    ? trips.filter((t) => t.is_active && t.status === "active") :
+    tab === "sold_out"  ? trips.filter((t) => t.is_active && t.status === "sold_out") :
+    tab === "hidden"    ? trips.filter((t) => !t.is_active && t.status !== "completed") :
+    trips.filter((t) => t.status === "completed");
+
   const filtered = tabTrips.filter(
     (t) =>
       t.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -158,9 +163,11 @@ export default function AdminViagens() {
   );
 
   const tabs: { key: typeof tab; label: string; count: number }[] = [
-    { key: "all",      label: "Todas",     count: counts.all },
-    { key: "active",   label: "Ativas",    count: counts.active },
-    { key: "sold_out", label: "Esgotadas", count: counts.sold_out },
+    { key: "all",       label: "Todas",      count: counts.all },
+    { key: "active",    label: "Ativas",     count: counts.active },
+    { key: "sold_out",  label: "Esgotadas",  count: counts.sold_out },
+    { key: "hidden",    label: "Ocultas",    count: counts.hidden },
+    { key: "completed", label: "Concluídas", count: counts.completed },
   ];
 
   return (
@@ -188,10 +195,26 @@ export default function AdminViagens() {
 
       {/* Tabs + search */}
       <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          {tabs.map(({ key, label, count }) => (
+        {/* Mobile: grid 2x2 (Todas ocupa linha inteira) | Desktop: flex em linha */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+          {tabs.slice(0, 1).map(({ key, label, count }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+              className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                tab === key
+                  ? "bg-navy-800 text-white shadow-sm"
+                  : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
+              }`}>
+              {label}
+              {count > 0 && (
+                <span className={`min-w-[20px] h-5 flex items-center justify-center rounded-full text-xs font-bold px-1 ${
+                  tab === key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                }`}>{count}</span>
+              )}
+            </button>
+          ))}
+          {tabs.slice(1).map(({ key, label, count }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
                 tab === key
                   ? "bg-navy-800 text-white shadow-sm"
                   : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
@@ -260,8 +283,10 @@ export default function AdminViagens() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      {!trip.is_active
-                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Inativo</span>
+                      {trip.status === "completed"
+                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Concluído</span>
+                        : !trip.is_active
+                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Oculto</span>
                         : <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>
                       }
                     </div>
@@ -278,9 +303,9 @@ export default function AdminViagens() {
                     </Link>
                     {trip.is_active ? (
                       <button onClick={() => setDeactivateTarget(trip)}
-                        className="flex items-center justify-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors">
-                        <Trash2 size={11} />
-                        <span className="hidden sm:inline">Desativar</span>
+                        className="flex items-center justify-center gap-1 border border-zinc-200 text-zinc-500 hover:bg-zinc-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors">
+                        <EyeOff size={11} />
+                        <span className="hidden sm:inline">Ocultar</span>
                       </button>
                     ) : (
                       <button onClick={() => reactivateTrip(trip)} disabled={reactivatingId === trip.id}

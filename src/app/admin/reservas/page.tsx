@@ -894,7 +894,7 @@ export default function AdminReservasPage() {
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ interesse: 0, confirmed: 0, cancelled: 0, all: 0 });
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [tab, setTab] = useState<"interesse" | "confirmed" | "all">("interesse");
+  const [tab, setTab] = useState<"interesse" | "confirmed" | "cancelled" | "all">("interesse");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -1004,9 +1004,10 @@ export default function AdminReservasPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const tabs: { key: typeof tab; label: string; count: number }[] = [
-    { key: "interesse", label: "Interesses", count: counts.interesse },
-    { key: "confirmed", label: "Confirmadas", count: counts.confirmed },
-    { key: "all",       label: "Todas",       count: counts.all },
+    { key: "all",        label: "Todas",       count: counts.all },
+    { key: "interesse",  label: "Interesses",  count: counts.interesse },
+    { key: "confirmed",  label: "Confirmadas", count: counts.confirmed },
+    { key: "cancelled",  label: "Canceladas",  count: counts.cancelled },
   ];
 
   return (
@@ -1063,10 +1064,11 @@ export default function AdminReservasPage() {
 
       {/* Tabs + filters */}
       <div className="flex flex-col gap-3">
-        <div className="flex gap-2 w-full sm:w-auto">
+        {/* Mobile: grid 2x2 | Desktop: flex em linha */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           {tabs.map(({ key, label, count }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
                 tab === key
                   ? "bg-navy-800 text-white shadow-sm"
                   : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
