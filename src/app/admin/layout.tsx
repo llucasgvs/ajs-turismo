@@ -9,7 +9,7 @@ import { getUser, logout } from "@/lib/api";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/viagens", label: "Viagens", icon: Map },
+  { href: "/admin/viagens", label: "Roteiros", icon: Map },
   { href: "/admin/reservas", label: "Reservas", icon: ClipboardList },
 ];
 
