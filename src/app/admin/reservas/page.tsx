@@ -81,30 +81,27 @@ function buildWaUrl(phone: string, name: string, code: string) {
 /* ─── Pagination ─── */
 function Pagination({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
   if (totalPages <= 1) return null;
-  const show = new Set([1, totalPages, page, page - 1, page + 1].filter((p) => p >= 1 && p <= totalPages));
-  const sorted = Array.from(show).sort((a, b) => a - b);
+  const items: (number | "…")[] = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) items.push(i);
+    else if (items[items.length - 1] !== "…") items.push("…");
+  }
   return (
-    <div className="flex items-center justify-center gap-1 py-2">
+    <div className="flex items-center justify-center gap-1 pt-1">
       <button onClick={() => onPage(page - 1)} disabled={page === 1}
-        className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
-        ← Anterior
-      </button>
-      {sorted.map((p, i) => {
-        const prev = sorted[i - 1];
-        return (
-          <Fragment key={p}>
-            {prev && p - prev > 1 && <span className="px-1 text-gray-300 select-none">…</span>}
-            <button onClick={() => onPage(p)}
-              className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${p === page ? "bg-navy-800 text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}>
-              {p}
-            </button>
-          </Fragment>
-        );
-      })}
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors text-sm">‹</button>
+      {items.map((item, i) =>
+        item === "…" ? (
+          <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">…</span>
+        ) : (
+          <button key={item} onClick={() => onPage(item as number)}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
+              page === item ? "bg-navy-800 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}>{item}</button>
+        )
+      )}
       <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
-        className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
-        Próxima →
-      </button>
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors text-sm">›</button>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Fragment } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 import Link from "next/link";
 import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -98,25 +98,90 @@ function VagasBar({ available, total }: { available: number; total: number }) {
   );
 }
 
+const PAGE_SIZE = 10;
+
+/* ─── Pagination ─── */
+function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) return null;
+  const items: (number | "…")[] = [];
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || Math.abs(i - page) <= 1) items.push(i);
+    else if (items[items.length - 1] !== "…") items.push("…");
+  }
+  return (
+    <div className="flex items-center justify-center gap-1 pt-1">
+      <button onClick={() => onChange(page - 1)} disabled={page === 1}
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 text-sm">‹</button>
+      {items.map((item, i) =>
+        item === "…" ? (
+          <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">…</span>
+        ) : (
+          <button key={item} onClick={() => onChange(item as number)}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
+              page === item ? "bg-navy-800 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}>{item}</button>
+        )
+      )}
+      <button onClick={() => onChange(page + 1)} disabled={page === pages}
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 text-sm">›</button>
+    </div>
+  );
+}
+
 /* ─── Main page ─── */
 export default function AdminViagens() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ all: 0, active: 0, sold_out: 0, hidden: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tab, setTab] = useState<"all" | "active" | "sold_out" | "hidden" | "completed">("all");
+  const [page, setPage] = useState(1);
   const [deactivateTarget, setDeactivateTarget] = useState<Trip | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
 
-  const load = () => {
-    setLoading(true);
-    apiFetch("/trips/admin-list")
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setTrips(data); })
-      .finally(() => setLoading(false));
-  };
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  useEffect(() => { load(); }, []);
+  // Reset page on filter change
+  useEffect(() => { setPage(1); }, [tab, debouncedSearch]);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const r = await apiFetch("/trips/admin-counts");
+      if (r.ok) setCounts(await r.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchTrips = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("skip", String((page - 1) * PAGE_SIZE));
+      params.set("limit", String(PAGE_SIZE));
+      if (tab !== "all") params.set("trip_status", tab);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const r = await apiFetch(`/trips/admin-list?${params}`);
+      if (r.ok) {
+        const data = await r.json();
+        setTrips(data.items);
+        setTotal(data.total);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [page, tab, debouncedSearch]);
+
+  useEffect(() => { fetchTrips(); }, [fetchTrips]);
+  useEffect(() => { fetchCounts(); }, [fetchCounts]);
+
+  const reload = () => { fetchTrips(); fetchCounts(); };
 
   const reactivateTrip = async (trip: Trip) => {
     setReactivatingId(trip.id);
@@ -125,7 +190,7 @@ export default function AdminViagens() {
         method: "PUT",
         body: JSON.stringify({ is_active: true, status: "active" }),
       });
-      load();
+      reload();
     } catch { /* ignore */ }
     setReactivatingId(null);
   };
@@ -138,29 +203,10 @@ export default function AdminViagens() {
     } catch { /* 204 no content - ok */ }
     setDeactivateLoading(false);
     setDeactivateTarget(null);
-    load();
+    reload();
   };
 
-  const counts = {
-    all:       trips.length,
-    active:    trips.filter((t) => t.is_active && t.status === "active").length,
-    sold_out:  trips.filter((t) => t.is_active && t.status === "sold_out").length,
-    hidden:    trips.filter((t) => !t.is_active && t.status !== "completed").length,
-    completed: trips.filter((t) => t.status === "completed").length,
-  };
-
-  const tabTrips =
-    tab === "all"       ? trips :
-    tab === "active"    ? trips.filter((t) => t.is_active && t.status === "active") :
-    tab === "sold_out"  ? trips.filter((t) => t.is_active && t.status === "sold_out") :
-    tab === "hidden"    ? trips.filter((t) => !t.is_active && t.status !== "completed") :
-    trips.filter((t) => t.status === "completed");
-
-  const filtered = tabTrips.filter(
-    (t) =>
-      t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.destination.toLowerCase().includes(search.toLowerCase())
-  );
+  const paginated = trips;
 
   const tabs: { key: typeof tab; label: string; count: number }[] = [
     { key: "all",       label: "Todas",      count: counts.all },
@@ -245,7 +291,7 @@ export default function AdminViagens() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : total === 0 ? (
           <div className="p-12 text-center">
             <p className="text-gray-400 text-sm mb-4">
               {search ? "Nenhuma viagem encontrada." : "Nenhuma viagem cadastrada ainda."}
@@ -259,7 +305,7 @@ export default function AdminViagens() {
           </div>
         ) : (
           <div className="p-4 flex flex-col gap-3">
-            {filtered.map((trip) => {
+            {paginated.map((trip) => {
               const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
               return (
                 <div key={trip.id}
@@ -322,7 +368,12 @@ export default function AdminViagens() {
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-right">{filtered.length} viagem(s)</p>
+      <div className="space-y-2">
+        <Pagination page={page} total={total} onChange={setPage} />
+        <p className="text-xs text-gray-400 text-right">
+          {total} viagem(s) · página {page} de {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        </p>
+      </div>
     </div>
   );
 }
