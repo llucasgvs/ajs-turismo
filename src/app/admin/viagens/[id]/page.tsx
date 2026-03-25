@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Plus, Pencil, EyeOff, RefreshCw, Calendar, Users,
-  DollarSign, MapPin, Star, Loader2, AlertTriangle, BookOpen,
+  MapPin, Star, Loader2, AlertTriangle,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -152,6 +152,8 @@ export default function TemplateDetailPage() {
   const [hideTarget, setHideTarget] = useState<TripDate | null>(null);
   const [hideLoading, setHideLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
+  const [hideTemplateModal, setHideTemplateModal] = useState(false);
+  const [hideTemplateLoading, setHideTemplateLoading] = useState(false);
 
   // Carregar template
   useEffect(() => {
@@ -204,6 +206,28 @@ export default function TemplateDetailPage() {
     }
   };
 
+  const handleHideTemplate = async () => {
+    setHideTemplateLoading(true);
+    try {
+      await apiFetch(`/templates/${templateId}`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: false }),
+      });
+      setTemplate((t) => t ? { ...t, is_active: false } : t);
+      setHideTemplateModal(false);
+    } finally {
+      setHideTemplateLoading(false);
+    }
+  };
+
+  const handleReactivateTemplate = async () => {
+    await apiFetch(`/templates/${templateId}`, {
+      method: "PUT",
+      body: JSON.stringify({ is_active: true }),
+    });
+    setTemplate((t) => t ? { ...t, is_active: true } : t);
+  };
+
   const handleReactivate = async (dateId: number) => {
     setReactivatingId(dateId);
     try {
@@ -232,7 +256,7 @@ export default function TemplateDetailPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* Header — título + subtítulo */}
       <div className="flex items-start gap-3">
         <Link href="/admin/viagens"
           className="p-2 text-gray-400 hover:text-navy-700 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0 mt-0.5">
@@ -254,18 +278,33 @@ export default function TemplateDetailPage() {
             <MapPin size={11} /> {template.destination} · {template.duration_nights} noite{template.duration_nights !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <Link href={`/admin/viagens/${templateId}/editar`}
-            className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-semibold px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
-            <Pencil size={14} />
-            <span className="hidden sm:inline">Editar roteiro</span>
-          </Link>
-          <Link href={`/admin/viagens/${templateId}/datas/nova`}
-            className="flex items-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-3 py-2 rounded-xl hover:bg-navy-700 transition-colors">
-            <Plus size={14} />
-            <span className="hidden sm:inline">Nova data</span>
-          </Link>
-        </div>
+      </div>
+
+      {/* Ações — 3 botões: grid no mobile, flex no desktop */}
+      <div className="grid grid-cols-3 sm:flex sm:justify-start gap-2">
+        <Link href={`/admin/viagens/${templateId}/datas/nova`}
+          className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 bg-navy-800 text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
+          <Plus size={15} />
+          <span>Nova data</span>
+        </Link>
+        <Link href={`/admin/viagens/${templateId}/editar`}
+          className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-gray-200 text-gray-600 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+          <Pencil size={15} />
+          <span>Editar</span>
+        </Link>
+        {template.is_active ? (
+          <button onClick={() => setHideTemplateModal(true)}
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-zinc-200 text-zinc-500 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
+            <EyeOff size={15} />
+            <span>Ocultar</span>
+          </button>
+        ) : (
+          <button onClick={handleReactivateTemplate}
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-green-200 text-green-600 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-green-50 transition-colors">
+            <RefreshCw size={15} />
+            <span>Reativar</span>
+          </button>
+        )}
       </div>
 
       {/* Info do roteiro */}
@@ -397,6 +436,40 @@ export default function TemplateDetailPage() {
           loading={hideLoading}
         />
       )}
+
+      {hideTemplateModal && template && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && setHideTemplateModal(false)}>
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl">
+            <div className="p-6 space-y-4">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle size={26} className="text-orange-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-navy-800 text-lg">Ocultar roteiro?</h3>
+                  <p className="text-gray-400 text-sm mt-1">O roteiro e todas as suas datas serão ocultados do site.</p>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3.5">
+                <p className="font-bold text-navy-800">{template.title}</p>
+                <p className="text-sm text-gray-500">{template.destination}</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setHideTemplateModal(false)}
+                  className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+                  Cancelar
+                </button>
+                <button onClick={handleHideTemplate} disabled={hideTemplateLoading}
+                  className="flex-1 bg-zinc-700 text-white font-semibold py-3 rounded-xl hover:bg-zinc-600 transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                  {hideTemplateLoading ? <Loader2 size={15} className="animate-spin" /> : <EyeOff size={15} />}
+                  Ocultar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -413,69 +486,81 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
   const isHidden = !date.is_active && date.status !== "completed";
   const isCompleted = date.status === "completed";
 
+  const borderCls = isCompleted ? "border-l-blue-400"
+    : isHidden ? "border-l-gray-300"
+    : date.status === "sold_out" ? "border-l-red-400"
+    : "border-l-green-400";
+
   const statusBadge = isCompleted
-    ? STATUS_STYLE.completed
+    ? { label: "Concluída", cls: "bg-blue-100 text-blue-700" }
     : isHidden
     ? { label: "Oculta", cls: "bg-gray-100 text-gray-500" }
-    : STATUS_STYLE[date.status] ?? STATUS_STYLE.active;
+    : date.status === "sold_out"
+    ? { label: "Esgotada", cls: "bg-red-100 text-red-700" }
+    : { label: "Ativa", cls: "bg-green-100 text-green-700" };
+
+  const barCls = pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-amber-400" : "bg-green-400";
+  const availCls = pct >= 90 ? "text-red-500 font-semibold" : pct >= 60 ? "text-amber-500 font-semibold" : "text-green-600 font-semibold";
 
   return (
-    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 transition-all ${isHidden ? "opacity-60" : ""}`}>
-      <div className="flex items-start gap-3">
-        {/* Datas */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-navy-800 text-sm">
-              {fmt(date.departure_date)} → {fmt(date.return_date)}
-            </span>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusBadge.cls}`}>
-              {statusBadge.label}
-            </span>
-          </div>
+    <div className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${borderCls} shadow-sm p-4 transition-all ${isHidden ? "opacity-60" : ""}`}>
 
-          {/* Preço e vagas */}
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-            <span className="flex items-center gap-0.5">
-              <DollarSign size={10} />
-              R$ {date.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-            </span>
-            <span className="flex items-center gap-0.5">
-              <Users size={10} />
-              {sold}/{date.total_spots} vendidas · {date.available_spots} disponíveis
-            </span>
-          </div>
-
-          {/* Barra de vagas */}
-          <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden w-full max-w-xs">
-            <div
-              className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-amber-400" : "bg-green-400"}`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+      {/* Linha 1: datas + badge + botões */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="font-bold text-navy-800 text-sm">
+            {fmt(date.departure_date)} → {fmt(date.return_date)}
+          </span>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusBadge.cls}`}>
+            {statusBadge.label}
+          </span>
         </div>
 
-        {/* Ações */}
         <div className="flex gap-1.5 flex-shrink-0">
           {isHidden ? (
             <button onClick={onReactivate} disabled={reactivating}
-              className="flex items-center gap-1 border border-green-200 text-green-600 font-semibold text-xs px-3 py-2 rounded-xl hover:bg-green-50 transition-colors disabled:opacity-50">
-              {reactivating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              className="flex items-center gap-1 border border-green-200 text-green-600 font-semibold text-xs px-2.5 py-1.5 rounded-xl hover:bg-green-50 transition-colors disabled:opacity-50">
+              {reactivating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
               Reativar
             </button>
           ) : !isCompleted && (
             <>
               <Link href={`/admin/viagens/${templateId}/datas/${date.id}/editar`}
-                className="flex items-center gap-1 border border-gray-200 text-gray-600 font-semibold text-xs px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
-                <Pencil size={12} />
-                <span className="hidden sm:inline">Editar</span>
+                className="flex items-center gap-1 border border-gray-200 text-gray-600 font-semibold text-xs px-2.5 py-1.5 rounded-xl hover:bg-gray-50 transition-colors">
+                <Pencil size={11} /> Editar
               </Link>
               <button onClick={onHide}
-                className="flex items-center gap-1 border border-zinc-200 text-zinc-500 font-semibold text-xs px-3 py-2 rounded-xl hover:bg-zinc-50 transition-colors">
-                <EyeOff size={12} />
-                <span className="hidden sm:inline">Ocultar</span>
+                className="flex items-center gap-1 border border-zinc-200 text-zinc-500 font-semibold text-xs px-2.5 py-1.5 rounded-xl hover:bg-zinc-50 transition-colors">
+                <EyeOff size={11} /> Ocultar
               </button>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Linha 2: preço */}
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="text-gold-600 font-bold text-lg leading-none">
+          R$ {date.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+        </span>
+        {date.original_price && (
+          <span className="text-gray-400 text-xs line-through">
+            R$ {date.original_price.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+          </span>
+        )}
+        <span className="text-gray-400 text-xs">/ pessoa · até {date.max_installments}x</span>
+      </div>
+
+      {/* Linha 3: barra de vagas full-width */}
+      <div className="mt-3 space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500 flex items-center gap-1">
+            <Users size={10} /> {sold}/{date.total_spots} vendidas
+          </span>
+          <span className={availCls}>{date.available_spots} disponíveis</span>
+        </div>
+        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
     </div>
