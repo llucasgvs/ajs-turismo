@@ -56,6 +56,8 @@ function buildWhatsAppMessage(
     `*Interesse em reserva -- ${trip.title}*\n` +
     `Destino: ${trip.destination}\n` +
     `Saida: ${fmt(trip.departure_date.slice(0, 10))}\n` +
+    `Retorno: ${fmt(trip.return_date.slice(0, 10))}\n` +
+    `Preco por pessoa: R$ ${trip.price_per_person.toLocaleString("pt-BR")}\n` +
     `Codigo: ${bookingCode}\n\n` +
     `*Titular:*\n` +
     `   Nome: ${user.full_name}\n` +
@@ -531,14 +533,26 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <div>
+        <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="font-display font-black text-navy-800 text-lg">Reservar viagem</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{trip.title} · {trip.destination}</p>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
+              <X size={18} />
+            </button>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400">
-            <X size={18} />
-          </button>
+          {/* Selected date highlight */}
+          <div className="bg-navy-50 border border-navy-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+            <Calendar size={15} className="text-navy-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-navy-500 font-semibold uppercase tracking-wide">Data selecionada</p>
+              <p className="text-sm font-bold text-navy-800">
+                {new Date(trip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                {" → "}
+                {new Date(trip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+              </p>
+            </div>
+            <span className="font-black text-navy-700 text-sm flex-shrink-0">R$ {trip.price_per_person.toLocaleString("pt-BR")}<span className="text-xs font-normal text-gray-400">/pessoa</span></span>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
@@ -631,7 +645,130 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
 }
 
 /* ═══════════════════════════════════════════
-   11. Main Component
+   11. Date Selector
+═══════════════════════════════════════════ */
+function fmtShort(d: string) {
+  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+function fmtFull(d: string) {
+  const date = new Date(d.slice(0, 10) + "T12:00:00");
+  const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  return date.toLocaleDateString("pt-BR", opts);
+}
+
+function DateSelector({
+  trips, selected, onSelect, hasError,
+}: {
+  trips: Trip[];
+  selected: Trip | null;
+  onSelect: (t: Trip) => void;
+  hasError: boolean;
+}) {
+  if (trips.length === 0) return null;
+
+  return (
+    <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{trips.length} {trips.length === 1 ? "data disponível" : "datas disponíveis"}</p>
+        </div>
+        {hasError && (
+          <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
+            <AlertTriangle size={13} /> Selecione uma data
+          </span>
+        )}
+      </div>
+
+      {/* Mobile: vertical stack; Desktop: grid */}
+      <div className="px-4 pb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+        {trips.map((t) => {
+          const isSold = t.available_spots === 0 || t.status === "sold_out";
+          const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
+          const isSelected = selected?.id === t.id;
+          const disc = t.original_price
+            ? Math.round((1 - t.price_per_person / t.original_price) * 100)
+            : null;
+
+          return (
+            <button
+              key={t.id}
+              disabled={isSold}
+              onClick={() => !isSold && onSelect(t)}
+              className={`relative text-left rounded-xl border-2 p-4 transition-all duration-150 w-full ${
+                isSelected
+                  ? "border-navy-700 bg-navy-50 shadow-md"
+                  : isSold
+                  ? "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
+                  : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
+              }`}
+            >
+              {/* Selected indicator */}
+              {isSelected && (
+                <span className="absolute top-3 right-3 w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center">
+                  <Check size={11} className="text-white" />
+                </span>
+              )}
+
+              {/* Discount badge */}
+              {disc && disc > 0 && !isSold && (
+                <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  -{disc}%
+                </span>
+              )}
+
+              {/* Date range */}
+              <div className="flex items-center gap-1.5 mb-2">
+                <Calendar size={13} className={isSelected ? "text-navy-600" : "text-gold-500"} />
+                <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                  {fmtFull(t.departure_date)}
+                </span>
+                <span className="text-gray-400 text-xs">→</span>
+                <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                  {fmtShort(t.return_date)}
+                </span>
+              </div>
+
+              {/* Price row */}
+              <div className="flex items-end justify-between">
+                <div>
+                  {t.original_price && (
+                    <p className="text-[10px] text-gray-400 line-through leading-none">
+                      R$ {t.original_price.toLocaleString("pt-BR")}
+                    </p>
+                  )}
+                  {isSold ? (
+                    <span className="text-sm font-bold text-gray-400">Esgotado</span>
+                  ) : (
+                    <span className={`text-base font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
+                      R$ {t.price_per_person.toLocaleString("pt-BR")}
+                      <span className="text-xs font-normal text-gray-400"> /pessoa</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Spots */}
+                {!isSold && (
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    isLow
+                      ? "bg-orange-100 text-orange-600"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {isLow ? `⚠ ${t.available_spots} vagas` : `${t.available_spots} vagas`}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   12. Main Component
 ═══════════════════════════════════════════ */
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
@@ -639,30 +776,66 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const [galleryStart, setGalleryStart] = useState(0);
   const [bookingUser, setBookingUser] = useState<StoredUser | null>(null);
   const [navUser, setNavUser] = useState<StoredUser | null>(null);
+  const [siblingTrips, setSiblingTrips] = useState<Trip[]>([]);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [dateError, setDateError] = useState(false);
 
-  const sold = trip.available_spots === 0 || trip.status === "sold_out";
-  const lowStock = !sold && trip.available_spots > 0 && trip.available_spots <= 5;
-  const discount = trip.original_price
-    ? Math.round((1 - trip.price_per_person / trip.original_price) * 100)
+  // activeTrip: the trip whose price/availability drives the UI
+  const activeTrip = selectedTrip || trip;
+
+  const sold = activeTrip.available_spots === 0 || activeTrip.status === "sold_out";
+  const lowStock = !sold && activeTrip.available_spots > 0 && activeTrip.available_spots <= 5;
+  const discount = activeTrip.original_price
+    ? Math.round((1 - activeTrip.price_per_person / activeTrip.original_price) * 100)
     : null;
 
   const allImages = [...(trip.image_url ? [trip.image_url] : []), ...(trip.gallery || [])].filter(Boolean);
-  const departureDate = new Date(trip.departure_date);
-  const returnDate = new Date(trip.return_date);
   const whatsappFallback = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no pacote *${trip.title}* — ${trip.destination}.`)}`;
 
   useEffect(() => {
     setNavUser(getStoredUser());
   }, []);
 
+  // Load all dates for same template
+  useEffect(() => {
+    if (!trip.template_id) return;
+    fetch(`${API}/trips/?template_id=${trip.template_id}&limit=50`)
+      .then(r => r.json())
+      .then((data: Trip[]) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const sorted = [...data].sort(
+          (a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime()
+        );
+        setSiblingTrips(sorted);
+        // Auto-select if only one date, or pre-select the current trip
+        if (sorted.length === 1) {
+          setSelectedTrip(sorted[0]);
+        } else {
+          const current = sorted.find(t => t.id === trip.id);
+          if (current) setSelectedTrip(current);
+        }
+      })
+      .catch(() => {});
+  }, [trip.id, trip.template_id]);
+
+  const handleSelectDate = useCallback((t: Trip) => {
+    setSelectedTrip(t);
+    setDateError(false);
+  }, []);
+
   const handleOpenBooking = useCallback(() => {
+    if (!selectedTrip) {
+      setDateError(true);
+      document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const u = getStoredUser();
     if (!u) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
     } else {
       setBookingUser(u);
     }
-  }, [router]);
+  }, [router, selectedTrip]);
 
   const openGallery = useCallback((idx: number) => {
     setGalleryStart(idx);
@@ -722,12 +895,12 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
       )}
 
       {/* Booking Modal */}
-      {bookingUser && (
-        <BookingModal trip={trip} user={bookingUser} onClose={() => setBookingUser(null)} />
+      {bookingUser && selectedTrip && (
+        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} />
       )}
 
       {/* Sticky Mobile CTA */}
-      <StickyMobileCTA trip={trip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />
+      <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />
 
       <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
         {/* ── Mobile top bar: back + share only ── */}
@@ -765,6 +938,18 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             <PhotoGrid images={allImages} onOpen={openGallery} />
           </div>
 
+          {/* Date Selector — mobile: before key info; desktop: in right sidebar */}
+          {siblingTrips.length > 0 && (
+            <div className="mb-6 lg:hidden">
+              <DateSelector
+                trips={siblingTrips}
+                selected={selectedTrip}
+                onSelect={handleSelectDate}
+                hasError={dateError}
+              />
+            </div>
+          )}
+
           {/* Scarcity Banner */}
           {lowStock && !sold && (
             <div className="mb-6">
@@ -776,18 +961,22 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* ── Left column ── */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Key info */}
+              {/* Key info — uses activeTrip so it updates with date selection */}
               <div className="bg-white rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm">
                 <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
-                  value={departureDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
+                  value={selectedTrip
+                    ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"} />
                 <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
-                  value={returnDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} />
+                  value={selectedTrip
+                    ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—"} />
                 <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
                   value={`${trip.duration_nights + 1}d / ${trip.duration_nights}n`} />
                 <InfoStat
                   icon={<Users size={16} className="text-gold-500" />}
                   label="Vagas"
-                  value={sold ? "Esgotado" : `${trip.available_spots} disponíveis`}
+                  value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
                   valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
                 />
               </div>
@@ -873,32 +1062,49 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
               <div className="space-y-4 sticky top-20">
+
+                {/* Date Selector — desktop sidebar */}
+                {siblingTrips.length > 0 && (
+                  <DateSelector
+                    trips={siblingTrips}
+                    selected={selectedTrip}
+                    onSelect={handleSelectDate}
+                    hasError={dateError}
+                  />
+                )}
+
                 {/* Price card */}
                 <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
-                  <p className="text-xs text-gray-400 mb-1">A partir de</p>
-                  {trip.original_price && (
-                    <p className="text-sm text-gray-400 line-through leading-none">
-                      R$ {trip.original_price.toLocaleString("pt-BR")}
-                    </p>
+                  {!selectedTrip && siblingTrips.length > 1 ? (
+                    <p className="text-sm text-gray-400 text-center py-2">Selecione uma data para ver o preço</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-400 mb-1">{selectedTrip ? "Preço para a data selecionada" : "A partir de"}</p>
+                      {activeTrip.original_price && (
+                        <p className="text-sm text-gray-400 line-through leading-none">
+                          R$ {activeTrip.original_price.toLocaleString("pt-BR")}
+                        </p>
+                      )}
+                      <p className="font-display font-black text-4xl text-navy-700 leading-tight">
+                        R$ {activeTrip.price_per_person.toLocaleString("pt-BR")}
+                      </p>
+                      <p className="text-xs text-gray-500 mb-1">por pessoa</p>
+                      <p className="text-sm text-emerald-600 font-semibold mb-4">
+                        {activeTrip.max_installments}x de R$ {Math.ceil(activeTrip.price_per_person / activeTrip.max_installments).toLocaleString("pt-BR")} sem juros
+                      </p>
+                    </>
                   )}
-                  <p className="font-display font-black text-4xl text-navy-700 leading-tight">
-                    R$ {trip.price_per_person.toLocaleString("pt-BR")}
-                  </p>
-                  <p className="text-xs text-gray-500 mb-1">por pessoa</p>
-                  <p className="text-sm text-emerald-600 font-semibold mb-4">
-                    {trip.max_installments}x de R$ {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} sem juros
-                  </p>
 
-                  {trip.original_price && discount && discount > 0 && (
+                  {activeTrip.original_price && discount && discount > 0 && (
                     <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center mb-4 border border-emerald-100">
-                      Economia de R$ {(trip.original_price - trip.price_per_person).toLocaleString("pt-BR")} por pessoa
+                      Economia de R$ {(activeTrip.original_price - activeTrip.price_per_person).toLocaleString("pt-BR")} por pessoa
                     </div>
                   )}
 
                   {lowStock && !sold && (
                     <div className="bg-orange-50 text-orange-700 text-xs font-semibold px-3 py-2 rounded-xl text-center mb-4 border border-orange-100 flex items-center justify-center gap-2">
                       <AlertTriangle size={13} />
-                      Apenas {trip.available_spots} vagas restantes
+                      Apenas {activeTrip.available_spots} vagas restantes
                     </div>
                   )}
 
@@ -912,8 +1118,12 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     </div>
                   ) : (
                     <button onClick={handleOpenBooking}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl text-center transition-colors text-lg hover:shadow-lg hover:shadow-emerald-500/20">
-                      Reservar agora
+                      className={`w-full font-bold py-4 rounded-xl text-center transition-all text-lg ${
+                        selectedTrip
+                          ? "bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20"
+                          : "bg-gray-200 text-gray-500 cursor-pointer"
+                      }`}>
+                      {selectedTrip ? "Reservar agora" : "Selecione uma data"}
                     </button>
                   )}
 

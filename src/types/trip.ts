@@ -1,5 +1,6 @@
 export interface Trip {
   id: number;
+  template_id: number | null;
   title: string;
   destination: string;
   description: string;
