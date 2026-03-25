@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import TripDetailClient from "@/components/TripDetailClient";
 import type { Trip } from "@/types/trip";
 
@@ -75,5 +76,9 @@ export default async function TripDetailPage({
   const { id } = await params;
   const trip = await getTrip(id);
   if (!trip) notFound();
-  return <TripDetailClient trip={trip} />;
+  return (
+    <Suspense>
+      <TripDetailClient trip={trip} />
+    </Suspense>
+  );
 }

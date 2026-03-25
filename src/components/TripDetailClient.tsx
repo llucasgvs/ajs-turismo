@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -771,6 +771,16 @@ function DateSelector({
 ═══════════════════════════════════════════ */
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
+
+  // Capture ?book= at mount time (before any async/replaceState changes the URL)
+  const initialBookId = useRef(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("book")
+      : null
+  );
+  // Tracks if the ?book= redirect was already handled (prevents Strict Mode double-run)
+  const bookHandled = useRef(false);
+
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
   const [bookingUser, setBookingUser] = useState<StoredUser | null>(null);
@@ -806,12 +816,14 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           (a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime()
         );
         setSiblingTrips(sorted);
-        // Auto-select if only one date, or pre-select the current trip
-        if (sorted.length === 1) {
-          setSelectedTrip(sorted[0]);
-        } else {
-          const current = sorted.find(t => t.id === trip.id);
-          if (current) setSelectedTrip(current);
+        // Only auto-select if no ?book= param (post-login redirect handles its own selection)
+        if (!initialBookId.current) {
+          if (sorted.length === 1) {
+            setSelectedTrip(sorted[0]);
+          } else {
+            const current = sorted.find(t => t.id === trip.id);
+            if (current) setSelectedTrip(current);
+          }
         }
       })
       .catch(() => {});
@@ -822,6 +834,21 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     setDateError(false);
   }, []);
 
+  // Auto-open booking modal after login redirect (?book=tripId)
+  useEffect(() => {
+    if (siblingTrips.length === 0) return;
+    if (bookHandled.current) return; // already processed (Strict Mode double-run guard)
+    const bookId = initialBookId.current;
+    if (!bookId) return;
+    const target = siblingTrips.find(t => t.id === Number(bookId));
+    if (!target) return;
+    bookHandled.current = true;
+    window.history.replaceState({}, "", window.location.pathname);
+    setSelectedTrip(target);
+    const u = getStoredUser();
+    if (u) setBookingUser(u);
+  }, [siblingTrips]);
+
   const handleOpenBooking = useCallback(() => {
     if (!selectedTrip) {
       setDateError(true);
@@ -830,7 +857,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     }
     const u = getStoredUser();
     if (!u) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      const returnUrl = `${window.location.pathname}?book=${selectedTrip.id}`;
+      router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
     } else {
       setBookingUser(u);
     }
@@ -858,7 +886,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           </Link>
           <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push("/viagens")}
             className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors whitespace-nowrap"
           >
             <ArrowLeft size={15} /> Voltar para viagens
@@ -905,7 +933,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         {/* ── Mobile top bar: back + share only ── */}
         <div className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-20">
           <div className="flex items-center justify-between">
-            <button onClick={() => router.back()}
+            <button onClick={() => router.push("/viagens")}
               className="flex items-center gap-1.5 text-gray-600 hover:text-navy-700 text-sm font-medium transition-colors">
               <ArrowLeft size={16} /> Voltar
             </button>
