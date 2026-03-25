@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw, Moon, DollarSign, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw, Moon, DollarSign, CheckCircle2, XCircle, Info, BookOpen } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Trip {
@@ -25,6 +25,7 @@ interface Trip {
   duration_nights: number;
   category: string;
   tag: string | null;
+  image_url: string | null;
   includes: string[];
   excludes: string[];
   created_at: string;
@@ -255,7 +256,12 @@ function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivati
         </div>
 
         {/* Actions footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+        <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+          <Link href={`/admin/reservas?trip_id=${trip.id}`}
+            className="w-full flex items-center justify-center gap-1.5 border border-navy-200 bg-navy-50 hover:bg-navy-100 text-navy-700 font-bold py-2.5 rounded-xl text-sm transition-colors">
+            <BookOpen size={14} /> Ver reservas desta viagem
+          </Link>
+          <div className="flex gap-2">
           <Link href={`/admin/viagens/${trip.id}/editar`}
             className="flex-1 flex items-center justify-center gap-1.5 bg-navy-800 hover:bg-navy-700 text-white font-bold py-3 rounded-xl text-sm transition-colors">
             <Pencil size={14} /> Editar
@@ -274,6 +280,7 @@ function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivati
               </button>
             )
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -288,7 +295,7 @@ function VagasBar({ available, total }: { available: number; total: number }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-500 flex items-center gap-1"><Users size={10} /> {available}/{total} vagas</span>
+        <span className="text-gray-500 flex items-center gap-1"><Users size={10} /> {used}/{total} vendidas</span>
         <span className={`font-semibold ${available === 0 ? "text-red-500" : pct >= 75 ? "text-amber-600" : "text-emerald-600"}`}>
           {available === 0 ? "Esgotado" : `${available} disponíve${available === 1 ? "l" : "is"}`}
         </span>
@@ -527,12 +534,26 @@ export default function AdminViagens() {
                   onClick={() => setDetailTrip(trip)}
                   className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
 
-                  {/* Top row: info + badge */}
-                  <div className="flex items-start justify-between gap-3">
+                  {/* Top row: thumbnail + info + badge */}
+                  <div className="flex items-start gap-3">
+                    {trip.image_url && (
+                      <img src={trip.image_url} alt={trip.title}
+                        className="w-14 h-14 rounded-xl object-cover shrink-0 bg-gray-100" />
+                    )}
                     <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex items-start gap-1.5">
-                        {trip.is_featured && <Star size={12} className="text-gold-500 shrink-0 mt-0.5" fill="currentColor" />}
-                        <p className="font-bold text-navy-800 text-sm leading-snug">{trip.title}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-1.5 min-w-0">
+                          {trip.is_featured && <Star size={12} className="text-gold-500 shrink-0 mt-0.5" fill="currentColor" />}
+                          <p className="font-bold text-navy-800 text-sm leading-snug">{trip.title}</p>
+                        </div>
+                        <div className="shrink-0">
+                          {trip.status === "completed"
+                            ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Concluído</span>
+                            : !trip.is_active
+                            ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Oculto</span>
+                            : <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>
+                          }
+                        </div>
                       </div>
                       <p className="text-xs text-gray-400 flex items-center gap-1">
                         <MapPin size={10} className="shrink-0" />{trip.destination}
@@ -543,14 +564,6 @@ export default function AdminViagens() {
                         <span className="flex items-center gap-1"><Calendar size={10} />{fmt(trip.departure_date)}</span>
                         {trip.category && <><span className="text-gray-300">·</span><span className="flex items-center gap-1"><Tag size={10} />{trip.category}</span></>}
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      {trip.status === "completed"
-                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Concluído</span>
-                        : !trip.is_active
-                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Oculto</span>
-                        : <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>
-                      }
                     </div>
                   </div>
 

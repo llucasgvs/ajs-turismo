@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
 import { getToken } from "@/lib/api";
 
@@ -902,7 +903,8 @@ export default function AdminReservasPage() {
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [tripFilter, setTripFilter] = useState<string>("");
+  const searchParams = useSearchParams();
+  const [tripFilter, setTripFilter] = useState<string>(searchParams.get("trip_id") ?? "");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const copyCode = (code: string) => {
