@@ -541,17 +541,21 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
             </button>
           </div>
           {/* Selected date highlight */}
-          <div className="bg-navy-50 border border-navy-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
-            <Calendar size={15} className="text-navy-600 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-navy-500 font-semibold uppercase tracking-wide">Data selecionada</p>
-              <p className="text-sm font-bold text-navy-800">
-                {new Date(trip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+          <div className="bg-navy-50 border border-navy-200 rounded-xl px-4 py-3">
+            <p className="text-[10px] text-navy-500 font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
+              <Calendar size={11} className="text-navy-500" /> Data selecionada
+            </p>
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <p className="text-sm font-bold text-navy-800 leading-snug">
+                {new Date(trip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
                 {" → "}
-                {new Date(trip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                {new Date(trip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
               </p>
+              <span className="font-black text-navy-700 text-base flex-shrink-0">
+                R$ {trip.price_per_person.toLocaleString("pt-BR")}
+                <span className="text-xs font-normal text-gray-400">/pessoa</span>
+              </span>
             </div>
-            <span className="font-black text-navy-700 text-sm flex-shrink-0">R$ {trip.price_per_person.toLocaleString("pt-BR")}<span className="text-xs font-normal text-gray-400">/pessoa</span></span>
           </div>
         </div>
 
@@ -647,14 +651,10 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
 /* ═══════════════════════════════════════════
    11. Date Selector
 ═══════════════════════════════════════════ */
-function fmtShort(d: string) {
-  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-}
-function fmtFull(d: string) {
-  const date = new Date(d.slice(0, 10) + "T12:00:00");
-  const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
-  if (date.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return date.toLocaleDateString("pt-BR", opts);
+function fmtDate(d: string) {
+  // Always show full date as dd/MM/yyyy — compact and unambiguous
+  const [y, m, day] = d.slice(0, 10).split("-");
+  return `${day}/${m}/${y}`;
 }
 
 function DateSelector({
@@ -704,29 +704,28 @@ function DateSelector({
                   : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
               }`}
             >
-              {/* Selected indicator */}
-              {isSelected && (
-                <span className="absolute top-3 right-3 w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center">
-                  <Check size={11} className="text-white" />
-                </span>
-              )}
-
-              {/* Discount badge */}
-              {disc && disc > 0 && !isSold && (
-                <span className="absolute top-3 right-3 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  -{disc}%
-                </span>
-              )}
+              {/* Top-right: check when selected, discount when not selected */}
+              <span className="absolute top-3 right-3">
+                {isSelected ? (
+                  <span className="w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center">
+                    <Check size={11} className="text-white" />
+                  </span>
+                ) : disc && disc > 0 && !isSold ? (
+                  <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    -{disc}%
+                  </span>
+                ) : null}
+              </span>
 
               {/* Date range */}
               <div className="flex items-center gap-1.5 mb-2">
                 <Calendar size={13} className={isSelected ? "text-navy-600" : "text-gold-500"} />
                 <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                  {fmtFull(t.departure_date)}
+                  {fmtDate(t.departure_date)}
                 </span>
                 <span className="text-gray-400 text-xs">→</span>
                 <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                  {fmtShort(t.return_date)}
+                  {fmtDate(t.return_date)}
                 </span>
               </div>
 
