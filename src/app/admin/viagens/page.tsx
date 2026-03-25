@@ -29,6 +29,8 @@ interface Trip {
   includes: string[];
   excludes: string[];
   created_at: string;
+  updated_at: string | null;
+  hidden_at: string | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string; border: string }> = {
@@ -69,7 +71,7 @@ function DeactivateModal({ trip, onClose, onConfirm, loading }: {
             <p className="font-bold text-navy-800">{trip.title}</p>
             <p className="text-sm text-gray-500">{trip.destination}</p>
             <p className="text-xs text-gray-400">
-              {trip.available_spots}/{trip.total_spots} vagas · R$ {trip.price_per_person.toLocaleString("pt-BR")} · {fmt(trip.departure_date)}
+              {trip.total_spots - trip.available_spots}/{trip.total_spots} vendidas · R$ {trip.price_per_person.toLocaleString("pt-BR")} · {fmt(trip.departure_date)}
             </p>
           </div>
 
@@ -119,13 +121,30 @@ function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivati
     >
       <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]">
 
-        {/* Drag handle (mobile) */}
+        {/* Hero image or drag handle */}
+        {trip.image_url ? (
+          <div className="relative shrink-0 hidden sm:block">
+            <img src={trip.image_url} alt={trip.title}
+              className="w-full h-44 object-cover rounded-t-3xl sm:rounded-t-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-t-3xl sm:rounded-t-2xl" />
+            <button onClick={onClose}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-black/30 hover:bg-black/50 text-white rounded-full transition-colors">
+              <X size={16} />
+            </button>
+            {/* Drag handle over image on mobile */}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 sm:hidden">
+              <div className="w-10 h-1 bg-white/50 rounded-full" />
+            </div>
+          </div>
+        ) : null}
+
+        {/* Drag handle — mobile only, always shown */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 bg-gray-200 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
+        <div className={`flex items-start justify-between gap-3 px-5 pb-3 border-b border-gray-100 ${trip.image_url ? "pt-3" : "pt-4"}`}>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
               {trip.is_featured && <Star size={13} className="text-gold-500 shrink-0" fill="currentColor" />}
@@ -137,7 +156,9 @@ function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivati
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             {statusBadge}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            {/* X no header: sempre no mobile, só quando sem imagem no desktop */}
+            <button onClick={onClose}
+              className={`text-gray-400 hover:text-gray-600 transition-colors ${trip.image_url ? "sm:hidden" : ""}`}>
               <X size={18} />
             </button>
           </div>
@@ -251,8 +272,28 @@ function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivati
             </div>
           )}
 
-          {/* Created at */}
-          <p className="text-[11px] text-gray-300">Cadastrado em {fmt(trip.created_at)}</p>
+          {/* Timeline */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Histórico</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span>Cadastrada em <span className="font-semibold text-gray-700">{fmt(trip.created_at)}</span></span>
+              </div>
+              {trip.updated_at && trip.updated_at !== trip.created_at && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                  <span>Última edição em <span className="font-semibold text-gray-700">{fmt(trip.updated_at)}</span></span>
+                </div>
+              )}
+              {trip.hidden_at && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0" />
+                  <span>Ocultada em <span className="font-semibold text-gray-700">{fmt(trip.hidden_at)}</span></span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Actions footer */}
@@ -532,7 +573,7 @@ export default function AdminViagens() {
               return (
                 <div key={trip.id}
                   onClick={() => setDetailTrip(trip)}
-                  className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
+                  className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300 opacity-50 hover:opacity-75" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
 
                   {/* Top row: thumbnail + info + badge */}
                   <div className="flex items-start gap-3">
@@ -571,7 +612,7 @@ export default function AdminViagens() {
                   <VagasBar available={trip.available_spots} total={trip.total_spots} />
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5 pt-0.5 opacity-100" onClick={(e) => e.stopPropagation()}>
                     <Link href={`/admin/viagens/${trip.id}/editar`}
                       className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors">
                       <Pencil size={11} /> Editar
