@@ -967,7 +967,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               {lowStock && !sold && <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">Últimas vagas!</span>}
               {discount && discount > 0 && <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">-{discount}% OFF</span>}
             </div>
-            <h1 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-navy-900 leading-tight">{trip.title}</h1>
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-navy-900 leading-tight">{trip.title}</h1>
+              <div className="hidden lg:block flex-shrink-0 mt-1"><ShareButton title={trip.title} /></div>
+            </div>
             <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-1.5">
               <MapPin size={14} className="text-gold-500" /> {trip.destination}
             </div>
