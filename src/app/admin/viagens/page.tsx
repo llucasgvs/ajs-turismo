@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, X, MapPin, Calendar, Star, Users, Loader2, ChevronRight } from "lucide-react";
+import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface TemplateSummary {
@@ -14,11 +14,9 @@ interface TemplateSummary {
   tag: string | null;
   is_featured: boolean;
   is_active: boolean;
-  duration_nights: number;
   active_dates_count: number;
+  hidden_dates_count: number;
   total_dates_count: number;
-  next_departure: string | null;
-  next_price: number | null;
   sold_spots: number;
 }
 
@@ -27,9 +25,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   aventura: "Aventura", cultural: "Cultural", internacional: "Internacional",
 };
 
-function fmt(d: string) {
-  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR");
-}
 
 export default function ViagensPage() {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -120,22 +115,22 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
       href={`/admin/viagens/${tmpl.id}`}
       className={`group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all overflow-hidden flex flex-col border border-gray-100 ${!tmpl.is_active ? "opacity-50" : ""}`}
     >
-      {/* Imagem com overlay gradiente */}
-      <div className="relative h-44 bg-gray-200 flex-shrink-0">
+      {/* Imagem — menor no mobile (h-28), maior no desktop (h-40) */}
+      <div className="relative h-28 sm:h-40 bg-gray-200 flex-shrink-0">
         {tmpl.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={tmpl.image_url} alt={tmpl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
-            <MapPin size={40} />
+            <MapPin size={32} />
           </div>
         )}
 
-        {/* Gradiente escuro na base da imagem */}
+        {/* Gradiente na base */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Badges no topo */}
-        <div className="absolute top-2.5 left-2.5 flex gap-1 flex-wrap">
+        <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           <span className="bg-white/90 backdrop-blur-sm text-navy-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
             {CATEGORY_LABEL[tmpl.category] ?? tmpl.category}
           </span>
@@ -152,10 +147,10 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
         </div>
 
         {/* Título + destino sobre a imagem */}
-        <div className="absolute bottom-0 left-0 right-0 p-3.5">
-          <h3 className="font-black text-white text-base leading-tight drop-shadow">{tmpl.title}</h3>
+        <div className="absolute bottom-0 left-0 right-0 px-3 py-2">
+          <h3 className="font-black text-white text-sm sm:text-base leading-tight drop-shadow">{tmpl.title}</h3>
           <p className="text-white/80 text-xs flex items-center gap-1 mt-0.5">
-            <MapPin size={10} className="flex-shrink-0" /> {tmpl.destination}
+            <MapPin size={9} className="flex-shrink-0" /> {tmpl.destination}
           </p>
         </div>
 
@@ -167,61 +162,46 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
       </div>
 
       {/* Corpo do card */}
-      <div className="p-3.5 flex flex-col gap-2.5 flex-1">
+      <div className="p-3 sm:p-3.5 flex flex-col gap-2 flex-1">
 
-        {/* Stats inline */}
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span className={`flex items-center gap-1 font-semibold ${tmpl.active_dates_count > 0 ? "text-green-600" : "text-gray-400"}`}>
-            <Calendar size={11} />
-            {tmpl.active_dates_count} ativa{tmpl.active_dates_count !== 1 ? "s" : ""}
-          </span>
-          <span className="text-gray-300">·</span>
-          <span className="flex items-center gap-1">
-            {tmpl.total_dates_count} total
-          </span>
-          {tmpl.sold_spots > 0 && (
-            <>
-              <span className="text-gray-300">·</span>
-              <span className="flex items-center gap-1 text-navy-600">
-                <Users size={10} /> {tmpl.sold_spots} vendidas
-              </span>
-            </>
-          )}
+        {/* Stats de datas */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className={`rounded-lg px-2 py-1.5 text-center ${tmpl.active_dates_count > 0 ? "bg-green-50" : "bg-red-50"}`}>
+            <p className={`text-[11px] font-black ${tmpl.active_dates_count > 0 ? "text-green-700" : "text-red-600"}`}>{tmpl.active_dates_count}</p>
+            <p className={`text-[9px] font-medium leading-tight ${tmpl.active_dates_count > 0 ? "text-green-600" : "text-red-500"}`}>Ativas</p>
+          </div>
+          <div className="bg-zinc-50 rounded-lg px-2 py-1.5 text-center">
+            <p className="text-[11px] font-black text-zinc-500">{tmpl.hidden_dates_count}</p>
+            <p className="text-[9px] text-zinc-400 font-medium leading-tight">Ocultas</p>
+          </div>
+          <div className="bg-navy-50 rounded-lg px-2 py-1.5 text-center">
+            <p className="text-[11px] font-black text-navy-700">{tmpl.total_dates_count}</p>
+            <p className="text-[9px] text-navy-500 font-medium leading-tight">Total</p>
+          </div>
         </div>
 
-        {/* Próxima data + preço */}
-        {tmpl.next_departure ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Próxima saída</p>
-              <p className="text-sm font-bold text-navy-800">{fmt(tmpl.next_departure)}</p>
-            </div>
-            {tmpl.next_price && (
-              <div className="text-right">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">A partir de</p>
-                <p className="text-sm font-bold text-gold-600">
-                  R$ {tmpl.next_price.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">Sem datas ativas</p>
-            <Link
-              href={`/admin/viagens/${tmpl.id}/datas/nova`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs text-navy-600 hover:text-gold-600 font-semibold flex items-center gap-0.5 transition-colors"
-            >
-              <Plus size={11} /> Nova data
-            </Link>
+        {/* Vendas totais */}
+        {tmpl.sold_spots > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-navy-600">
+            <Users size={11} />
+            <span><strong>{tmpl.sold_spots}</strong> vagas vendidas no total</span>
           </div>
         )}
 
+        {tmpl.active_dates_count === 0 && (
+          <Link
+            href={`/admin/viagens/${tmpl.id}/datas/nova`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-gold-600 hover:text-gold-700 font-semibold flex items-center gap-0.5 transition-colors"
+          >
+            <Plus size={11} /> Adicionar data
+          </Link>
+        )}
+
         {/* CTA */}
-        <div className="mt-auto pt-1 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-navy-600 group-hover:text-gold-600 transition-colors">
+        <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-navy-600 group-hover:text-gold-600 transition-colors">
           <span>Ver datas</span>
-          <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          <ChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
     </Link>

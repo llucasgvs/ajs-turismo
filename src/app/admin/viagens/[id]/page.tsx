@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Plus, Pencil, EyeOff, RefreshCw, Calendar, Users,
-  MapPin, Star, Loader2, AlertTriangle,
+  MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -20,10 +20,10 @@ interface TripTemplate {
   tag: string | null;
   is_featured: boolean;
   is_active: boolean;
-  duration_nights: number;
-  min_group_size: number;
   includes: string[];
   excludes: string[];
+  itinerary: { day: number; title: string; description: string }[];
+  gallery: string[];
 }
 
 interface TripDate {
@@ -58,13 +58,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "completed", label: "Concluídas" },
 ];
 
-const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
-  active:    { label: "Ativa",     cls: "bg-green-100 text-green-700" },
-  sold_out:  { label: "Esgotada",  cls: "bg-red-100 text-red-700" },
-  completed: { label: "Concluída", cls: "bg-blue-100 text-blue-700" },
-  cancelled: { label: "Cancelada", cls: "bg-gray-100 text-gray-500" },
-};
-
 function fmt(d: string) {
   return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR");
 }
@@ -95,7 +88,7 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
   );
 }
 
-/* ── Modal de confirmar ocultar ────────────────────────────────────────── */
+/* ── Modal de confirmar ocultar data ───────────────────────────────────── */
 function HideModal({ date, onClose, onConfirm, loading }: {
   date: TripDate; onClose: () => void; onConfirm: () => void; loading: boolean;
 }) {
@@ -136,6 +129,146 @@ function HideModal({ date, onClose, onConfirm, loading }: {
   );
 }
 
+/* ── Drawer com detalhes do roteiro ────────────────────────────────────── */
+function TemplateDrawer({ template, onClose }: { template: TripTemplate; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh]">
+        {/* Drag handle / header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 flex-shrink-0">
+          <div className="sm:hidden w-10 h-1 bg-gray-200 rounded-full absolute left-1/2 -translate-x-1/2 top-2" />
+          <h2 className="font-black text-navy-800 text-base truncate pr-4">{template.title}</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Conteúdo scrollável */}
+        <div className="overflow-y-auto flex-1">
+          {/* Imagem */}
+          {template.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={template.image_url} alt={template.title} className="w-full h-44 object-cover" />
+          )}
+
+          <div className="p-5 space-y-5">
+            {/* Destino + badges */}
+            <div className="space-y-2">
+              <p className="text-sm text-gray-500 flex items-center gap-1.5">
+                <MapPin size={13} className="text-gray-400" /> {template.destination}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="bg-navy-50 text-navy-700 text-xs px-2.5 py-1 rounded-full font-medium capitalize">{template.category}</span>
+                {template.tag && <span className="bg-gold-50 text-gold-700 text-xs px-2.5 py-1 rounded-full font-medium">{template.tag}</span>}
+                {template.is_featured && (
+                  <span className="bg-gold-100 text-gold-700 text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                    <Star size={9} fill="currentColor" /> Destaque
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Descrição curta */}
+            {template.short_description && (
+              <p className="text-sm text-gray-600 font-medium">{template.short_description}</p>
+            )}
+
+            {/* Descrição completa */}
+            {template.description && (
+              <div>
+                <p className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-2">Sobre o roteiro</p>
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{template.description}</p>
+              </div>
+            )}
+
+            {/* Inclui / Não inclui */}
+            {(template.includes.length > 0 || template.excludes.length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {template.includes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} /> Inclui
+                    </p>
+                    <ul className="space-y-1.5">
+                      {template.includes.map((item, i) => (
+                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                          <span className="text-green-500 mt-0.5 flex-shrink-0">•</span> {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {template.excludes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <XCircle size={12} /> Não inclui
+                    </p>
+                    <ul className="space-y-1.5">
+                      {template.excludes.map((item, i) => (
+                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                          <span className="text-red-400 mt-0.5 flex-shrink-0">•</span> {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Roteiro dia a dia */}
+            {template.itinerary && template.itinerary.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <List size={12} /> Roteiro dia a dia
+                </p>
+                <div className="space-y-3">
+                  {template.itinerary.map((day) => (
+                    <div key={day.day} className="flex gap-3">
+                      <div className="flex-shrink-0 w-7 h-7 bg-navy-800 text-white text-xs font-black rounded-full flex items-center justify-center mt-0.5">
+                        {day.day}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-navy-800">{day.title}</p>
+                        {day.description && (
+                          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{day.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Galeria */}
+            {template.gallery && template.gallery.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-2">Galeria</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {template.gallery.map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={url} alt="" className="w-full h-20 object-cover rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ação no rodapé */}
+        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          <Link href={`/admin/viagens/${template.id}/editar`}
+            className="flex items-center justify-center gap-2 w-full bg-navy-800 text-white font-semibold py-3 rounded-xl hover:bg-navy-700 transition-colors text-sm">
+            <Pencil size={15} /> Editar roteiro
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Página principal ───────────────────────────────────────────────────── */
 export default function TemplateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -152,8 +285,7 @@ export default function TemplateDetailPage() {
   const [hideTarget, setHideTarget] = useState<TripDate | null>(null);
   const [hideLoading, setHideLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
-  const [hideTemplateModal, setHideTemplateModal] = useState(false);
-  const [hideTemplateLoading, setHideTemplateLoading] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Carregar template
   useEffect(() => {
@@ -206,28 +338,6 @@ export default function TemplateDetailPage() {
     }
   };
 
-  const handleHideTemplate = async () => {
-    setHideTemplateLoading(true);
-    try {
-      await apiFetch(`/templates/${templateId}`, {
-        method: "PUT",
-        body: JSON.stringify({ is_active: false }),
-      });
-      setTemplate((t) => t ? { ...t, is_active: false } : t);
-      setHideTemplateModal(false);
-    } finally {
-      setHideTemplateLoading(false);
-    }
-  };
-
-  const handleReactivateTemplate = async () => {
-    await apiFetch(`/templates/${templateId}`, {
-      method: "PUT",
-      body: JSON.stringify({ is_active: true }),
-    });
-    setTemplate((t) => t ? { ...t, is_active: true } : t);
-  };
-
   const handleReactivate = async (dateId: number) => {
     setReactivatingId(dateId);
     try {
@@ -256,7 +366,7 @@ export default function TemplateDetailPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header — título + subtítulo */}
+      {/* Header */}
       <div className="flex items-start gap-3">
         <Link href="/admin/viagens"
           className="p-2 text-gray-400 hover:text-navy-700 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0 mt-0.5">
@@ -275,62 +385,47 @@ export default function TemplateDetailPage() {
             )}
           </div>
           <p className="text-gray-500 text-sm flex items-center gap-1 mt-0.5">
-            <MapPin size={11} /> {template.destination} · {template.duration_nights} noite{template.duration_nights !== 1 ? "s" : ""}
+            <MapPin size={11} /> {template.destination}
           </p>
         </div>
       </div>
 
-      {/* Ações — 3 botões: grid no mobile, flex no desktop */}
-      <div className="grid grid-cols-3 sm:flex sm:justify-start gap-2">
+      {/* Ações — 2 botões */}
+      <div className="flex gap-2">
         <Link href={`/admin/viagens/${templateId}/datas/nova`}
-          className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 bg-navy-800 text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
+          className="flex items-center justify-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
           <Plus size={15} />
           <span>Nova data</span>
         </Link>
         <Link href={`/admin/viagens/${templateId}/editar`}
-          className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-gray-200 text-gray-600 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+          className="flex items-center justify-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
           <Pencil size={15} />
-          <span>Editar</span>
+          <span>Editar roteiro</span>
         </Link>
-        {template.is_active ? (
-          <button onClick={() => setHideTemplateModal(true)}
-            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-zinc-200 text-zinc-500 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
-            <EyeOff size={15} />
-            <span>Ocultar</span>
-          </button>
-        ) : (
-          <button onClick={handleReactivateTemplate}
-            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 border border-green-200 text-green-600 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-green-50 transition-colors">
-            <RefreshCw size={15} />
-            <span>Reativar</span>
-          </button>
-        )}
       </div>
 
-      {/* Info do roteiro */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Card de info do roteiro — clicável */}
+      <button
+        type="button"
+        onClick={() => setDrawerOpen(true)}
+        className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
+      >
         <div className="sm:flex">
           {template.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={template.image_url} alt={template.title}
-              className="w-full sm:w-48 h-40 sm:h-auto object-cover flex-shrink-0" />
+              className="w-full sm:w-40 h-32 sm:h-auto object-cover flex-shrink-0" />
           )}
-          <div className="p-4 space-y-3 flex-1">
+          <div className="p-4 flex-1 min-w-0">
             {template.short_description && (
-              <p className="text-sm text-gray-600">{template.short_description}</p>
+              <p className="text-sm text-gray-600 line-clamp-2 mb-2">{template.short_description}</p>
             )}
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-1.5 text-xs mb-3">
               <span className="bg-navy-50 text-navy-700 px-2.5 py-1 rounded-full font-medium capitalize">{template.category}</span>
               {template.tag && <span className="bg-gold-50 text-gold-700 px-2.5 py-1 rounded-full font-medium">{template.tag}</span>}
-              <span className="bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full">
-                {template.duration_nights} noite{template.duration_nights !== 1 ? "s" : ""}
-              </span>
-              <span className="bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full flex items-center gap-1">
-                <Users size={10} /> mín. {template.min_group_size} pessoa{template.min_group_size !== 1 ? "s" : ""}
-              </span>
             </div>
             {(template.includes.length > 0 || template.excludes.length > 0) && (
-              <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 {template.includes.length > 0 && (
                   <div>
                     <p className="font-semibold text-green-700 mb-1">Inclui</p>
@@ -359,9 +454,12 @@ export default function TemplateDetailPage() {
                 )}
               </div>
             )}
+            <p className="text-xs text-navy-500 font-semibold mt-3 flex items-center gap-1 group-hover:text-gold-600 transition-colors">
+              Ver detalhes completos <ChevronRight size={12} />
+            </p>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Seção de datas */}
       <div className="space-y-3">
@@ -437,38 +535,8 @@ export default function TemplateDetailPage() {
         />
       )}
 
-      {hideTemplateModal && template && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && setHideTemplateModal(false)}>
-          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl">
-            <div className="p-6 space-y-4">
-              <div className="flex flex-col items-center text-center space-y-3">
-                <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle size={26} className="text-orange-500" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-navy-800 text-lg">Ocultar roteiro?</h3>
-                  <p className="text-gray-400 text-sm mt-1">O roteiro e todas as suas datas serão ocultados do site.</p>
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3.5">
-                <p className="font-bold text-navy-800">{template.title}</p>
-                <p className="text-sm text-gray-500">{template.destination}</p>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={() => setHideTemplateModal(false)}
-                  className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
-                  Cancelar
-                </button>
-                <button onClick={handleHideTemplate} disabled={hideTemplateLoading}
-                  className="flex-1 bg-zinc-700 text-white font-semibold py-3 rounded-xl hover:bg-zinc-600 transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50">
-                  {hideTemplateLoading ? <Loader2 size={15} className="animate-spin" /> : <EyeOff size={15} />}
-                  Ocultar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {drawerOpen && template && (
+        <TemplateDrawer template={template} onClose={() => setDrawerOpen(false)} />
       )}
     </div>
   );

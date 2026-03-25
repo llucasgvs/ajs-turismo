@@ -20,8 +20,6 @@ interface TemplateFormData {
   short_description: string;
   description: string;
   image_url: string;
-  duration_nights: number;
-  min_group_size: number;
   includes: string[];
   excludes: string[];
   itinerary: ItineraryDay[];
@@ -33,7 +31,6 @@ interface TemplateFormData {
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", image_url: "",
-  duration_nights: 1, min_group_size: 1,
   includes: [], excludes: [], itinerary: [], gallery: [],
   is_featured: false, is_active: true,
 };
@@ -105,32 +102,32 @@ export default function TemplateForm({
   return (
     <form onSubmit={handleSubmit}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href={templateId ? `/admin/viagens/${templateId}` : "/admin/viagens"}
-            className="p-2 text-gray-400 hover:text-navy-700 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <ChevronLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-display font-black text-navy-800">
-              {templateId ? "Editar Roteiro" : "Novo Roteiro"}
-            </h1>
-            <p className="text-gray-500 text-sm">
-              {templateId ? "Atualize os dados do roteiro" : "Preencha os dados do novo roteiro"}
-            </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link
+              href={templateId ? `/admin/viagens/${templateId}` : "/admin/viagens"}
+              className="p-2 text-gray-400 hover:text-navy-700 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0"
+            >
+              <ChevronLeft size={20} />
+            </Link>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-display font-black text-navy-800 truncate">
+                {templateId ? "Editar Roteiro" : "Novo Roteiro"}
+              </h1>
+              <p className="text-gray-500 text-xs sm:text-sm hidden sm:block">
+                {templateId ? "Atualize os dados do roteiro" : "Preencha os dados do novo roteiro"}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {error && <p className="text-red-600 text-sm max-w-xs text-right">{error}</p>}
-          {success && <p className="text-green-600 text-sm">{success}</p>}
           <button type="submit" disabled={loading}
-            className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50">
+            className="btn-primary flex items-center gap-2 px-4 py-2.5 text-sm disabled:opacity-50 flex-shrink-0">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {templateId ? "Salvar" : "Criar Roteiro"}
+            <span className="hidden xs:inline">{templateId ? "Salvar" : "Criar"}</span>
           </button>
         </div>
+        {error && <p className="text-red-600 text-sm mt-2 px-2">{error}</p>}
+        {success && <p className="text-green-600 text-sm mt-2 px-2">{success}</p>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -143,7 +140,7 @@ export default function TemplateForm({
                   onChange={(e) => set("title", e.target.value)}
                   placeholder="Ex: Ilha do Mel · Final de Semana" />
               </Field>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Destino *">
                   <input className="input-field" required value={form.destination}
                     onChange={(e) => set("destination", e.target.value)}
@@ -158,16 +155,6 @@ export default function TemplateForm({
                   </select>
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Duração padrão (noites)">
-                  <input className="input-field" type="number" min="1" value={form.duration_nights}
-                    onChange={(e) => set("duration_nights", parseInt(e.target.value) || 1)} />
-                </Field>
-                <Field label="Mínimo por grupo">
-                  <input className="input-field" type="number" min="1" value={form.min_group_size}
-                    onChange={(e) => set("min_group_size", parseInt(e.target.value) || 1)} />
-                </Field>
-              </div>
               <Field label="Descrição Curta (aparece nos cards)">
                 <input className="input-field" value={form.short_description}
                   onChange={(e) => set("short_description", e.target.value)}
@@ -178,16 +165,14 @@ export default function TemplateForm({
                   onChange={(e) => set("description", e.target.value)}
                   placeholder="Descreva os detalhes do roteiro..." />
               </Field>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Imagem Principal">
-                  <ImageUpload value={form.image_url} onChange={(url) => set("image_url", url)} />
-                </Field>
-                <Field label="Tag (opcional)">
-                  <input className="input-field" value={form.tag}
-                    onChange={(e) => set("tag", e.target.value)}
-                    placeholder="Ex: Mais Vendido, Promoção" />
-                </Field>
-              </div>
+              <Field label="Imagem Principal">
+                <ImageUpload value={form.image_url} onChange={(url) => set("image_url", url)} />
+              </Field>
+              <Field label="Tag (opcional)">
+                <input className="input-field" value={form.tag}
+                  onChange={(e) => set("tag", e.target.value)}
+                  placeholder="Ex: Mais Vendido, Promoção" />
+              </Field>
             </div>
           </Section>
 
