@@ -33,9 +33,13 @@ type Booking = {
   discount_amount: number;
   installments: number;
   is_external: boolean;
+  trip_title: string | null;
+  trip_destination: string | null;
+  trip_departure_date: string | null;
+  trip_return_date: string | null;
 };
 
-type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number };
+type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null };
 
 const STATUS_LABEL: Record<string, { label: string; color: string; border: string }> = {
   interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700",     border: "border-l-amber-400" },
@@ -168,8 +172,16 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
           {/* Viagem */}
           <section>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><MapPin size={11} /> Viagem</p>
-            <p className="font-bold text-navy-800">{trip?.title ?? `Viagem #${booking.trip_id}`}</p>
-            {trip?.destination && <p className="text-sm text-gray-500 mt-0.5">{trip.destination}</p>}
+            <p className="font-bold text-navy-800">{booking.trip_title ?? trip?.title ?? `Viagem #${booking.trip_id}`}</p>
+            {(booking.trip_destination ?? trip?.destination) && (
+              <p className="text-sm text-gray-500 mt-0.5">{booking.trip_destination ?? trip?.destination}</p>
+            )}
+            {booking.trip_departure_date && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5">
+                <Clock size={10} />
+                {fmt(booking.trip_departure_date)}{booking.trip_return_date ? ` → ${fmt(booking.trip_return_date)}` : ""}
+              </p>
+            )}
           </section>
 
           {/* Titular */}
@@ -568,6 +580,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 }) {
   type Companion = { full_name: string; cpf: string; birth_date: string };
 
+  const [templateKey, setTemplateKey] = useState("");
   const [tripId, setTripId] = useState("");
   const [cpf, setCpf] = useState("");
   const [name, setName] = useState("");
@@ -645,6 +658,22 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     }, 400);
   };
 
+  // Unique templates (deduplicated by template_id or title)
+  const templateOptions: Trip[] = (() => {
+    const seen = new Set<string>();
+    return trips.filter((t) => {
+      const key = String(t.template_id ?? t.title);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  // Dates available for selected template
+  const dateOptions = trips.filter(
+    (t) => templateKey && String(t.template_id ?? t.title) === templateKey
+  );
+
   const selectedTrip = trips.find((t) => String(t.id) === tripId);
   const effectivePrice = priceOverride ? parseFloat(priceOverride) || 0 : (selectedTrip?.price_per_person || 0);
   const total = effectivePrice * people;
@@ -652,7 +681,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!tripId) { setError("Selecione a viagem."); return; }
+    if (!templateKey) { setError("Selecione o roteiro."); return; }
+    if (!tripId) { setError("Selecione a data de saída."); return; }
     if (cpf.replace(/\D/g, "").length < 11) { setError("CPF inválido."); return; }
     if (!name.trim()) { setError("Informe o nome do titular."); return; }
 
@@ -711,31 +741,52 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-          {/* 1. Viagem */}
+          {/* 1. Roteiro */}
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Viagem</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Roteiro</label>
             <div className="relative">
-              <select required value={tripId} onChange={(e) => setTripId(e.target.value)}
+              <select value={templateKey} onChange={(e) => { setTemplateKey(e.target.value); setTripId(""); }}
                 className="w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer">
-                <option value="">Selecione a viagem...</option>
-                {trips.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title} ({t.available_spots} vagas · R$ {t.price_per_person.toLocaleString("pt-BR")})
+                <option value="">Selecione o roteiro...</option>
+                {templateOptions.map((t) => (
+                  <option key={t.template_id ?? t.title} value={String(t.template_id ?? t.title)}>
+                    {t.title} — {t.destination}
                   </option>
                 ))}
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
-            {selectedTrip && (
-              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
-                <MapPin size={10} /> {selectedTrip.destination}
-                <span className="mx-1">·</span>
-                <span className="font-semibold text-navy-600">R$ {selectedTrip.price_per_person.toLocaleString("pt-BR")} / pessoa</span>
-                <span className="mx-1">·</span>
-                {selectedTrip.available_spots} vagas
-              </p>
-            )}
           </div>
+
+          {/* 2. Data */}
+          {templateKey && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Data de saída</label>
+              <div className="relative">
+                <select required value={tripId} onChange={(e) => setTripId(e.target.value)}
+                  className="w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer">
+                  <option value="">Selecione a data...</option>
+                  {dateOptions.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR") : "Data indefinida"}
+                      {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR")}` : ""}
+                      {" "}· {t.available_spots} vaga{t.available_spots !== 1 ? "s" : ""} · R$ {t.price_per_person.toLocaleString("pt-BR")}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+              {selectedTrip && (
+                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
+                  <MapPin size={10} /> {selectedTrip.destination}
+                  <span className="mx-1">·</span>
+                  <span className="font-semibold text-navy-600">R$ {selectedTrip.price_per_person.toLocaleString("pt-BR")} / pessoa</span>
+                  <span className="mx-1">·</span>
+                  {selectedTrip.available_spots} vagas
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 2. CPF com lookup */}
           <div>
@@ -959,8 +1010,8 @@ export default function AdminReservasPage() {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   useEffect(() => {
-    fetch(`${API}/trips/admin-list`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.json()).then((d) => { if (Array.isArray(d)) setTrips(d); }).catch(() => {});
+    fetch(`${API}/trips/admin-list?limit=100`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => r.json()).then((d) => { if (d?.items) setTrips(d.items); else if (Array.isArray(d)) setTrips(d); }).catch(() => {});
   }, []);
 
   const confirm = async (code: string) => {
@@ -1094,7 +1145,9 @@ export default function AdminReservasPage() {
               className={`w-full sm:w-auto pl-8 pr-8 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none cursor-pointer ${tripFilter ? "border-navy-400 bg-navy-50 text-navy-700 font-semibold" : "border-gray-200 text-gray-500"}`}>
               <option value="">Todas as viagens</option>
               {trips.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
+                <option key={t.id} value={t.id}>
+                  {t.title}{t.departure_date ? ` · ${new Date(t.departure_date).toLocaleDateString("pt-BR")}` : ""}
+                </option>
               ))}
             </select>
           </div>
@@ -1134,9 +1187,11 @@ export default function AdminReservasPage() {
                           ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
                           : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>
                         }
-                        <span className="text-gray-300 hidden sm:inline">·</span>
-                        <span className="font-bold text-navy-800 text-sm truncate">{trip?.title ?? `Viagem #${b.trip_id}`}</span>
-                        {trip?.destination && <span className="text-xs text-gray-400 hidden sm:inline">{trip.destination}</span>}
+                        <span className="w-full sm:w-auto font-bold text-navy-800 text-sm sm:truncate leading-snug">
+                          <span className="hidden sm:inline text-gray-300 mr-1">·</span>
+                          {b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}
+                          {(b.trip_destination ?? trip?.destination) && <span className="hidden sm:inline text-xs text-gray-400 font-normal ml-1.5">{b.trip_destination ?? trip?.destination}</span>}
+                        </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
                         <span className="font-medium text-gray-600 truncate">{travelerName}</span>
