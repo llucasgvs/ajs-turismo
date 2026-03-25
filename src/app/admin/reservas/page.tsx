@@ -158,6 +158,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700"><Store size={10} /> Externo</span>
               : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"><Globe size={10} /> Via Site</span>
             }
+            {booking.status === "interesse" && <WaitingBadge createdAt={booking.created_at} />}
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
             <X size={18} />
