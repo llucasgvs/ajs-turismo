@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
 import { getToken } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PAGE_SIZE = 25;
 
 /* ─── Types ─── */
 type Booking = {
@@ -27,6 +28,7 @@ type Booking = {
   created_at: string;
   confirmed_at: string | null;
   cancelled_at: string | null;
+  updated_at: string | null;
   discount_amount: number;
   installments: number;
   is_external: boolean;
@@ -47,11 +49,64 @@ function fmt(d: string) {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
+function daysSince(dateStr: string): number {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function WaitingBadge({ createdAt }: { createdAt: string }) {
+  const days = daysSince(createdAt);
+  if (days === 0) return null;
+  const label = days === 1 ? "há 1 dia" : `há ${days} dias`;
+  const cls =
+    days >= 5
+      ? "bg-red-100 text-red-600"
+      : days >= 3
+      ? "bg-amber-100 text-amber-600"
+      : "bg-gray-100 text-gray-500";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
 function buildWaUrl(phone: string, name: string, code: string) {
   const clean = phone.replace(/\D/g, "");
   const number = clean.startsWith("55") ? clean : `55${clean}`;
   const msg = `Olá ${name}! Aqui é a equipe AJS Turismo. Gostaria de falar sobre sua reserva *${code}*.`;
   return `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+}
+
+/* ─── Pagination ─── */
+function Pagination({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  const show = new Set([1, totalPages, page, page - 1, page + 1].filter((p) => p >= 1 && p <= totalPages));
+  const sorted = Array.from(show).sort((a, b) => a - b);
+  return (
+    <div className="flex items-center justify-center gap-1 py-2">
+      <button onClick={() => onPage(page - 1)} disabled={page === 1}
+        className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
+        ← Anterior
+      </button>
+      {sorted.map((p, i) => {
+        const prev = sorted[i - 1];
+        return (
+          <Fragment key={p}>
+            {prev && p - prev > 1 && <span className="px-1 text-gray-300 select-none">…</span>}
+            <button onClick={() => onPage(p)}
+              className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${p === page ? "bg-navy-800 text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}>
+              {p}
+            </button>
+          </Fragment>
+        );
+      })}
+      <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
+        className="px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
+        Próxima →
+      </button>
+    </div>
+  );
 }
 
 /* ─── Booking Detail Modal ─── */
@@ -61,7 +116,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   onClose: () => void;
   onConfirm: (code: string) => void;
   onEdit: (booking: Booking) => void;
-  onCancel: (code: string) => void;
+  onCancel: (booking: Booking) => void;
   actionLoading: string | null;
 }) {
   const st = STATUS_LABEL[booking.status] ?? { label: booking.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
@@ -193,6 +248,9 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock size={11} /> Histórico</p>
             <div className="space-y-1 text-xs text-gray-500">
               <p>Criado em {fmt(booking.created_at)}</p>
+              {booking.updated_at && booking.updated_at !== booking.created_at && (
+                <p className="text-gray-400">Editado em {fmt(booking.updated_at)}</p>
+              )}
               {booking.confirmed_at && <p className="text-emerald-600">Confirmado em {fmt(booking.confirmed_at)}</p>}
               {booking.cancelled_at && <p className="text-red-500">Cancelado em {fmt(booking.cancelled_at)}</p>}
             </div>
@@ -212,9 +270,10 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               className="flex-1 flex items-center justify-center gap-2 border border-navy-300 text-navy-700 bg-navy-50 hover:bg-navy-100 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
               <Pencil size={14} /> Editar
             </button>
-            <button onClick={() => { onCancel(booking.booking_code); onClose(); }} disabled={isLoading}
-              className="flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
+            <button onClick={() => { onCancel(booking); onClose(); }} disabled={isLoading}
+              className="flex items-center justify-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
               <X size={14} />
+              <span className="hidden sm:inline">Cancelar</span>
             </button>
           </div>
         )}
@@ -451,6 +510,56 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   );
 }
 
+
+/* ─── Cancel Confirm Modal ─── */
+function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
+  booking: Booking;
+  trip: Trip | undefined;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl">
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle size={26} className="text-red-500" />
+            </div>
+            <div>
+              <h3 className="font-bold text-navy-800 text-lg">Cancelar reserva?</h3>
+              <p className="text-gray-400 text-sm mt-1">Esta ação não pode ser desfeita.</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
+            <p className="font-mono text-xs text-gray-400">{booking.booking_code}</p>
+            <p className="font-bold text-navy-800">{travelerName}</p>
+            {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
+            <p className="text-xs text-gray-400">
+              R$ {booking.final_amount.toLocaleString("pt-BR")} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+              Voltar
+            </button>
+            <button onClick={onConfirm} disabled={loading}
+              className="flex-1 bg-red-500 hover:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
+              Cancelar reserva
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── External Sale Modal ─── */
 function ExternalSaleModal({ trips, onClose, onSaved }: {
@@ -781,14 +890,20 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 /* ─── Main page ─── */
 export default function AdminReservasPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ interesse: 0, confirmed: 0, cancelled: 0, all: 0 });
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tab, setTab] = useState<"interesse" | "confirmed" | "all">("interesse");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showExternal, setShowExternal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [tripFilter, setTripFilter] = useState<string>("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -799,21 +914,49 @@ export default function AdminReservasPage() {
     });
   };
 
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [tab, tripFilter, debouncedSearch]);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/bookings/admin/counts`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) setCounts(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/bookings/admin/all?limit=200`, {
+      const params = new URLSearchParams();
+      params.set("skip", String((page - 1) * PAGE_SIZE));
+      params.set("limit", String(PAGE_SIZE));
+      if (tab !== "all") params.set("booking_status", tab);
+      if (tripFilter) params.set("trip_id", tripFilter);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+
+      const res = await fetch(`${API}/bookings/admin/all?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (res.ok) setBookings(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.items);
+        setTotal(data.total);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, tab, tripFilter, debouncedSearch]);
 
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+  useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   useEffect(() => {
     fetch(`${API}/trips/admin-list`, { headers: { Authorization: `Bearer ${getToken()}` } })
@@ -830,46 +973,34 @@ export default function AdminReservasPage() {
         body: JSON.stringify({}),
       });
       fetchBookings();
+      fetchCounts();
     } finally {
       setActionLoading(null);
     }
   };
 
-  const cancel = async (code: string) => {
-    if (!window.confirm(`Cancelar reserva ${code}?`)) return;
-    setActionLoading(code);
+  const promptCancel = (booking: Booking) => {
+    setCancelTarget(booking);
+  };
+
+  const executeCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelLoading(true);
     try {
-      await fetch(`${API}/bookings/${code}/cancel`, {
+      await fetch(`${API}/bookings/${cancelTarget.booking_code}/cancel`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+      setCancelTarget(null);
       fetchBookings();
+      fetchCounts();
     } finally {
-      setActionLoading(null);
+      setCancelLoading(false);
     }
   };
 
   const tripMap = Object.fromEntries(trips.map((t) => [t.id, t]));
-
-  const counts = {
-    interesse: bookings.filter((b) => b.status === "interesse").length,
-    confirmed: bookings.filter((b) => b.status === "confirmed").length,
-    all: bookings.length,
-  };
-
-  const tabBookings = tab === "all" ? bookings : bookings.filter((b) => b.status === tab);
-
-  const filtered = tabBookings.filter((b) => {
-    if (tripFilter && String(b.trip_id) !== tripFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      b.booking_code.toLowerCase().includes(q) ||
-      (b.traveler_name || "").toLowerCase().includes(q) ||
-      (b.traveler_cpf || "").includes(q) ||
-      (tripMap[b.trip_id]?.title || "").toLowerCase().includes(q)
-    );
-  });
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const tabs: { key: typeof tab; label: string; count: number }[] = [
     { key: "interesse", label: "Interesses", count: counts.interesse },
@@ -879,6 +1010,16 @@ export default function AdminReservasPage() {
 
   return (
     <div className="space-y-6">
+      {cancelTarget && (
+        <CancelConfirmModal
+          booking={cancelTarget}
+          trip={tripMap[cancelTarget.trip_id]}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={executeCancel}
+          loading={cancelLoading}
+        />
+      )}
+
       {selectedBooking && (
         <BookingDetailModal
           booking={selectedBooking}
@@ -886,7 +1027,7 @@ export default function AdminReservasPage() {
           onClose={() => setSelectedBooking(null)}
           onConfirm={(code) => { confirm(code); setSelectedBooking(null); }}
           onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
-          onCancel={cancel}
+          onCancel={(b) => { setSelectedBooking(null); promptCancel(b); }}
           actionLoading={actionLoading}
         />
       )}
@@ -938,17 +1079,17 @@ export default function AdminReservasPage() {
             </button>
           ))}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Buscar por código, nome, CPF..."
+            <input type="text" placeholder="Buscar por código, nome ou CPF..."
               value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
           </div>
-          <div className="relative shrink-0">
+          <div className="relative">
             <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <select value={tripFilter} onChange={(e) => setTripFilter(e.target.value)}
-              className={`pl-8 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none cursor-pointer ${tripFilter ? "border-navy-400 bg-navy-50 text-navy-700 font-semibold" : "border-gray-200 text-gray-500"}`}>
+              className={`w-full sm:w-auto pl-8 pr-8 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none cursor-pointer ${tripFilter ? "border-navy-400 bg-navy-50 text-navy-700 font-semibold" : "border-gray-200 text-gray-500"}`}>
               <option value="">Todas as viagens</option>
               {trips.map((t) => (
                 <option key={t.id} value={t.id}>{t.title}</option>
@@ -964,13 +1105,13 @@ export default function AdminReservasPage() {
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : bookings.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <p className="font-medium">Nenhuma reserva encontrada</p>
           </div>
         ) : (
           <div className="p-4 flex flex-col gap-3">
-            {filtered.map((b) => {
+            {bookings.map((b) => {
               const trip = tripMap[b.trip_id];
               const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
               const isLoading = actionLoading === b.booking_code;
@@ -1008,7 +1149,10 @@ export default function AdminReservasPage() {
                         <span>{fmt(b.created_at)}</span>
                       </div>
                     </div>
-                    <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                      {b.status === "interesse" && <WaitingBadge createdAt={b.created_at} />}
+                    </div>
                   </div>
                   {/* Actions */}
                   {["interesse", "confirmed", "pending"].includes(b.status) && (
@@ -1023,9 +1167,10 @@ export default function AdminReservasPage() {
                         className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
                         <Pencil size={11} /> Editar
                       </button>
-                      <button onClick={() => cancel(b.booking_code)} disabled={isLoading}
-                        className="flex items-center justify-center border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 rounded-lg transition-colors disabled:opacity-50">
+                      <button onClick={() => promptCancel(b)} disabled={isLoading}
+                        className="flex items-center justify-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors disabled:opacity-50">
                         <X size={11} />
+                        <span className="hidden sm:inline">Cancelar</span>
                       </button>
                     </div>
                   )}
@@ -1036,7 +1181,10 @@ export default function AdminReservasPage() {
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-right">{filtered.length} registro(s)</p>
+      <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+      <p className="text-xs text-gray-400 text-right">
+        {total} registro{total !== 1 ? "s" : ""} · página {page} de {Math.max(1, totalPages)}
+      </p>
     </div>
   );
 }
