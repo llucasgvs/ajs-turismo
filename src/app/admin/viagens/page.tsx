@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Fragment } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Trip {
@@ -106,6 +106,7 @@ export default function AdminViagens() {
   const [tab, setTab] = useState<"all" | "active" | "sold_out">("all");
   const [deactivateTarget, setDeactivateTarget] = useState<Trip | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<number | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -117,10 +118,24 @@ export default function AdminViagens() {
 
   useEffect(() => { load(); }, []);
 
+  const reactivateTrip = async (trip: Trip) => {
+    setReactivatingId(trip.id);
+    try {
+      await apiFetch(`/trips/${trip.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: true, status: "active" }),
+      });
+      load();
+    } catch { /* ignore */ }
+    setReactivatingId(null);
+  };
+
   const executeDeactivate = async () => {
     if (!deactivateTarget) return;
     setDeactivateLoading(true);
-    await apiFetch(`/trips/${deactivateTarget.id}`, { method: "DELETE" });
+    try {
+      await apiFetch(`/trips/${deactivateTarget.id}`, { method: "DELETE" });
+    } catch { /* 204 no content - ok */ }
     setDeactivateLoading(false);
     setDeactivateTarget(null);
     load();
@@ -128,11 +143,14 @@ export default function AdminViagens() {
 
   const counts = {
     all: trips.length,
-    active: trips.filter((t) => t.status === "active").length,
-    sold_out: trips.filter((t) => t.status === "sold_out").length,
+    active: trips.filter((t) => t.is_active).length,
+    sold_out: trips.filter((t) => t.status === "sold_out" && t.is_active).length,
   };
 
-  const tabTrips = tab === "all" ? trips : trips.filter((t) => t.status === tab);
+  const tabTrips =
+    tab === "all" ? trips :
+    tab === "active" ? trips.filter((t) => t.is_active) :
+    trips.filter((t) => t.status === tab);
   const filtered = tabTrips.filter(
     (t) =>
       t.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -222,7 +240,7 @@ export default function AdminViagens() {
               const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
               return (
                 <div key={trip.id}
-                  className={`rounded-xl border border-gray-100 border-l-4 ${s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                  className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md`}>
 
                   {/* Top row: info + badge */}
                   <div className="flex items-start justify-between gap-3">
@@ -242,10 +260,10 @@ export default function AdminViagens() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>
-                      {!trip.is_active && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-600">Oculto</span>
-                      )}
+                      {!trip.is_active
+                        ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Inativo</span>
+                        : <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>
+                      }
                     </div>
                   </div>
 
@@ -258,11 +276,19 @@ export default function AdminViagens() {
                       className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors">
                       <Pencil size={11} /> Editar
                     </Link>
-                    <button onClick={() => setDeactivateTarget(trip)}
-                      className="flex items-center justify-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors">
-                      <Trash2 size={11} />
-                      <span className="hidden sm:inline">Desativar</span>
-                    </button>
+                    {trip.is_active ? (
+                      <button onClick={() => setDeactivateTarget(trip)}
+                        className="flex items-center justify-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors">
+                        <Trash2 size={11} />
+                        <span className="hidden sm:inline">Desativar</span>
+                      </button>
+                    ) : (
+                      <button onClick={() => reactivateTrip(trip)} disabled={reactivatingId === trip.id}
+                        className="flex items-center gap-1 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                        {reactivatingId === trip.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                        <span>Reativar</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
