@@ -2,37 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import TripForm from "@/components/admin/TripForm";
+import TemplateForm from "@/components/admin/TemplateForm";
 import { apiFetch } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
-export default function EditarViagem() {
+export default function EditarRoteiro() {
   const { id } = useParams<{ id: string }>();
-  const [trip, setTrip] = useState<Record<string, unknown> | null>(null);
+  const [template, setTemplate] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiFetch(`/trips/${id}`)
+    apiFetch(`/templates/${id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.id) setTrip(data);
-        else setError("Viagem não encontrada.");
+        if (data.id) setTemplate(data);
+        else setError("Roteiro não encontrado.");
       })
-      .catch(() => setError("Erro ao carregar viagem."))
+      .catch(() => setError("Erro ao carregar roteiro."))
       .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
+        <Loader2 size={28} className="text-navy-400 animate-spin" />
       </div>
     );
   }
 
-  if (error || !trip) {
-    return <p className="text-red-500 p-8">{error || "Viagem não encontrada."}</p>;
+  if (error || !template) {
+    return <p className="text-red-500 p-8">{error || "Roteiro não encontrado."}</p>;
   }
 
-  return <TripForm tripId={parseInt(id)} initialData={trip as Parameters<typeof TripForm>[0]["initialData"]} />;
+  return (
+    <TemplateForm
+      templateId={parseInt(id)}
+      initialData={template as Parameters<typeof TemplateForm>[0]["initialData"]}
+    />
+  );
 }
