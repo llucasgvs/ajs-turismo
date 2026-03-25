@@ -1,22 +1,33 @@
 "use client";
 
-import { useEffect, useState, useCallback, Fragment } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw } from "lucide-react";
+import { Plus, Pencil, EyeOff, Star, Search, X, AlertTriangle, Loader2, MapPin, Users, Calendar, Tag, RefreshCw, Moon, DollarSign, CheckCircle2, XCircle, Info } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 interface Trip {
   id: number;
   title: string;
   destination: string;
+  description: string;
+  short_description: string | null;
   status: string;
   is_featured: boolean;
   is_active: boolean;
   price_per_person: number;
+  original_price: number | null;
+  max_installments: number;
   available_spots: number;
   total_spots: number;
+  min_group_size: number;
   departure_date: string;
+  return_date: string;
+  duration_nights: number;
   category: string;
+  tag: string | null;
+  includes: string[];
+  excludes: string[];
+  created_at: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string; border: string }> = {
@@ -72,6 +83,197 @@ function DeactivateModal({ trip, onClose, onConfirm, loading }: {
               Ocultar
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Trip Detail Modal ─── */
+function TripDetailModal({ trip, onClose, onDeactivate, onReactivate, reactivating }: {
+  trip: Trip;
+  onClose: () => void;
+  onDeactivate: () => void;
+  onReactivate: () => void;
+  reactivating: boolean;
+}) {
+  const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+  const used = trip.total_spots - trip.available_spots;
+  const pct = trip.total_spots > 0 ? Math.round((used / trip.total_spots) * 100) : 0;
+  const barColor = trip.available_spots === 0 ? "bg-red-400" : pct >= 75 ? "bg-amber-400" : "bg-emerald-400";
+  const discount = trip.original_price && trip.original_price > trip.price_per_person
+    ? Math.round((1 - trip.price_per_person / trip.original_price) * 100)
+    : null;
+
+  const statusBadge = trip.status === "completed"
+    ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Concluído</span>
+    : !trip.is_active
+    ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Oculto</span>
+    : <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>{s.label}</span>;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]">
+
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 bg-gray-200 rounded-full" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1">
+              {trip.is_featured && <Star size={13} className="text-gold-500 shrink-0" fill="currentColor" />}
+              <h2 className="font-bold text-navy-800 text-base leading-snug line-clamp-2">{trip.title}</h2>
+            </div>
+            <p className="text-xs text-gray-400 flex items-center gap-1">
+              <MapPin size={10} className="shrink-0" /> {trip.destination}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {statusBadge}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+          {/* Dates + Duration */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-400 mb-0.5 uppercase tracking-wide">Partida</p>
+              <p className="font-bold text-navy-800 text-sm">{fmt(trip.departure_date)}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-400 mb-0.5 uppercase tracking-wide">Retorno</p>
+              <p className="font-bold text-navy-800 text-sm">{fmt(trip.return_date)}</p>
+            </div>
+            <div className="bg-navy-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-navy-400 mb-0.5 uppercase tracking-wide flex items-center justify-center gap-0.5"><Moon size={9} />Noites</p>
+              <p className="font-bold text-navy-800 text-sm">{trip.duration_nights}</p>
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="bg-gray-50 rounded-xl p-3.5 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5 flex items-center gap-0.5"><DollarSign size={9} /> Preço por pessoa</p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-black text-navy-800 text-lg">R$ {trip.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                {trip.original_price && (
+                  <span className="line-through text-gray-400 text-xs">R$ {trip.original_price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                )}
+              </div>
+              {discount && <span className="text-xs text-emerald-600 font-semibold">{discount}% de desconto</span>}
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Parcelas</p>
+              <p className="font-bold text-navy-800 text-sm">até {trip.max_installments}×</p>
+            </div>
+          </div>
+
+          {/* Vagas */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500 flex items-center gap-1 font-medium"><Users size={11} /> Vagas</span>
+              <span className={`font-semibold ${trip.available_spots === 0 ? "text-red-500" : pct >= 75 ? "text-amber-600" : "text-emerald-600"}`}>
+                {trip.available_spots === 0 ? "Esgotado" : `${trip.available_spots} disponíve${trip.available_spots === 1 ? "l" : "is"}`}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+            </div>
+            <p className="text-[11px] text-gray-400">{used} ocupadas de {trip.total_spots} vagas totais · mín. {trip.min_group_size} pessoa(s)</p>
+          </div>
+
+          {/* Category + Tag */}
+          <div className="flex flex-wrap gap-2">
+            <span className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+              <Tag size={10} /> {trip.category}
+            </span>
+            {trip.tag && (
+              <span className="flex items-center gap-1 text-xs bg-gold-100 text-gold-700 px-2.5 py-1 rounded-full font-semibold">
+                {trip.tag}
+              </span>
+            )}
+            {trip.is_featured && (
+              <span className="flex items-center gap-1 text-xs bg-amber-50 text-amber-600 px-2.5 py-1 rounded-full font-semibold">
+                <Star size={10} fill="currentColor" /> Destaque
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {(trip.short_description || trip.description) && (
+            <div className="bg-gray-50 rounded-xl p-3.5">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Info size={9} /> Descrição</p>
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-4">
+                {trip.short_description || trip.description}
+              </p>
+            </div>
+          )}
+
+          {/* Includes */}
+          {trip.includes && trip.includes.length > 0 && (
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1"><CheckCircle2 size={9} className="text-emerald-500" /> Inclui</p>
+              <ul className="space-y-1">
+                {trip.includes.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                    <CheckCircle2 size={12} className="text-emerald-500 mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Excludes */}
+          {trip.excludes && trip.excludes.length > 0 && (
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1"><XCircle size={9} className="text-red-400" /> Não inclui</p>
+              <ul className="space-y-1">
+                {trip.excludes.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-gray-500">
+                    <XCircle size={12} className="text-red-400 mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Created at */}
+          <p className="text-[11px] text-gray-300">Cadastrado em {fmt(trip.created_at)}</p>
+        </div>
+
+        {/* Actions footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+          <Link href={`/admin/viagens/${trip.id}/editar`}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-navy-800 hover:bg-navy-700 text-white font-bold py-3 rounded-xl text-sm transition-colors">
+            <Pencil size={14} /> Editar
+          </Link>
+          {trip.status !== "completed" && (
+            trip.is_active ? (
+              <button onClick={onDeactivate}
+                className="flex-1 flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-500 hover:bg-zinc-50 font-bold py-3 rounded-xl text-sm transition-colors">
+                <EyeOff size={14} /> Ocultar
+              </button>
+            ) : (
+              <button onClick={onReactivate} disabled={reactivating}
+                className="flex-1 flex items-center justify-center gap-1.5 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-bold py-3 rounded-xl text-sm transition-colors disabled:opacity-50">
+                {reactivating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Reativar
+              </button>
+            )
+          )}
         </div>
       </div>
     </div>
@@ -142,6 +344,7 @@ export default function AdminViagens() {
   const [deactivateTarget, setDeactivateTarget] = useState<Trip | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
+  const [detailTrip, setDetailTrip] = useState<Trip | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -190,6 +393,7 @@ export default function AdminViagens() {
         method: "PUT",
         body: JSON.stringify({ is_active: true, status: "active" }),
       });
+      setDetailTrip(null);
       reload();
     } catch { /* ignore */ }
     setReactivatingId(null);
@@ -203,6 +407,7 @@ export default function AdminViagens() {
     } catch { /* 204 no content - ok */ }
     setDeactivateLoading(false);
     setDeactivateTarget(null);
+    setDetailTrip(null);
     reload();
   };
 
@@ -224,6 +429,16 @@ export default function AdminViagens() {
           onClose={() => setDeactivateTarget(null)}
           onConfirm={executeDeactivate}
           loading={deactivateLoading}
+        />
+      )}
+
+      {detailTrip && !deactivateTarget && (
+        <TripDetailModal
+          trip={detailTrip}
+          onClose={() => setDetailTrip(null)}
+          onDeactivate={() => { setDeactivateTarget(detailTrip); }}
+          onReactivate={() => reactivateTrip(detailTrip)}
+          reactivating={reactivatingId === detailTrip.id}
         />
       )}
 
@@ -309,7 +524,8 @@ export default function AdminViagens() {
               const s = STATUS_LABEL[trip.status] ?? { label: trip.status, cls: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
               return (
                 <div key={trip.id}
-                  className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md`}>
+                  onClick={() => setDetailTrip(trip)}
+                  className={`rounded-xl border border-gray-100 border-l-4 ${!trip.is_active ? "border-l-gray-300" : s.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
 
                   {/* Top row: info + badge */}
                   <div className="flex items-start justify-between gap-3">
@@ -342,16 +558,16 @@ export default function AdminViagens() {
                   <VagasBar available={trip.available_spots} total={trip.total_spots} />
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5 pt-0.5">
+                  <div className="flex items-center gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
                     <Link href={`/admin/viagens/${trip.id}/editar`}
                       className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors">
                       <Pencil size={11} /> Editar
                     </Link>
                     {trip.is_active ? (
                       <button onClick={() => setDeactivateTarget(trip)}
-                        className="flex items-center justify-center gap-1 border border-zinc-200 text-zinc-500 hover:bg-zinc-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors">
+                        className="flex items-center justify-center gap-1 border border-zinc-200 text-zinc-500 hover:bg-zinc-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors">
                         <EyeOff size={11} />
-                        <span className="hidden sm:inline">Ocultar</span>
+                        <span>Ocultar</span>
                       </button>
                     ) : (
                       <button onClick={() => reactivateTrip(trip)} disabled={reactivatingId === trip.id}
