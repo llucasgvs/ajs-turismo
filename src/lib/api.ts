@@ -25,7 +25,8 @@ export function saveSession(accessToken: string, refreshToken: string, user: Sto
   localStorage.setItem("ajs_refresh_token", refreshToken);
   localStorage.setItem("ajs_user", JSON.stringify(user));
   if (user.is_admin) {
-    document.cookie = "ajs_admin=1; path=/; SameSite=Lax; max-age=86400";
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `ajs_admin=1; path=/; SameSite=Lax; max-age=86400${secure}`;
   }
 }
 
