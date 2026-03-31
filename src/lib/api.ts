@@ -24,12 +24,16 @@ export function saveSession(accessToken: string, refreshToken: string, user: Sto
   localStorage.setItem("ajs_token", accessToken);
   localStorage.setItem("ajs_refresh_token", refreshToken);
   localStorage.setItem("ajs_user", JSON.stringify(user));
+  if (user.is_admin) {
+    document.cookie = "ajs_admin=1; path=/; SameSite=Lax; max-age=86400";
+  }
 }
 
 export function logout() {
   localStorage.removeItem("ajs_token");
   localStorage.removeItem("ajs_refresh_token");
   localStorage.removeItem("ajs_user");
+  document.cookie = "ajs_admin=; path=/; max-age=0";
   window.location.href = "/login";
 }
 
