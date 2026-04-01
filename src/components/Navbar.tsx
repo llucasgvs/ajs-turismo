@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X, MessageCircle, LayoutDashboard } from "lucide-react";
+import { Menu, X, MessageCircle, LayoutDashboard, User } from "lucide-react";
 import { getUser } from "@/lib/api";
 import type { StoredUser } from "@/lib/api";
 import { useLoading } from "@/components/LoadingProvider";
