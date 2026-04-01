@@ -535,9 +535,10 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);
-      window.open(`https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+      const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
       onClose();
-      window.location.href = "/dashboard";
+      // Redireciona para o WhatsApp direto na mesma aba — evita bloqueio de popup após async
+      window.location.href = waUrl;
     } catch { setError("Erro de conexão. Tente novamente."); }
     finally { setLoading(false); }
   };
