@@ -158,7 +158,11 @@ export default function TripForm({ tripId, initialData }: { tripId?: number; ini
       const data = await res.json();
 
       if (!res.ok) {
-        setError(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d: { msg?: string }) => d.msg ?? JSON.stringify(d)).join(", "));
+        } else {
+          setError(typeof data.detail === "string" ? data.detail : "Erro ao salvar.");
+        }
         return;
       }
 

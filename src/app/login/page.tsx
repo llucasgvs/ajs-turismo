@@ -32,7 +32,11 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || "Email ou senha incorretos.");
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d: { msg?: string }) => d.msg ?? JSON.stringify(d)).join(", "));
+        } else {
+          setError(data.detail || "Email ou senha incorretos.");
+        }
         return;
       }
 

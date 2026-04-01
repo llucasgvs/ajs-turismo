@@ -41,7 +41,11 @@ export default function RedefinirSenhaPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.detail || "Erro ao redefinir senha.");
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d: { msg?: string }) => d.msg ?? JSON.stringify(d)).join(", "));
+        } else {
+          setError(data.detail || "Erro ao redefinir senha.");
+        }
         return;
       }
       setDone(true);
