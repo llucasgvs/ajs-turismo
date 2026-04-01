@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function TermosDeUso() {
-  const updated = "31 de março de 2025";
+  const updated = "31 de março de 2026";
 
   return (
     <div className="min-h-screen bg-gray-50">
