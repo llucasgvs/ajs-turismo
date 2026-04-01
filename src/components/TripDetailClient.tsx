@@ -39,6 +39,19 @@ function formatCPF(val: string) {
   if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
+
+function validateCPF(val: string): boolean {
+  const d = val.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
+  let r = sum % 11;
+  if ((r < 2 ? 0 : 11 - r) !== parseInt(d[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
+  r = sum % 11;
+  return (r < 2 ? 0 : 11 - r) === parseInt(d[10]);
+}
 function formatPhone(val: string) {
   const d = val.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 2) return d;
@@ -510,12 +523,12 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (cpf.replace(/\D/g, "").length < 11) { setError("Informe seu CPF completo."); return; }
+    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); return; }
     if (!birthDate) { setError("Informe sua data de nascimento."); return; }
     if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); return; }
     for (const [i, c] of companions.entries()) {
       if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); return; }
-      if (c.cpf.replace(/\D/g, "").length < 11) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
+      if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
       if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); return; }
     }
     setLoading(true);

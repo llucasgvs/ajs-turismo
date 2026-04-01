@@ -572,6 +572,36 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
   );
 }
 
+function validateCPF(val: string): boolean {
+  const d = val.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
+  let r = sum % 11;
+  if ((r < 2 ? 0 : 11 - r) !== parseInt(d[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
+  r = sum % 11;
+  return (r < 2 ? 0 : 11 - r) === parseInt(d[10]);
+}
+
+function parseApiError(err: unknown): string {
+  if (!err || typeof err !== "object") return "Erro ao salvar.";
+  const e = err as Record<string, unknown>;
+  if (typeof e.detail === "string") return e.detail;
+  if (Array.isArray(e.detail)) {
+    // Pydantic 422 — array de objetos com { msg, loc }
+    return e.detail.map((d: unknown) => {
+      if (d && typeof d === "object") {
+        const de = d as Record<string, unknown>;
+        return typeof de.msg === "string" ? de.msg : JSON.stringify(de);
+      }
+      return String(d);
+    }).join(", ");
+  }
+  return "Erro ao salvar.";
+}
+
 /* ─── External Sale Modal ─── */
 function ExternalSaleModal({ trips, onClose, onSaved }: {
   trips: Trip[];
@@ -683,7 +713,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     setError("");
     if (!templateKey) { setError("Selecione o roteiro."); return; }
     if (!tripId) { setError("Selecione a data de saída."); return; }
-    if (cpf.replace(/\D/g, "").length < 11) { setError("CPF inválido."); return; }
+    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); return; }
     if (!name.trim()) { setError("Informe o nome do titular."); return; }
 
     setLoading(true);
@@ -710,7 +740,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
       });
       if (!res.ok) {
         const err = await res.json();
-        setError(err.detail || "Erro ao salvar.");
+        setError(parseApiError(err));
         return;
       }
       onSaved();
