@@ -31,6 +31,16 @@ function toDateInput(iso: string | undefined): string {
   return iso.slice(0, 10);
 }
 
+interface TripDateInitialData {
+  departure_date?: string;
+  return_date?: string;
+  price_per_person?: number;
+  original_price?: number | null;
+  max_installments?: number;
+  total_spots?: number;
+  available_spots?: number;
+}
+
 export default function TripDateForm({
   templateId,
   tripId,
@@ -39,17 +49,19 @@ export default function TripDateForm({
 }: {
   templateId: number;
   tripId?: number;
-  initialData?: Partial<TripDateFormData & { departure_date?: string; return_date?: string; price_per_person?: number; original_price?: number | null }>;
+  initialData?: TripDateInitialData;
   templateTitle?: string;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<TripDateFormData>({
     ...EMPTY,
-    ...initialData,
+    max_installments: initialData?.max_installments ?? EMPTY.max_installments,
+    total_spots: initialData?.total_spots ?? EMPTY.total_spots,
+    available_spots: initialData?.available_spots ?? EMPTY.available_spots,
     departure_date: toDateInput(initialData?.departure_date),
     return_date: toDateInput(initialData?.return_date),
-    price_per_person: initialData?.price_per_person?.toString() ?? "",
-    original_price: initialData?.original_price?.toString() ?? "",
+    price_per_person: initialData?.price_per_person != null ? String(initialData.price_per_person) : "",
+    original_price: initialData?.original_price != null ? String(initialData.original_price) : "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
