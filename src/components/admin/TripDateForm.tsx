@@ -87,9 +87,27 @@ export default function TripDateForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
     setSuccess("");
+
+    if (!form.departure_date) { setError("Informe a data de saída."); return; }
+    if (!form.return_date) { setError("Informe a data de retorno."); return; }
+    if (new Date(form.return_date) <= new Date(form.departure_date)) {
+      setError("A data de retorno deve ser posterior à data de saída."); return;
+    }
+    if (new Date(form.departure_date) < new Date(new Date().toDateString())) {
+      setError("A data de saída não pode ser no passado."); return;
+    }
+    const priceVal = parseFloat(form.price_per_person);
+    if (!form.price_per_person || isNaN(priceVal) || priceVal <= 0) {
+      setError("Informe um preço por pessoa válido."); return;
+    }
+    if (form.available_spots > form.total_spots) {
+      setError("Vagas disponíveis não podem ser maiores que o total de vagas."); return;
+    }
+    if (form.total_spots <= 0) { setError("Total de vagas deve ser maior que zero."); return; }
+
+    setLoading(true);
 
     const body = {
       departure_date: form.departure_date
@@ -115,7 +133,11 @@ export default function TripDateForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d: {msg?: string}) => d.msg ?? JSON.stringify(d)).join(", "));
+        } else {
+          setError(typeof data.detail === "string" ? data.detail : "Erro ao salvar.");
+        }
         return;
       }
       setSuccess(tripId ? "Data atualizada!" : "Data criada!");

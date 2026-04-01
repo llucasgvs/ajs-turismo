@@ -29,6 +29,20 @@ export default function CadastroPage() {
     e.preventDefault();
     setError("");
 
+    const nameParts = form.full_name.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      setError("Informe seu nome e sobrenome.");
+      return;
+    }
+
+    if (form.phone) {
+      const phoneDigits = form.phone.replace(/\D/g, "");
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        setError("Telefone inválido. Informe DDD + número (ex: 41999999999).");
+        return;
+      }
+    }
+
     if (form.password !== form.confirmPassword) {
       setError("As senhas não coincidem.");
       return;
@@ -61,7 +75,11 @@ export default function CadastroPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.detail || "Erro ao criar conta. Tente novamente.");
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d: {msg?: string}) => d.msg ?? JSON.stringify(d)).join(", "));
+        } else {
+          setError(data.detail || "Erro ao criar conta. Tente novamente.");
+        }
         return;
       }
 

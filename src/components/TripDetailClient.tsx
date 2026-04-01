@@ -544,7 +544,11 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined }),
       });
-      if (!bookingRes.ok) { const err = await bookingRes.json(); setError(err.detail || "Erro ao criar reserva."); return; }
+      if (!bookingRes.ok) {
+        const err = await bookingRes.json();
+        setError(Array.isArray(err.detail) ? err.detail.map((d: {msg?: string}) => d.msg ?? String(d)).join(", ") : (err.detail || "Erro ao criar reserva."));
+        return;
+      }
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);

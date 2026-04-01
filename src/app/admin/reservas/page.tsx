@@ -375,7 +375,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
           companions: companions.map((c) => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date || undefined })),
         }),
       });
-      if (!res.ok) { const e = await res.json(); setError(e.detail || "Erro ao salvar."); return; }
+      if (!res.ok) { const e = await res.json(); setError(parseApiError(e)); return; }
       onSaved();
       onClose();
     } catch { setError("Erro de conexão."); }
@@ -715,6 +715,13 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     if (!tripId) { setError("Selecione a data de saída."); return; }
     if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); return; }
     if (!name.trim()) { setError("Informe o nome do titular."); return; }
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) { setError("Telefone inválido. Informe DDD + número."); return; }
+    for (let i = 0; i < companions.length; i++) {
+      const c = companions[i];
+      if (!c.full_name.trim()) { setError(`Informe o nome do acompanhante ${i + 1}.`); return; }
+      if (c.cpf && !validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
+    }
 
     setLoading(true);
     try {
