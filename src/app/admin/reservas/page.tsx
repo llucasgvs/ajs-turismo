@@ -39,7 +39,7 @@ type Booking = {
   trip_return_date: string | null;
 };
 
-type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null };
+type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
 
 const STATUS_LABEL: Record<string, { label: string; color: string; border: string }> = {
   interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700",     border: "border-l-amber-400" },
@@ -1131,7 +1131,7 @@ export default function AdminReservasPage() {
 
       {showExternal && (
         <ExternalSaleModal
-          trips={trips.filter((t) => t.available_spots > 0)}
+          trips={trips.filter((t) => t.is_active !== false && t.available_spots > 0 && t.status !== "cancelled" && t.status !== "completed")}
           onClose={() => setShowExternal(false)}
           onSaved={fetchBookings}
         />
