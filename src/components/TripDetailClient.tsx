@@ -1053,6 +1053,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
                   <h2 className="font-display font-black text-xl text-navy-800 mb-4">Sobre o pacote</h2>
                   <p className="text-gray-600 leading-relaxed whitespace-pre-line">{trip.description}</p>
+                  <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                    <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
+                    <p className="text-amber-800 text-sm font-medium">Sempre chegar com 10 minutos de antecedência.</p>
+                  </div>
                 </div>
               )}
 

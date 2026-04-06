@@ -92,8 +92,8 @@ export default function TripDateForm({
 
     if (!form.departure_date) { setError("Informe a data de saída."); return; }
     if (!form.return_date) { setError("Informe a data de retorno."); return; }
-    if (new Date(form.return_date) <= new Date(form.departure_date)) {
-      setError("A data de retorno deve ser posterior à data de saída."); return;
+    if (new Date(form.return_date) < new Date(form.departure_date)) {
+      setError("A data de retorno deve ser igual ou posterior à data de saída."); return;
     }
     if (new Date(form.departure_date) < new Date(new Date().toDateString())) {
       setError("A data de saída não pode ser no passado."); return;
