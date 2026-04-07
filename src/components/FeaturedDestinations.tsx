@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, ArrowRight } from "lucide-react";
+import { fmtBRL } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -92,7 +93,7 @@ export default function FeaturedDestinations() {
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">A partir de</p>
                     <p className="text-navy-600 font-black text-xl">
-                      R$ {tmpl.price_from.toLocaleString("pt-BR")}
+                      R$ {fmtBRL(tmpl.price_from)}
                       <span className="text-gray-400 font-normal text-xs">/pessoa</span>
                     </p>
                   </div>

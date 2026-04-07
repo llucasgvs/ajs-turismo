@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
 import { getToken } from "@/lib/api";
+import { fmtBRL } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const PAGE_SIZE = 25;
@@ -229,18 +230,18 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><DollarSign size={11} /> Financeiro</p>
             <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {booking.price_per_person.toLocaleString("pt-BR")}</span>
-                <span>R$ {booking.total_amount.toLocaleString("pt-BR")}</span>
+                <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {fmtBRL(booking.price_per_person)}</span>
+                <span>R$ {fmtBRL(booking.total_amount)}</span>
               </div>
               {booking.discount_amount > 0 && (
                 <div className="flex justify-between text-red-500">
                   <span>Desconto</span>
-                  <span>− R$ {booking.discount_amount.toLocaleString("pt-BR")}</span>
+                  <span>− R$ {fmtBRL(booking.discount_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
                 <span>Total</span>
-                <span>R$ {booking.final_amount.toLocaleString("pt-BR")}</span>
+                <span>R$ {fmtBRL(booking.final_amount)}</span>
               </div>
               <p className="text-xs text-gray-400">{PAYMENT_LABEL[booking.payment_method ?? ""] ?? booking.payment_method ?? "—"}{booking.installments > 1 ? ` · ${booking.installments}x` : ""}</p>
             </div>
@@ -408,7 +409,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
                 <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
                   className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${priceNum !== booking.price_per_person ? "border-amber-300 bg-amber-50" : "border-gray-200"}`} />
               </div>
-              {priceNum !== booking.price_per_person && <p className="text-[10px] text-amber-600 mt-1">Original: R$ {booking.price_per_person.toLocaleString("pt-BR")}</p>}
+              {priceNum !== booking.price_per_person && <p className="text-[10px] text-amber-600 mt-1">Original: R$ {fmtBRL(booking.price_per_person)}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Desconto <span className="text-gray-400 font-normal normal-case">(R$)</span></label>
@@ -501,8 +502,8 @@ function EditBookingModal({ booking, onClose, onSaved }: {
 
           {/* Total */}
           <div className={`rounded-xl px-4 py-3 flex items-center justify-between text-sm ${changed ? "bg-amber-50 border border-amber-200" : "bg-navy-50"}`}>
-            <span className="text-gray-500">{people} × R$ {priceNum.toLocaleString("pt-BR")}{discNum > 0 ? ` − R$ ${discNum.toLocaleString("pt-BR")}` : ""}</span>
-            <span className="font-black text-navy-800 text-base">R$ {total.toLocaleString("pt-BR")}</span>
+            <span className="text-gray-500">{people} × R$ {fmtBRL(priceNum)}{discNum > 0 ? ` − R$ ${fmtBRL(discNum)}` : ""}</span>
+            <span className="font-black text-navy-800 text-base">R$ {fmtBRL(total)}</span>
           </div>
         </div>
 
@@ -551,7 +552,7 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
             <p className="font-bold text-navy-800">{travelerName}</p>
             {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
             <p className="text-xs text-gray-400">
-              R$ {booking.final_amount.toLocaleString("pt-BR")} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
+              R$ {fmtBRL(booking.final_amount)} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
             </p>
           </div>
 
@@ -807,7 +808,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                     <option key={t.id} value={t.id}>
                       {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR") : "Data indefinida"}
                       {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR")}` : ""}
-                      {" "}· {t.available_spots} vaga{t.available_spots !== 1 ? "s" : ""} · R$ {t.price_per_person.toLocaleString("pt-BR")}
+                      {" "}· {t.available_spots} vaga{t.available_spots !== 1 ? "s" : ""} · R$ {fmtBRL(t.price_per_person)}
                     </option>
                   ))}
                 </select>
@@ -817,7 +818,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                 <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
                   <MapPin size={10} /> {selectedTrip.destination}
                   <span className="mx-1">·</span>
-                  <span className="font-semibold text-navy-600">R$ {selectedTrip.price_per_person.toLocaleString("pt-BR")} / pessoa</span>
+                  <span className="font-semibold text-navy-600">R$ {fmtBRL(selectedTrip.price_per_person)} / pessoa</span>
                   <span className="mx-1">·</span>
                   {selectedTrip.available_spots} vagas
                 </p>
@@ -959,8 +960,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           {/* Resumo + Submit */}
           {selectedTrip && (
             <div className="bg-navy-50 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
-              <span className="text-gray-500">{people} pessoa{people !== 1 ? "s" : ""} × R$ {effectivePrice.toLocaleString("pt-BR")}</span>
-              <span className="font-black text-navy-800 text-base">R$ {total.toLocaleString("pt-BR")}</span>
+              <span className="text-gray-500">{people} pessoa{people !== 1 ? "s" : ""} × R$ {fmtBRL(effectivePrice)}</span>
+              <span className="font-black text-navy-800 text-base">R$ {fmtBRL(total)}</span>
             </div>
           )}
 
@@ -1238,7 +1239,7 @@ export default function AdminReservasPage() {
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 pt-0.5">
                         <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
                         <span>·</span>
-                        <span className="font-bold text-navy-700">R$ {b.final_amount.toLocaleString("pt-BR")}</span>
+                        <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>
                         <span>·</span>
                         <span>{fmt(b.created_at)}</span>
                       </div>

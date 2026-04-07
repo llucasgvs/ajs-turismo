@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
+import { fmtBRL, fmtInstallment } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -145,18 +146,18 @@ export default function FeaturedPackages() {
                       <div>
                         {pkg.original_price_from && (
                           <p className="text-xs text-gray-400 line-through">
-                            R$ {pkg.original_price_from.toLocaleString("pt-BR")}
+                            R$ {fmtBRL(pkg.original_price_from)}
                           </p>
                         )}
                         <div className="flex items-baseline gap-1">
                           <span className="text-xs text-gray-500">a partir de</span>
                           <span className="font-display font-black text-2xl text-navy-700">
-                            R$ {pkg.price_from.toLocaleString("pt-BR")}
+                            R$ {fmtBRL(pkg.price_from)}
                           </span>
                         </div>
                         <p className="text-xs text-emerald-600 font-medium">
                           ou {pkg.max_installments}x de R${" "}
-                          {Math.ceil(pkg.price_from / pkg.max_installments).toLocaleString("pt-BR")} sem juros
+                          {fmtInstallment(pkg.price_from, pkg.max_installments)} sem juros
                         </p>
                       </div>
                       {discount && discount > 0 && (

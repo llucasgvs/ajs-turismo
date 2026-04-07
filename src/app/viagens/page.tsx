@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { fmtBRL, fmtInstallment } from "@/lib/format";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
@@ -547,7 +548,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
                   {isSoldOut ? (
                     <span className="text-red-400 font-bold text-[10px]">Esgotado</span>
                   ) : (
-                    <span className="font-bold text-gold-600">R$ {d.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</span>
+                    <span className="font-bold text-gold-600">R$ {fmtBRL(d.price_per_person)}</span>
                   )}
                 </div>
               );
@@ -563,16 +564,16 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
           <div>
             {tmpl.original_price_from && (
               <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
-                R$ {tmpl.original_price_from.toLocaleString("pt-BR")}
+                R$ {fmtBRL(tmpl.original_price_from)}
               </p>
             )}
             <p className="text-[10px] text-gray-400 leading-none">a partir de</p>
             <p className="font-display font-black text-xl text-navy-700 leading-tight">
-              R$ {tmpl.price_from.toLocaleString("pt-BR")}
+              R$ {fmtBRL(tmpl.price_from)}
             </p>
             <p className="text-[10px] text-emerald-600 font-semibold">
               {tmpl.max_installments}x de R${" "}
-              {Math.ceil(tmpl.price_from / tmpl.max_installments).toLocaleString("pt-BR")} s/ juros
+              {fmtInstallment(tmpl.price_from, tmpl.max_installments)} s/ juros
             </p>
           </div>
           <div className="w-9 h-9 rounded-xl bg-navy-800 text-white group-hover:bg-gold-500 flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110">

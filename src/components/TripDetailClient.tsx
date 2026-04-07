@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
+import { fmtBRL, fmtInstallment } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -70,7 +71,7 @@ function buildWhatsAppMessage(
     `Destino: ${trip.destination}\n` +
     `Saida: ${fmt(trip.departure_date.slice(0, 10))}\n` +
     `Retorno: ${fmt(trip.return_date.slice(0, 10))}\n` +
-    `Preco por pessoa: R$ ${trip.price_per_person.toLocaleString("pt-BR")}\n` +
+    `Preco por pessoa: R$ ${fmtBRL(trip.price_per_person)}\n` +
     `Codigo: ${bookingCode}\n\n` +
     `*Titular:*\n` +
     `   Nome: ${user.full_name}\n` +
@@ -81,7 +82,7 @@ function buildWhatsAppMessage(
     msg += `\n*Acompanhante ${i + 1}:*\n   Nome: ${c.full_name}\n   CPF: ${c.cpf}\n   Nascimento: ${fmt(c.birth_date)}\n`;
   });
   msg += `\n*Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
-  msg += `*Valor estimado:* R$ ${(people * trip.price_per_person).toLocaleString("pt-BR")}`;
+  msg += `*Valor estimado:* R$ ${fmtBRL(people * trip.price_per_person)}`;
   if (note) msg += `\n\nObservacao: ${note}`;
   return msg;
 }
@@ -355,7 +356,7 @@ function RelatedCard({ trip }: { trip: Trip }) {
         <div className="mt-auto flex items-end justify-between">
           <div>
             <p className="text-[10px] text-gray-400">a partir de</p>
-            <p className="font-black text-base text-navy-700 leading-tight">R$ {trip.price_per_person.toLocaleString("pt-BR")}</p>
+            <p className="font-black text-base text-navy-700 leading-tight">R$ {fmtBRL(trip.price_per_person)}</p>
           </div>
           <span className="text-[10px] text-navy-500 font-medium">
             {depDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
@@ -449,14 +450,14 @@ function StickyMobileCTA({
       <div className="flex-1 min-w-0">
         {trip.original_price && (
           <p className="text-xs text-gray-400 line-through leading-none">
-            R$ {trip.original_price.toLocaleString("pt-BR")}
+            R$ {fmtBRL(trip.original_price)}
           </p>
         )}
         <p className="font-display font-black text-xl text-navy-700 leading-tight">
-          R$ {trip.price_per_person.toLocaleString("pt-BR")}
+          R$ {fmtBRL(trip.price_per_person)}
         </p>
         <p className="text-[11px] text-emerald-600 font-medium">
-          {trip.max_installments}x de R$ {Math.ceil(trip.price_per_person / trip.max_installments).toLocaleString("pt-BR")} s/juros
+          {trip.max_installments}x de R$ {fmtInstallment(trip.price_per_person, trip.max_installments)} s/juros
         </p>
       </div>
       {sold ? (
@@ -583,7 +584,7 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
                 {new Date(trip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
               </p>
               <span className="font-black text-navy-700 text-base flex-shrink-0">
-                R$ {trip.price_per_person.toLocaleString("pt-BR")}
+                R$ {fmtBRL(trip.price_per_person)}
                 <span className="text-xs font-normal text-gray-400">/pessoa</span>
               </span>
             </div>
@@ -662,8 +663,8 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
           </div>
 
           <div className="bg-navy-50 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm text-navy-600 font-medium">{people} × R$ {trip.price_per_person.toLocaleString("pt-BR")}</span>
-            <span className="font-black text-navy-800 text-lg">R$ {(people * trip.price_per_person).toLocaleString("pt-BR")}</span>
+            <span className="text-sm text-navy-600 font-medium">{people} × R$ {fmtBRL(trip.price_per_person)}</span>
+            <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(people * trip.price_per_person)}</span>
           </div>
 
           <button type="submit" disabled={loading}
@@ -765,14 +766,14 @@ function DateSelector({
                 <div>
                   {t.original_price && (
                     <p className="text-[10px] text-gray-400 line-through leading-none">
-                      R$ {t.original_price.toLocaleString("pt-BR")}
+                      R$ {fmtBRL(t.original_price)}
                     </p>
                   )}
                   {isSold ? (
                     <span className="text-sm font-bold text-gray-400">Esgotado</span>
                   ) : (
                     <span className={`text-base font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                      R$ {t.price_per_person.toLocaleString("pt-BR")}
+                      R$ {fmtBRL(t.price_per_person)}
                       <span className="text-xs font-normal text-gray-400"> /pessoa</span>
                     </span>
                   )}
@@ -1194,22 +1195,22 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       <p className="text-xs text-gray-400 mb-1">{selectedTrip ? "Preço para a data selecionada" : "A partir de"}</p>
                       {activeTrip.original_price && (
                         <p className="text-sm text-gray-400 line-through leading-none">
-                          R$ {activeTrip.original_price.toLocaleString("pt-BR")}
+                          R$ {fmtBRL(activeTrip.original_price)}
                         </p>
                       )}
                       <p className="font-display font-black text-4xl text-navy-700 leading-tight">
-                        R$ {activeTrip.price_per_person.toLocaleString("pt-BR")}
+                        R$ {fmtBRL(activeTrip.price_per_person)}
                       </p>
                       <p className="text-xs text-gray-500 mb-1">por pessoa</p>
                       <p className="text-sm text-emerald-600 font-semibold mb-4">
-                        {activeTrip.max_installments}x de R$ {Math.ceil(activeTrip.price_per_person / activeTrip.max_installments).toLocaleString("pt-BR")} sem juros
+                        {activeTrip.max_installments}x de R$ {fmtInstallment(activeTrip.price_per_person, activeTrip.max_installments)} sem juros
                       </p>
                     </>
                   )}
 
                   {activeTrip.original_price && discount && discount > 0 && (
                     <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center mb-4 border border-emerald-100">
-                      Economia de R$ {(activeTrip.original_price - activeTrip.price_per_person).toLocaleString("pt-BR")} por pessoa
+                      Economia de R$ {fmtBRL(activeTrip.original_price - activeTrip.price_per_person)} por pessoa
                     </div>
                   )}
 

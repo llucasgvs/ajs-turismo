@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import TripDetailClient from "@/components/TripDetailClient";
 import type { Trip } from "@/types/trip";
+import { fmtBRL } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://ajsturismo.com.br";
@@ -28,7 +29,7 @@ export async function generateMetadata({
 
   const description =
     trip.short_description ||
-    `Pacote para ${trip.destination}. A partir de R$ ${trip.price_per_person.toLocaleString("pt-BR")} por pessoa. ${trip.duration_nights + 1} dias / ${trip.duration_nights} noites saindo de Curitiba.`;
+    `Pacote para ${trip.destination}. A partir de R$ ${fmtBRL(trip.price_per_person)} por pessoa. ${trip.duration_nights + 1} dias / ${trip.duration_nights} noites saindo de Curitiba.`;
 
   const ogImage = trip.image_url
     ? [{ url: trip.image_url, width: 1200, height: 630, alt: trip.title }]

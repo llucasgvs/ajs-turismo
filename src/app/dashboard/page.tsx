@@ -9,6 +9,7 @@ import {
   RotateCcw, ArrowRight,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
+import { fmtBRL } from "@/lib/format";
 
 interface StoredUser {
   full_name: string;
@@ -145,7 +146,7 @@ function BookingCard({ b }: { b: Booking }) {
             <div className="bg-white/70 rounded-xl px-3 py-2">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-0.5">Total</p>
               <p className="text-xs font-bold text-navy-800">
-                R$ {b.final_amount.toLocaleString("pt-BR")}
+                R$ {fmtBRL(b.final_amount)}
               </p>
             </div>
           )}

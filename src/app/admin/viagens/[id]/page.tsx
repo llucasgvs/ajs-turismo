@@ -8,6 +8,7 @@ import {
   MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { fmtBRL } from "@/lib/format";
 
 interface TripTemplate {
   id: number;
@@ -110,7 +111,7 @@ function HideModal({ date, onClose, onConfirm, loading }: {
           <div className="bg-gray-50 rounded-xl p-3.5 space-y-1">
             <p className="font-bold text-navy-800">{fmt(date.departure_date)} → {fmt(date.return_date)}</p>
             <p className="text-xs text-gray-400">
-              {sold}/{date.total_spots} vendidas · R$ {date.price_per_person.toLocaleString("pt-BR")}
+              {sold}/{date.total_spots} vendidas · R$ {fmtBRL(date.price_per_person)}
             </p>
           </div>
           <div className="flex gap-2 pt-1">
@@ -609,11 +610,11 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
       {/* Linha 2: preço */}
       <div className="mt-2 flex items-baseline gap-2">
         <span className="text-gold-600 font-bold text-lg leading-none">
-          R$ {date.price_per_person.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+          R$ {fmtBRL(date.price_per_person)}
         </span>
         {date.original_price && (
           <span className="text-gray-400 text-xs line-through">
-            R$ {date.original_price.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            R$ {fmtBRL(date.original_price)}
           </span>
         )}
         <span className="text-gray-400 text-xs">/ pessoa · até {date.max_installments}x</span>
