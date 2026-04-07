@@ -1104,24 +1104,52 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               )}
 
               {/* Itinerary */}
-              {trip.itinerary?.length > 0 && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <h2 className="font-display font-black text-xl text-navy-800 mb-6">Roteiro dia a dia</h2>
-                  <div className="space-y-4">
-                    {trip.itinerary.map((day) => (
-                      <div key={day.day} className="flex gap-4">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
-                          {day.day}
-                        </div>
-                        <div className="flex-1 pb-4 border-b border-gray-100 last:border-0">
-                          <h4 className="font-bold text-navy-800 mb-1">{day.title}</h4>
-                          <p className="text-gray-600 text-sm leading-relaxed">{day.description}</p>
-                        </div>
+              {trip.itinerary?.length > 0 && (() => {
+                const isSameDay = trip.departure_date && trip.return_date &&
+                  trip.departure_date.slice(0, 10) === trip.return_date.slice(0, 10);
+                return (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm">
+                    <h2 className="font-display font-black text-xl text-navy-800 mb-6">
+                      {isSameDay ? "Programação do Dia" : "Roteiro dia a dia"}
+                    </h2>
+                    <div className="relative">
+                      {/* vertical line */}
+                      <div className="absolute left-5 top-0 bottom-0 w-px bg-gray-100" />
+                      <div className="space-y-0">
+                        {trip.itinerary.map((item, idx) => (
+                          <div key={idx} className="flex gap-4 relative pb-6 last:pb-0">
+                            {/* badge: time or day number */}
+                            <div className="flex-shrink-0 z-10">
+                              {item.time ? (
+                                <div className="w-10 h-10 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center font-black text-[11px] leading-tight text-center">
+                                  {item.time.slice(0, 5)}
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
+                                  {isSameDay ? (idx + 1) : item.day}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 pt-2">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h4 className="font-bold text-navy-800">{item.title}</h4>
+                                {!isSameDay && item.time && (
+                                  <span className="text-xs font-semibold text-gold-600 bg-gold-50 border border-gold-200 px-2 py-0.5 rounded-full">
+                                    {item.time.slice(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <p className="text-gray-600 text-sm leading-relaxed">{item.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Trust Block */}
               <TrustBlock />
