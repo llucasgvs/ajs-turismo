@@ -40,3 +40,16 @@ next-env.d.ts
 # Misc
 .vercel
 .turbo
+.cache/
+.eslintcache
+.stylelintcache
+
+# Claude Code
+.claude/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Sentry
+.sentryclirc
