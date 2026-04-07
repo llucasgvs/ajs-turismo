@@ -10,6 +10,7 @@ interface ItineraryDay {
   day: number;
   title: string;
   description: string;
+  time?: string;
 }
 
 interface TemplateFormData {
@@ -64,9 +65,9 @@ export default function TemplateForm({
     setForm((f) => ({ ...f, [key]: f[key].filter((_, i) => i !== index) }));
 
   const addDay = () =>
-    setForm((f) => ({ ...f, itinerary: [...f.itinerary, { day: f.itinerary.length + 1, title: "", description: "" }] }));
+    setForm((f) => ({ ...f, itinerary: [...f.itinerary, { day: f.itinerary.length + 1, title: "", description: "", time: "" }] }));
 
-  const updateDay = (index: number, field: "title" | "description", value: string) =>
+  const updateDay = (index: number, field: "title" | "description" | "time", value: string) =>
     setForm((f) => ({ ...f, itinerary: f.itinerary.map((d, i) => (i === index ? { ...d, [field]: value } : d)) }));
 
   const removeDay = (index: number) =>
@@ -202,13 +203,23 @@ export default function TemplateForm({
                     className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition-colors">
                     <X size={15} />
                   </button>
-                  <p className="text-xs font-bold text-gold-600 uppercase tracking-wider mb-3">Dia {day.day}</p>
+                  <div className="flex items-center gap-3 mb-3">
+                    <p className="text-xs font-bold text-gold-600 uppercase tracking-wider">Dia {day.day}</p>
+                    <input
+                      className="input-field py-1 px-2 text-xs w-28"
+                      type="time"
+                      value={day.time ?? ""}
+                      onChange={(e) => updateDay(i, "time", e.target.value)}
+                      title="Horário (opcional)"
+                    />
+                    <span className="text-xs text-gray-400">horário opcional</span>
+                  </div>
                   <input className="input-field mb-2 text-sm" value={day.title}
                     onChange={(e) => updateDay(i, "title", e.target.value)}
-                    placeholder="Título do dia (Ex: Chegada e city tour)" />
+                    placeholder="Título (Ex: Chegada e city tour)" />
                   <textarea className="input-field resize-y min-h-[80px] text-sm" value={day.description}
                     onChange={(e) => updateDay(i, "description", e.target.value)}
-                    placeholder="Descreva as atividades do dia..." />
+                    placeholder="Descreva as atividades..." />
                 </div>
               ))}
               <button type="button" onClick={addDay}
