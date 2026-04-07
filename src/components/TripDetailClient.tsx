@@ -1111,22 +1111,25 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 const renderDescription = (text: string) => {
                   if (!text) return null;
                   const lines = text.split("\n").filter((l) => l.trim());
+                  const timeLineRegex = /^(\d{1,2}:\d{2})\s*-\s*(.*)/;
                   return (
                     <div className="space-y-1.5 mt-2">
                       {lines.map((line, i) => {
-                        const parts = line.split(/(\b\d{1,2}:\d{2}\b)/);
-                        const hasTime = parts.length > 1;
+                        const match = line.match(timeLineRegex);
+                        if (match) {
+                          const [, time, rest] = match;
+                          return (
+                            <div key={i} className="flex gap-2.5 items-baseline">
+                              <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gold-400 mt-2" />
+                              <p className="text-gray-700 text-sm leading-relaxed">
+                                <span className="font-bold text-gold-600 mr-1.5">{time}</span>
+                                {rest}
+                              </p>
+                            </div>
+                          );
+                        }
                         return (
-                          <div key={i} className={`flex gap-2 items-baseline ${hasTime ? "" : "pl-3"}`}>
-                            {hasTime && <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gold-400 mt-2" />}
-                            <p className="text-gray-600 text-sm leading-relaxed">
-                              {parts.map((part, j) =>
-                                /^\d{1,2}:\d{2}$/.test(part) ? (
-                                  <span key={j} className="font-bold text-gold-600">{part}</span>
-                                ) : part
-                              )}
-                            </p>
-                          </div>
+                          <p key={i} className="text-gray-500 text-sm leading-relaxed pl-4 italic">{line}</p>
                         );
                       })}
                     </div>
@@ -1154,6 +1157,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         ))}
                       </div>
                     </div>
+                    <p className="text-xs text-gray-400 mt-5">
+                      * Os horários são previstos e podem variar conforme trânsito e imprevistos.
+                    </p>
                   </div>
                 );
               })()}

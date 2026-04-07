@@ -206,9 +206,12 @@ export default function TemplateForm({
                   <input className="input-field mb-2 text-sm" value={day.title}
                     onChange={(e) => updateDay(i, "title", e.target.value)}
                     placeholder="Título do dia (Ex: Chegada e city tour)" />
-                  <textarea className="input-field resize-y min-h-[120px] text-sm" value={day.description}
+                  <textarea className="input-field resize-y min-h-[120px] text-sm font-mono" value={day.description}
                     onChange={(e) => updateDay(i, "description", e.target.value)}
-                    placeholder={"Descreva as atividades. Inclua os horários no texto:\n06:00 Café da manhã no hotel.\n07:30 Saída para o Paraguai.\n14:00 Check-in nos quartos."} />
+                    placeholder={"Atividades com horário:\n06:00 - Café da manhã no hotel.\n07:30 - Saída para o Paraguai.\n\nSem horário (info / observação):\nBagagens ficam em sala reservada à agência."} />
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Use <span className="font-mono bg-gray-100 px-1 rounded">HH:MM - descrição</span> para atividades com horário fixo. Linhas sem horário aparecem como observação.
+                  </p>
                 </div>
               ))}
               <button type="button" onClick={addDay}
