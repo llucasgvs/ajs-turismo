@@ -49,18 +49,17 @@ export default function TemplateForm({
   const [success, setSuccess] = useState("");
   const [newInclude, setNewInclude] = useState("");
   const [newExclude, setNewExclude] = useState("");
-  const [newGallery, setNewGallery] = useState("");
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const addToList = (key: "includes" | "excludes" | "gallery", value: string, clear: () => void) => {
+  const addToList = (key: "includes" | "excludes", value: string, clear: () => void) => {
     if (!value.trim()) return;
     setForm((f) => ({ ...f, [key]: [...f[key], value.trim()] }));
     clear();
   };
 
-  const removeFromList = (key: "includes" | "excludes" | "gallery", index: number) =>
+  const removeFromList = (key: "includes" | "excludes", index: number) =>
     setForm((f) => ({ ...f, [key]: f[key].filter((_, i) => i !== index) }));
 
   const addDay = () =>
@@ -74,6 +73,11 @@ export default function TemplateForm({
       ...f,
       itinerary: f.itinerary.filter((_, i) => i !== index).map((d, i) => ({ ...d, day: i + 1 })),
     }));
+
+  // Unified images: [image_url, ...gallery] (first = principal)
+  const allImages = [form.image_url, ...form.gallery].filter(Boolean);
+  const setAllImages = (imgs: string[]) =>
+    setForm((f) => ({ ...f, image_url: imgs[0] ?? "", gallery: imgs.slice(1) }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,15 +173,19 @@ export default function TemplateForm({
                   onChange={(e) => set("description", e.target.value)}
                   placeholder="Descreva os detalhes do roteiro..." />
               </Field>
-              <Field label="Imagem Principal">
-                <ImageUpload value={form.image_url} onChange={(url) => set("image_url", url)} />
-              </Field>
               <Field label="Tag (opcional)">
                 <input className="input-field" value={form.tag}
                   onChange={(e) => set("tag", e.target.value)}
                   placeholder="Ex: Mais Vendido, Promoção" />
               </Field>
             </div>
+          </Section>
+
+          <Section title="Imagens">
+            <p className="text-xs text-gray-400 mb-3">
+              A <span className="font-semibold text-gold-600">primeira imagem</span> é a principal (capa do roteiro). Passe o mouse nas demais para definir outra como principal.
+            </p>
+            <UnifiedGallery images={allImages} onChange={setAllImages} />
           </Section>
 
           <Section title="O que inclui">
@@ -220,12 +228,6 @@ export default function TemplateForm({
               </button>
             </div>
           </Section>
-
-          <Section title="Galeria de Fotos">
-            <GalleryUpload items={form.gallery} value={newGallery} onChange={setNewGallery}
-              onAdd={() => addToList("gallery", newGallery, () => setNewGallery(""))}
-              onRemove={(i) => removeFromList("gallery", i)} />
-          </Section>
         </div>
 
         {/* Sidebar */}
@@ -240,7 +242,7 @@ export default function TemplateForm({
           </Section>
 
           {form.image_url && (
-            <Section title="Preview">
+            <Section title="Preview do Card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={form.image_url} alt={form.title} className="w-full h-36 object-cover rounded-xl mb-3" />
               <p className="font-bold text-navy-800 text-sm leading-tight">{form.title || "Nome do roteiro"}</p>
@@ -258,7 +260,7 @@ export default function TemplateForm({
   );
 }
 
-/* ── Sub-componentes reutilizáveis ────────────────────────────────────── */
+/* ── Sub-componentes ────────────────────────────────────── */
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -333,78 +335,174 @@ async function uploadFile(file: File): Promise<string> {
   return (await res.json()).url;
 }
 
-function ImageUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploading(true); setError("");
-    try { onChange(await uploadFile(file)); }
-    catch (err) { setError(err instanceof Error ? err.message : "Erro"); }
-    finally { setUploading(false); e.target.value = ""; }
-  };
-  return (
-    <div className="space-y-2">
-      {value && (
-        <div className="relative group">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
-          <button type="button" onClick={() => onChange("")}
-            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <X size={12} />
-          </button>
-        </div>
-      )}
-      <div className="flex gap-2">
-        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed cursor-pointer text-sm font-medium transition-colors ${uploading ? "border-gray-200 text-gray-400" : "border-navy-200 text-navy-600 hover:border-gold-400 hover:text-gold-600"}`}>
-          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-          {uploading ? "Enviando..." : "Enviar foto"}
-          <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
-        </label>
-        <input className="input-field flex-1 py-2 text-sm" type="url" value={value}
-          onChange={(e) => onChange(e.target.value)} placeholder="Ou cole uma URL..." />
-      </div>
-      {error && <p className="text-red-500 text-xs">{error}</p>}
-    </div>
-  );
-}
-
-function GalleryUpload({ items, value, onChange, onAdd, onRemove }: {
-  items: string[]; value: string; onChange: (v: string) => void;
-  onAdd: () => void; onRemove: (i: number) => void;
+function UnifiedGallery({ images, onChange }: {
+  images: string[];
+  onChange: (images: string[]) => void;
 }) {
+  const [showUrl, setShowUrl] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []); if (!files.length) return;
-    setUploading(true); setError("");
-    try { for (const file of files) { onChange(await uploadFile(file)); onAdd(); } }
-    catch (err) { setError(err instanceof Error ? err.message : "Erro"); }
-    finally { setUploading(false); e.target.value = ""; }
+  const [uploadError, setUploadError] = useState("");
+
+  const addUrl = () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    if (images.includes(url)) { setUploadError("Esta imagem já está na galeria."); return; }
+    onChange([...images, url]);
+    setUrlInput("");
+    setUploadError("");
   };
+
+  const remove = (index: number) => onChange(images.filter((_, i) => i !== index));
+
+  const setMain = (index: number) => {
+    if (index === 0) return;
+    const next = [...images];
+    const [item] = next.splice(index, 1);
+    next.unshift(item);
+    onChange(next);
+  };
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    setUploadError("");
+    const next = [...images];
+    let skipped = 0;
+    try {
+      for (const file of files) {
+        const url = await uploadFile(file);
+        if (next.includes(url)) { skipped++; continue; }
+        next.push(url);
+      }
+      onChange(next);
+      if (skipped > 0) setUploadError(`${skipped} imagem(ns) ignorada(s) por já estarem na galeria.`);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Erro no upload");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
   return (
-    <div className="space-y-2">
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item} alt="" className="w-10 h-8 object-cover rounded-lg flex-shrink-0" />
-          <p className="flex-1 text-xs text-gray-500 truncate">{item}</p>
-          <button type="button" onClick={() => onRemove(i)} className="text-gray-300 hover:text-red-500 flex-shrink-0"><X size={14} /></button>
-        </div>
-      ))}
-      <div className="flex gap-2 pt-1">
-        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed cursor-pointer text-sm font-medium transition-colors flex-shrink-0 ${uploading ? "border-gray-200 text-gray-400" : "border-navy-200 text-navy-600 hover:border-gold-400 hover:text-gold-600"}`}>
-          {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-          {uploading ? "Enviando..." : "Enviar fotos"}
-          <input type="file" accept="image/*" multiple className="hidden" onChange={handleFile} disabled={uploading} />
+    <div className="space-y-3">
+      {/* Grid */}
+      <div className="grid grid-cols-3 gap-3">
+        {images.map((img, i) => (
+          <div
+            key={i}
+            className={`relative group rounded-xl overflow-hidden border-2 transition-colors ${
+              i === 0 ? "border-gold-400" : "border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={img} alt="" className="w-full h-28 object-cover" />
+
+            {/* Principal badge */}
+            {i === 0 && (
+              <span className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-900 text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                Principal
+              </span>
+            )}
+
+            {/* Set as main */}
+            {i !== 0 && (
+              <button
+                type="button"
+                onClick={() => setMain(i)}
+                title="Definir como principal"
+                className="absolute top-1.5 left-1.5 bg-white/90 text-gold-500 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+              >
+                <Star size={12} fill="currentColor" />
+              </button>
+            )}
+
+            {/* Remove */}
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+            >
+              <X size={12} />
+            </button>
+
+            {/* Order badge */}
+            {i > 0 && (
+              <span className="absolute bottom-1.5 right-1.5 bg-black/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {i + 1}
+              </span>
+            )}
+          </div>
+        ))}
+
+        {/* Add button */}
+        <label className={`flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+          uploading
+            ? "border-gray-200 text-gray-400 cursor-not-allowed"
+            : "border-navy-200 text-navy-500 hover:border-gold-400 hover:text-gold-600"
+        }`}>
+          {uploading ? (
+            <>
+              <Loader2 size={20} className="animate-spin mb-1" />
+              <span className="text-xs">Enviando...</span>
+            </>
+          ) : (
+            <>
+              <Upload size={20} className="mb-1" />
+              <span className="text-xs font-medium">Adicionar fotos</span>
+              <span className="text-[10px] text-gray-400 mt-0.5">múltiplas de uma vez</span>
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFiles}
+            disabled={uploading}
+          />
         </label>
-        <input className="input-field flex-1 py-2 text-sm" type="url" value={value}
-          onChange={(e) => onChange(e.target.value)} placeholder="Ou cole uma URL..."
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdd(); } }} />
-        <button type="button" onClick={onAdd}
-          className="px-3 bg-navy-700 text-white rounded-xl hover:bg-navy-600 transition-colors"><Plus size={16} /></button>
       </div>
-      {error && <p className="text-red-500 text-xs">{error}</p>}
+
+      {images.length === 0 && (
+        <p className="text-xs text-gray-400 text-center py-1">
+          Nenhuma imagem ainda. A primeira adicionada será a principal.
+        </p>
+      )}
+
+      {/* URL secundário */}
+      <div>
+        <button
+          type="button"
+          onClick={() => { setShowUrl(!showUrl); setUploadError(""); }}
+          className="text-xs text-gray-400 hover:text-navy-600 underline underline-offset-2 transition-colors"
+        >
+          {showUrl ? "Ocultar" : "Adicionar por URL externa"}
+        </button>
+        {showUrl && (
+          <div className="flex gap-2 mt-2">
+            <input
+              className="input-field flex-1 py-2 text-sm"
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://..."
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl(); } }}
+            />
+            <button
+              type="button"
+              onClick={addUrl}
+              className="px-3 bg-navy-700 text-white rounded-xl hover:bg-navy-600 transition-colors"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {uploadError && <p className="text-amber-600 text-xs">{uploadError}</p>}
     </div>
   );
 }
