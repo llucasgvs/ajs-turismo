@@ -713,8 +713,9 @@ function DateSelector({
         )}
       </div>
 
-      {/* Mobile: vertical stack; Desktop: grid */}
-      <div className="px-4 pb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+      {/* Scrollable date list */}
+      <div className="px-4 pb-4 max-h-[300px] sm:max-h-[380px] overflow-y-auto overscroll-contain date-scroll">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3 pb-1">
         {trips.map((t) => {
           const isSold = t.available_spots === 0 || t.status === "sold_out";
           const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
@@ -793,6 +794,7 @@ function DateSelector({
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -1054,10 +1056,6 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
                   <h2 className="font-display font-black text-xl text-navy-800 mb-4">Sobre o pacote</h2>
                   <p className="text-gray-600 leading-relaxed whitespace-pre-line">{trip.description}</p>
-                  <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                    <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
-                    <p className="text-amber-800 text-sm font-medium">Sempre chegar com 10 minutos de antecedência.</p>
-                  </div>
                 </div>
               )}
 
@@ -1161,6 +1159,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     <p className="text-xs text-gray-400 mt-5">
                       * Os horários são previstos e podem variar conforme trânsito e imprevistos.
                     </p>
+                    <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                      <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
+                      <p className="text-amber-800 text-sm font-medium">Sempre chegar com 10 minutos de antecedência.</p>
+                    </div>
                   </div>
                 );
               })()}
