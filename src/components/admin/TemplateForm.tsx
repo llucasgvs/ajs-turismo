@@ -256,6 +256,17 @@ export default function TemplateForm({
           )}
         </div>
       </div>
+
+      {/* Botão salvar inferior */}
+      <div className="mt-6 flex flex-col items-stretch sm:items-end gap-2">
+        {error && <p className="text-red-600 text-sm sm:text-right">{error}</p>}
+        {success && <p className="text-green-600 text-sm sm:text-right">{success}</p>}
+        <button type="submit" disabled={loading}
+          className="btn-primary flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50 w-full sm:w-auto sm:px-8">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          <span>{templateId ? "Salvar Roteiro" : "Criar Roteiro"}</span>
+        </button>
+      </div>
     </form>
   );
 }
@@ -344,9 +355,12 @@ function UnifiedGallery({ images, onChange }: {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
+  const MAX = 5;
+
   const addUrl = () => {
     const url = urlInput.trim();
     if (!url) return;
+    if (images.length >= MAX) { setUploadError(`Limite de ${MAX} imagens atingido.`); return; }
     if (images.includes(url)) { setUploadError("Esta imagem já está na galeria."); return; }
     onChange([...images, url]);
     setUrlInput("");
@@ -372,12 +386,13 @@ function UnifiedGallery({ images, onChange }: {
     let skipped = 0;
     try {
       for (const file of files) {
+        if (next.length >= MAX) { skipped++; continue; }
         const url = await uploadFile(file);
         if (next.includes(url)) { skipped++; continue; }
         next.push(url);
       }
       onChange(next);
-      if (skipped > 0) setUploadError(`${skipped} imagem(ns) ignorada(s) por já estarem na galeria.`);
+      if (skipped > 0) setUploadError(`${skipped} imagem(ns) ignorada(s) — duplicada ou limite de ${MAX} atingido.`);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Erro no upload");
     } finally {
@@ -389,7 +404,7 @@ function UnifiedGallery({ images, onChange }: {
   return (
     <div className="space-y-3">
       {/* Grid */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {images.map((img, i) => (
           <div
             key={i}
@@ -407,23 +422,23 @@ function UnifiedGallery({ images, onChange }: {
               </span>
             )}
 
-            {/* Set as main */}
+            {/* Set as main — always visible on mobile, hover-only on desktop */}
             {i !== 0 && (
               <button
                 type="button"
                 onClick={() => setMain(i)}
                 title="Definir como principal"
-                className="absolute top-1.5 left-1.5 bg-white/90 text-gold-500 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                className="absolute top-1.5 left-1.5 bg-white/90 text-gold-500 rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-sm"
               >
                 <Star size={12} fill="currentColor" />
               </button>
             )}
 
-            {/* Remove */}
+            {/* Remove — always visible on mobile, hover-only on desktop */}
             <button
               type="button"
               onClick={() => remove(i)}
-              className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+              className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-sm"
             >
               <X size={12} />
             </button>
@@ -437,8 +452,8 @@ function UnifiedGallery({ images, onChange }: {
           </div>
         ))}
 
-        {/* Add button */}
-        <label className={`flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+        {/* Add button — hidden when at limit */}
+        {images.length < MAX && <label className={`flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
           uploading
             ? "border-gray-200 text-gray-400 cursor-not-allowed"
             : "border-navy-200 text-navy-500 hover:border-gold-400 hover:text-gold-600"
@@ -463,14 +478,19 @@ function UnifiedGallery({ images, onChange }: {
             onChange={handleFiles}
             disabled={uploading}
           />
-        </label>
+        </label>}
       </div>
 
-      {images.length === 0 && (
-        <p className="text-xs text-gray-400 text-center py-1">
-          Nenhuma imagem ainda. A primeira adicionada será a principal.
-        </p>
-      )}
+      <div className="flex items-center justify-between">
+        {images.length === 0 ? (
+          <p className="text-xs text-gray-400">Nenhuma imagem ainda. A primeira será a principal.</p>
+        ) : (
+          <p className="text-xs text-gray-400">{images.length}/{MAX} imagens</p>
+        )}
+        {images.length >= MAX && (
+          <p className="text-xs text-amber-600 font-medium">Limite atingido — remova uma para adicionar outra.</p>
+        )}
+      </div>
 
       {/* URL secundário */}
       <div>
