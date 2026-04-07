@@ -10,7 +10,6 @@ interface ItineraryDay {
   day: number;
   title: string;
   description: string;
-  time?: string;
 }
 
 interface TripFormData {
@@ -116,10 +115,10 @@ export default function TripForm({ tripId, initialData }: { tripId?: number; ini
   const addDay = () =>
     setForm((f) => ({
       ...f,
-      itinerary: [...f.itinerary, { day: f.itinerary.length + 1, title: "", description: "", time: "" }],
+      itinerary: [...f.itinerary, { day: f.itinerary.length + 1, title: "", description: "" }],
     }));
 
-  const updateDay = (index: number, field: "title" | "description" | "time", value: string) =>
+  const updateDay = (index: number, field: "title" | "description", value: string) =>
     setForm((f) => ({
       ...f,
       itinerary: f.itinerary.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
@@ -427,30 +426,20 @@ export default function TripForm({ tripId, initialData }: { tripId?: number; ini
                   >
                     <X size={15} />
                   </button>
-                  <div className="flex items-center gap-3 mb-3">
-                    <p className="text-xs font-bold text-gold-600 uppercase tracking-wider">
-                      Dia {day.day}
-                    </p>
-                    <input
-                      className="input-field py-1 px-2 text-xs w-28"
-                      type="time"
-                      value={day.time ?? ""}
-                      onChange={(e) => updateDay(i, "time", e.target.value)}
-                      title="Horário (opcional)"
-                    />
-                    <span className="text-xs text-gray-400">horário opcional</span>
-                  </div>
+                  <p className="text-xs font-bold text-gold-600 uppercase tracking-wider mb-3">
+                    Dia {day.day}
+                  </p>
                   <input
                     className="input-field mb-2 text-sm"
                     value={day.title}
                     onChange={(e) => updateDay(i, "title", e.target.value)}
-                    placeholder="Título (Ex: Chegada e city tour)"
+                    placeholder="Título do dia (Ex: Chegada e city tour)"
                   />
                   <textarea
-                    className="input-field resize-y min-h-[80px] text-sm"
+                    className="input-field resize-y min-h-[120px] text-sm"
                     value={day.description}
                     onChange={(e) => updateDay(i, "description", e.target.value)}
-                    placeholder="Descreva as atividades..."
+                    placeholder={"Descreva as atividades. Inclua os horários no texto:\n06:00 Café da manhã no hotel.\n07:30 Saída para o Paraguai.\n14:00 Check-in nos quartos."}
                   />
                 </div>
               ))}

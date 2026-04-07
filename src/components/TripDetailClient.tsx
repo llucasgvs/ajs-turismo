@@ -1107,41 +1107,48 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               {trip.itinerary?.length > 0 && (() => {
                 const isSameDay = trip.departure_date && trip.return_date &&
                   trip.departure_date.slice(0, 10) === trip.return_date.slice(0, 10);
+
+                const renderDescription = (text: string) => {
+                  if (!text) return null;
+                  const lines = text.split("\n").filter((l) => l.trim());
+                  return (
+                    <div className="space-y-1.5 mt-2">
+                      {lines.map((line, i) => {
+                        const parts = line.split(/(\b\d{1,2}:\d{2}\b)/);
+                        const hasTime = parts.length > 1;
+                        return (
+                          <div key={i} className={`flex gap-2 items-baseline ${hasTime ? "" : "pl-3"}`}>
+                            {hasTime && <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gold-400 mt-2" />}
+                            <p className="text-gray-600 text-sm leading-relaxed">
+                              {parts.map((part, j) =>
+                                /^\d{1,2}:\d{2}$/.test(part) ? (
+                                  <span key={j} className="font-bold text-gold-600">{part}</span>
+                                ) : part
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                };
+
                 return (
                   <div className="bg-white rounded-2xl p-6 shadow-sm">
                     <h2 className="font-display font-black text-xl text-navy-800 mb-6">
                       {isSameDay ? "Programação do Dia" : "Roteiro dia a dia"}
                     </h2>
                     <div className="relative">
-                      {/* vertical line */}
                       <div className="absolute left-5 top-0 bottom-0 w-px bg-gray-100" />
                       <div className="space-y-0">
                         {trip.itinerary.map((item, idx) => (
                           <div key={idx} className="flex gap-4 relative pb-6 last:pb-0">
-                            {/* badge: time or day number */}
-                            <div className="flex-shrink-0 z-10">
-                              {item.time ? (
-                                <div className="w-10 h-10 rounded-full bg-gold-500 text-navy-900 flex items-center justify-center font-black text-[11px] leading-tight text-center">
-                                  {item.time.slice(0, 5)}
-                                </div>
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
-                                  {isSameDay ? (idx + 1) : item.day}
-                                </div>
-                              )}
+                            <div className="flex-shrink-0 z-10 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
+                              {item.day ?? idx + 1}
                             </div>
                             <div className="flex-1 pt-2">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <h4 className="font-bold text-navy-800">{item.title}</h4>
-                                {!isSameDay && item.time && (
-                                  <span className="text-xs font-semibold text-gold-600 bg-gold-50 border border-gold-200 px-2 py-0.5 rounded-full">
-                                    {item.time.slice(0, 5)}
-                                  </span>
-                                )}
-                              </div>
-                              {item.description && (
-                                <p className="text-gray-600 text-sm leading-relaxed">{item.description}</p>
-                              )}
+                              <h4 className="font-bold text-navy-800">{item.title}</h4>
+                              {item.description && renderDescription(item.description)}
                             </div>
                           </div>
                         ))}
