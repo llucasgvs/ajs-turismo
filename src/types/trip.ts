@@ -18,7 +18,7 @@ export interface Trip {
   min_group_size: number;
   includes: string[];
   excludes: string[];
-  itinerary: { day: number; title: string; description: string }[];
+  itinerary: { day: number; title: string; description: string; time?: string }[];
   category: string;
   tag: string | null;
   status: string;
