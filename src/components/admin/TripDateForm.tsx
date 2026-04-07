@@ -26,9 +26,12 @@ const EMPTY: TripDateFormData = {
   available_spots: 30,
 };
 
-function toDateInput(iso: string | undefined): string {
+/** Converte ISO UTC → datetime-local no fuso de SP (para preencher o input) */
+function toDatetimeInput(iso: string | undefined): string {
   if (!iso) return "";
-  return iso.slice(0, 10);
+  const d = new Date(iso);
+  // "sv" locale produz formato "YYYY-MM-DD HH:MM:SS"
+  return d.toLocaleString("sv", { timeZone: "America/Sao_Paulo" }).slice(0, 16).replace(" ", "T");
 }
 
 interface TripDateInitialData {
@@ -58,8 +61,8 @@ export default function TripDateForm({
     max_installments: initialData?.max_installments ?? EMPTY.max_installments,
     total_spots: initialData?.total_spots ?? EMPTY.total_spots,
     available_spots: initialData?.available_spots ?? EMPTY.available_spots,
-    departure_date: toDateInput(initialData?.departure_date),
-    return_date: toDateInput(initialData?.return_date),
+    departure_date: toDatetimeInput(initialData?.departure_date),
+    return_date: toDatetimeInput(initialData?.return_date),
     price_per_person: initialData?.price_per_person != null ? String(initialData.price_per_person) : "",
     original_price: initialData?.original_price != null ? String(initialData.original_price) : "",
   });
@@ -67,14 +70,20 @@ export default function TripDateForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Noites = diferença entre datas (ignora hora)
+  const depDateOnly = form.departure_date.slice(0, 10);
+  const retDateOnly = form.return_date.slice(0, 10);
   const nights =
-    form.departure_date && form.return_date
+    depDateOnly && retDateOnly
       ? Math.max(0, Math.round(
-          (new Date(form.return_date + "T12:00:00").getTime() -
-            new Date(form.departure_date + "T12:00:00").getTime()) /
-            (1000 * 60 * 60 * 24)
+          (new Date(retDateOnly + "T12:00:00").getTime() -
+           new Date(depDateOnly + "T12:00:00").getTime()) /
+           (1000 * 60 * 60 * 24)
         ))
       : 0;
+  // Dias: se saída ≥ 18h (ônibus noturno), dias = noites; senão dias = noites + 1
+  const depHour = form.departure_date.length >= 13 ? parseInt(form.departure_date.slice(11, 13)) : 12;
+  const days = nights === 0 ? 1 : depHour >= 18 ? nights : nights + 1;
 
   // Sync available_spots when total_spots changes on new form
   useEffect(() => {
@@ -90,12 +99,12 @@ export default function TripDateForm({
     setError("");
     setSuccess("");
 
-    if (!form.departure_date) { setError("Informe a data de saída."); return; }
-    if (!form.return_date) { setError("Informe a data de retorno."); return; }
-    if (new Date(form.return_date) < new Date(form.departure_date)) {
-      setError("A data de retorno deve ser igual ou posterior à data de saída."); return;
+    if (!form.departure_date) { setError("Informe a data e hora de saída."); return; }
+    if (!form.return_date) { setError("Informe a data e hora de retorno."); return; }
+    if (form.return_date < form.departure_date) {
+      setError("A data/hora de retorno deve ser igual ou posterior à saída."); return;
     }
-    if (new Date(form.departure_date) < new Date(new Date().toDateString())) {
+    if (form.departure_date.slice(0, 10) < new Date().toISOString().slice(0, 10)) {
       setError("A data de saída não pode ser no passado."); return;
     }
     const priceVal = parseFloat(form.price_per_person);
@@ -110,12 +119,9 @@ export default function TripDateForm({
     setLoading(true);
 
     const body = {
-      departure_date: form.departure_date
-        ? new Date(form.departure_date + "T12:00:00").toISOString()
-        : null,
-      return_date: form.return_date
-        ? new Date(form.return_date + "T12:00:00").toISOString()
-        : null,
+      // Envia com offset de Brasília (-03:00) para preservar o horário local
+      departure_date: form.departure_date ? `${form.departure_date}:00-03:00` : null,
+      return_date: form.return_date ? `${form.return_date}:00-03:00` : null,
       price_per_person: parseFloat(form.price_per_person) || 0,
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       max_installments: form.max_installments,
@@ -184,22 +190,30 @@ export default function TripDateForm({
           <h2 className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Calendar size={13} /> Datas da Viagem
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">Data de Ida *</label>
-              <input className="input-field" type="date" required value={form.departure_date}
+              <label className="block text-sm font-medium text-navy-700 mb-1.5">Data e hora de saída *</label>
+              <input className="input-field" type="datetime-local" required value={form.departure_date}
                 onChange={(e) => set("departure_date", e.target.value)} />
+              <p className="text-[11px] text-gray-400 mt-1">Horário de Brasília (GMT-3)</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">Data de Volta *</label>
-              <input className="input-field" type="date" required value={form.return_date}
+              <label className="block text-sm font-medium text-navy-700 mb-1.5">Data e hora de retorno *</label>
+              <input className="input-field" type="datetime-local" required value={form.return_date}
                 onChange={(e) => set("return_date", e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">Noites (auto)</label>
-              <input className="input-field bg-gray-50 cursor-not-allowed" type="number" value={nights} readOnly />
+              <p className="text-[11px] text-gray-400 mt-1">Horário de Brasília (GMT-3)</p>
             </div>
           </div>
+          {nights > 0 && (
+            <div className="mt-3 flex items-center gap-3 bg-navy-50 rounded-xl px-4 py-3">
+              <span className="text-navy-500 text-sm font-semibold">{days} {days === 1 ? "dia" : "dias"}</span>
+              <span className="text-gray-300">/</span>
+              <span className="text-navy-500 text-sm font-semibold">{nights} {nights === 1 ? "noite" : "noites"}</span>
+              {depHour >= 18 && (
+                <span className="ml-auto text-[11px] text-gray-400">Saída noturna detectada</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Preço */}

@@ -33,6 +33,24 @@ function getStoredUser(): StoredUser | null {
 }
 function getToken(): string | null { return localStorage.getItem("ajs_token"); }
 
+/** Extrai hora local de Brasília de uma ISO string (ex: "22:00") */
+function fmtTimeSP(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+}
+
+/** Hora numérica em SP para lógica de duração */
+function getHourSP(iso: string): number {
+  return parseInt(fmtTimeSP(iso).slice(0, 2));
+}
+
+/** Dias = noites se saída noturna (≥18h), senão noites+1 */
+function calcDays(duration_nights: number, departure_date: string): number {
+  if (duration_nights === 0) return 1;
+  return getHourSP(departure_date) >= 18 ? duration_nights : duration_nights + 1;
+}
+
 function formatCPF(val: string) {
   const d = val.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 3) return d;
@@ -1038,8 +1056,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
                   value={(() => {
                     const nights = activeTrip.duration_nights;
-                    const days = nights + 1;
                     if (nights === 0) return "Bate e volta";
+                    const days = calcDays(nights, activeTrip.departure_date);
                     if (nights === 1) return `${days} dia / ${nights} noite`;
                     return `${days} dias / ${nights} noites`;
                   })()} />
@@ -1159,13 +1177,40 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     <p className="text-xs text-gray-400 mt-5">
                       * Os horários são previstos e podem variar conforme trânsito e imprevistos.
                     </p>
-                    <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                      <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
-                      <p className="text-amber-800 text-sm font-medium">Sempre chegar com 10 minutos de antecedência.</p>
-                    </div>
                   </div>
                 );
               })()}
+
+              {/* Embarque */}
+              {selectedTrip && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+                  <h2 className="font-display font-black text-lg text-navy-800 flex items-center gap-2">
+                    <Clock size={18} className="text-gold-500" /> Horários de Embarque
+                  </h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-navy-50 rounded-xl px-4 py-3">
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Saída</p>
+                      <p className="font-black text-2xl text-navy-800 leading-none">{fmtTimeSP(activeTrip.departure_date)}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
+                    <div className="bg-navy-50 rounded-xl px-4 py-3">
+                      <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Retorno</p>
+                      <p className="font-black text-2xl text-navy-800 leading-none">{fmtTimeSP(activeTrip.return_date)}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                    <span className="text-amber-500 text-base leading-none mt-0.5">⚠️</span>
+                    <p className="text-amber-800 text-sm font-medium">
+                      Chegue ao ponto de embarque com <strong>10 minutos de antecedência</strong> do horário marcado.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Trust Block */}
               <TrustBlock />
