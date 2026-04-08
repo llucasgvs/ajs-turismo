@@ -764,6 +764,44 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
+/* ═══════════════════════════════════════════
+   Description Block (collapsible on mobile)
+═══════════════════════════════════════════ */
+function DescriptionBlock({ description }: { description: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setClamped(el.scrollHeight > el.clientHeight + 2);
+  }, [description]);
+
+  return (
+    <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm">
+      <h2 className="font-display font-black text-xl text-navy-800 mb-3">Sobre o pacote</h2>
+      <p
+        ref={ref}
+        className={`text-gray-600 leading-relaxed whitespace-pre-line transition-all ${
+          !expanded ? "line-clamp-4 sm:line-clamp-none" : ""
+        }`}
+      >
+        {description}
+      </p>
+      {(clamped || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="sm:hidden mt-2 flex items-center gap-1 text-navy-600 text-sm font-semibold"
+        >
+          {expanded ? <><ChevronUp size={15} /> Ver menos</> : <><ChevronDown size={15} /> Ver mais</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
 const DATE_INITIAL = 4;
 
 function DateSelector({
@@ -1157,12 +1195,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               </div>
 
               {/* Description */}
-              {trip.description && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <h2 className="font-display font-black text-xl text-navy-800 mb-4">Sobre o pacote</h2>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{trip.description}</p>
-                </div>
-              )}
+              {trip.description && <DescriptionBlock description={trip.description} />}
 
               {/* Destination Highlights */}
               <DestinationHighlights trip={trip} />
