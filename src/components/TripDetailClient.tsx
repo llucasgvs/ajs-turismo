@@ -126,7 +126,7 @@ const DESC_RULES: { keys: string[]; icon: React.ElementType; label: string; sub:
   { keys: ["cultura", "cultural", "história", "historia", "museu", "patrimônio", "patrimonio", "tradição", "tradicao", "histórico", "historico"], icon: Globe, label: "Cultura e história", sub: "Riqueza cultural" },
   { keys: ["família", "familia", "crianças", "criancas", "parque temático", "parque tematico", "aquático", "aquatico", "beto carrero"], icon: Users, label: "Família", sub: "Para toda a família" },
   { keys: ["compras", "shopping", "lojas", "outlet", "artesanato", "feira"], icon: Camera, label: "Compras", sub: "Muitas opções" },
-  { keys: ["internacional", "exterior", "europa", "disney", "orlando", "cancún", "cancun", "miami", "paris"], icon: Plane, label: "Internacional", sub: "Experiência global" },
+  { keys: ["internacional", "exterior", "europa", "disney", "orlando", "cancún", "cancun", "miami", "paris", "fronteira", "paraguai", "argentina", "três países", "tres paises", "país vizinho"], icon: Plane, label: "Internacional", sub: "Experiência global" },
   { keys: ["lago", "rio", "barco", "lancha", "cruzeiro", "náutico", "nautico", "ferry"], icon: Waves, label: "Passeio náutico", sub: "Beleza das águas" },
   { keys: ["shows", "festival", "evento", "natal luz", "natal de luz", "carnatal", "reveillon", "carnaval"], icon: Star, label: "Eventos", sub: "Experiências únicas" },
 ];
