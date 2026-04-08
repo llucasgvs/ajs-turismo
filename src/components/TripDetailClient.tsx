@@ -115,36 +115,32 @@ function buildWhatsAppMessage(
 /* ─── destination highlights — derived from trip.includes ─── */
 type HL = { icon: React.ElementType; label: string; sub: string };
 
-const INCLUDE_RULES: { keys: string[]; icon: React.ElementType; label: string; sub: string }[] = [
-  { keys: ["hotel", "hospedagem", "hosped", "pousada", "resort", "acomodaç", "quarto"], icon: Mountain, label: "Hospedagem", sub: "Incluso no pacote" },
-  { keys: ["ônibus", "onibus", "transfer", "transporte", "van", "micro", "veículo", "veiculo"], icon: Globe, label: "Transporte", sub: "Incluso no pacote" },
-  // refeições específicas — ordem importa (mais específico primeiro)
-  { keys: ["pensão completa", "pensao completa", "todas as refeições", "todas as refeicoes", "meia pensão", "meia pensao"], icon: Utensils, label: "Refeições", sub: "Incluso no pacote" },
-  { keys: ["café da manhã", "cafe da manha", "café da manha", "cafe da manhã"], icon: Utensils, label: "Café da manhã", sub: "Incluso no pacote" },
-  { keys: ["almoço incluso", "almoco incluso", "almoço incluído", "almoco incluido"], icon: Utensils, label: "Almoço incluso", sub: "Incluso no pacote" },
-  { keys: ["jantar incluso", "jantar incluído", "jantar incluido"], icon: Utensils, label: "Jantar incluso", sub: "Incluso no pacote" },
-  { keys: ["guia", "acompanhante", "monitor"], icon: Users, label: "Guia turístico", sub: "Incluso no pacote" },
-  { keys: ["ingresso", "entrada", "bilhete", "acesso", "ticket"], icon: Camera, label: "Ingressos", sub: "Incluso no pacote" },
-  { keys: ["passeio", "excursão", "excursao", "tour", "city tour", "visita"], icon: MapPin, label: "Passeios", sub: "Incluso no pacote" },
-  { keys: ["seguro", "assistência", "assistencia"], icon: Shield, label: "Seguro viagem", sub: "Incluso no pacote" },
-  { keys: ["aéreo", "aereo", "passagem aérea", "passagem aerea", "voo", "avião", "aviao"], icon: Plane, label: "Passagem aérea", sub: "Incluso no pacote" },
-  { keys: ["parque", "aquático", "aquatico", "temático", "tematico", "cataratas", "beto carrero", "caldas novas"], icon: Sun, label: "Parques", sub: "Incluso no pacote" },
-  { keys: ["cruzeiro", "barco", "lancha", "embarque", "navio"], icon: Waves, label: "Passeio náutico", sub: "Incluso no pacote" },
-  { keys: ["trilha", "cachoeira", "rapel", "tirolesa", "rafting"], icon: TreePine, label: "Ecoturismo", sub: "Incluso no pacote" },
+const DESC_RULES: { keys: string[]; icon: React.ElementType; label: string; sub: string }[] = [
+  { keys: ["gastronomia", "culinária", "culinaria", "restaurante", "fondue", "chocolate", "cerveja", "vinho", "frutos do mar", "churrasco"], icon: Utensils, label: "Gastronomia", sub: "Experiência gastronômica" },
+  { keys: ["natureza", "trilha", "cachoeira", "cascata", "parque", "verde", "flora", "fauna", "mata", "floresta", "ecoturismo"], icon: TreePine, label: "Natureza", sub: "Paisagens naturais" },
+  { keys: ["arquitetura", "europeu", "europeia", "colonial", "castelo", "chalé", "chale", "estilo", "rua coberta", "enxaimel"], icon: Camera, label: "Arquitetura", sub: "Estilo encantador" },
+  { keys: ["clima", "aconchegante", "frio", "serra", "montanha", "altitude", "fresco", "neblina"], icon: Mountain, label: "Clima de serra", sub: "Temperatura agradável" },
+  { keys: ["praia", "mar", "litoral", "costa", "areia", "cristalino", "mergulho", "snorkel"], icon: Waves, label: "Praias", sub: "Águas cristalinas" },
+  { keys: ["romântico", "romantico", "romance", "casal", "lua de mel", "intimidade"], icon: Star, label: "Romântico", sub: "Clima acolhedor" },
+  { keys: ["aventura", "radical", "adrenalina", "esporte", "rapel", "rafting", "tirolesa", "bungee"], icon: Sun, label: "Aventura", sub: "Emoção garantida" },
+  { keys: ["cultura", "cultural", "história", "historia", "museu", "patrimônio", "patrimonio", "tradição", "tradicao", "histórico", "historico"], icon: Globe, label: "Cultura e história", sub: "Riqueza cultural" },
+  { keys: ["família", "familia", "crianças", "criancas", "parque temático", "parque tematico", "aquático", "aquatico", "beto carrero"], icon: Users, label: "Família", sub: "Para toda a família" },
+  { keys: ["compras", "shopping", "lojas", "outlet", "artesanato", "feira"], icon: Camera, label: "Compras", sub: "Muitas opções" },
+  { keys: ["internacional", "exterior", "europa", "disney", "orlando", "cancún", "cancun", "miami", "paris"], icon: Plane, label: "Internacional", sub: "Experiência global" },
+  { keys: ["lago", "rio", "barco", "lancha", "cruzeiro", "náutico", "nautico", "ferry"], icon: Waves, label: "Passeio náutico", sub: "Beleza das águas" },
+  { keys: ["shows", "festival", "evento", "natal luz", "natal de luz", "carnatal", "reveillon", "carnaval"], icon: Star, label: "Eventos", sub: "Experiências únicas" },
 ];
 
 function getHighlights(trip: Trip): HL[] {
-  const items = (trip.includes || []).map(s => s.toLowerCase());
-  if (items.length === 0) return [];
+  const text = (trip.description || "").toLowerCase();
+  if (!text.trim()) return [];
 
   const seen = new Set<string>();
   const result: HL[] = [];
 
-  for (const rule of INCLUDE_RULES) {
+  for (const rule of DESC_RULES) {
     if (result.length >= 4) break;
-    // Checa cada item do includes individualmente para evitar falsos positivos
-    const matched = items.some(item => rule.keys.some(k => item.includes(k)));
-    if (matched && !seen.has(rule.label)) {
+    if (rule.keys.some(k => text.includes(k)) && !seen.has(rule.label)) {
       seen.add(rule.label);
       result.push({ icon: rule.icon, label: rule.label, sub: rule.sub });
     }
