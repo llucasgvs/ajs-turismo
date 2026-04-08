@@ -49,7 +49,9 @@ function toISO(date: string, time: string): string {
 }
 
 /* ── DateRangePicker ── */
-const WEEK_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+// mobile: 1 letra (padrão BR), desktop: 3 letras
+const WEEK_DAYS_SHORT = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEK_DAYS_LONG  = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const MONTHS_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -123,11 +125,14 @@ function DateRangePicker({
           {MONTHS_PT[month]} {year}
         </p>
         <div className="grid grid-cols-7">
-          {WEEK_DAYS.map(w => (
-            <div key={w} className="text-center text-[11px] text-gray-400 font-semibold py-1.5">{w}</div>
+          {WEEK_DAYS_SHORT.map((short, i) => (
+            <div key={i} className="text-center font-semibold py-1.5">
+              <span className="sm:hidden text-[11px] text-gray-400">{short}</span>
+              <span className="hidden sm:inline text-[11px] text-gray-400">{WEEK_DAYS_LONG[i]}</span>
+            </div>
           ))}
           {cells.map((dateStr, i) => {
-            if (!dateStr) return <div key={i} className="h-9" />;
+            if (!dateStr) return <div key={i} className="h-10" />;
 
             const isPast = new Date(dateStr + "T12:00:00") < today;
             const isToday = dateStr === today.toISOString().slice(0, 10);
@@ -144,7 +149,7 @@ function DateRangePicker({
               <div
                 key={dateStr}
                 className={[
-                  "relative h-9 flex items-center justify-center",
+                  "relative h-10 flex items-center justify-center",
                   inRange ? "bg-navy-50" : "",
                   isRangeStart ? "rounded-l-full bg-navy-50" : "",
                   isRangeEnd ? "rounded-r-full bg-navy-50" : "",
@@ -158,7 +163,7 @@ function DateRangePicker({
                   onMouseLeave={() => setHovered(null)}
                   title={isDep ? "Saída" : isRet ? "Volta" : undefined}
                   className={[
-                    "relative w-9 h-9 text-sm rounded-full flex flex-col items-center justify-center transition-all leading-none",
+                    "relative w-10 h-10 text-sm rounded-full flex flex-col items-center justify-center transition-all leading-none",
                     isPast ? "text-gray-300 cursor-not-allowed" : "cursor-pointer",
                     isDep ? "bg-navy-700 text-white font-black shadow-md" : "",
                     isRet ? "bg-gold-500 text-navy-900 font-black shadow-md" : "",
@@ -350,19 +355,20 @@ export default function TripDateForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-fill return when departure set and return empty
   const handleDateRange = (dep: string, ret: string) => {
-    setForm(f => ({
-      ...f,
-      dep_date: dep,
-      ret_date: ret || (dep && !f.ret_date
+    setForm(f => {
+      // Se limpando (dep vazio), zera tudo
+      if (!dep) return { ...f, dep_date: "", ret_date: "" };
+      // Auto-preenche retorno se ainda vazio
+      const autoRet = !f.ret_date
         ? (() => {
             const d = new Date(dep + "T12:00:00");
             d.setDate(d.getDate() + (templateDurationNights ?? 2));
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
           })()
-        : f.ret_date),
-    }));
+        : f.ret_date;
+      return { ...f, dep_date: dep, ret_date: ret || autoRet };
+    });
   };
 
   const set = <K extends keyof TripDateFormData>(key: K, value: TripDateFormData[K]) =>
