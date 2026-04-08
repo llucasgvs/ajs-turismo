@@ -1267,6 +1267,33 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 </div>
               )}
 
+              {/* Documentos necessários */}
+              {trip.required_documents && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                  <h3 className="font-display font-bold text-navy-800 mb-3 flex items-center gap-2">
+                    <span className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Shield size={15} className="text-amber-600" />
+                    </span>
+                    Documentos necessários para embarque
+                  </h3>
+                  <div className="space-y-1.5">
+                    {trip.required_documents.split("\n").map((line, i) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return null;
+                      const isBullet = trimmed.startsWith("•") || trimmed.startsWith("-");
+                      return isBullet ? (
+                        <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <span className="text-amber-500 font-bold mt-0.5 flex-shrink-0">•</span>
+                          <span>{trimmed.replace(/^[•\-]\s*/, "")}</span>
+                        </div>
+                      ) : (
+                        <p key={i} className="text-sm text-gray-700 font-medium">{trimmed}</p>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Opcionais */}
               {trip.optionals?.length > 0 && (
                 <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm">

@@ -19,6 +19,7 @@ interface TemplateFormData {
   tag: string;
   short_description: string;
   description: string;
+  required_documents: string;
   image_url: string;
   includes: string[];
   excludes: string[];
@@ -31,7 +32,7 @@ interface TemplateFormData {
 
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
-  short_description: "", description: "", image_url: "",
+  short_description: "", description: "", required_documents: "", image_url: "",
   includes: [], excludes: [], optionals: [], itinerary: [], gallery: [],
   is_featured: false, is_active: true,
 };
@@ -189,6 +190,15 @@ export default function TemplateForm({
                 <textarea className="input-field min-h-[120px] resize-y" required value={form.description}
                   onChange={(e) => set("description", e.target.value)}
                   placeholder="Descreva os detalhes do roteiro..." />
+              </Field>
+              <Field label="Documentos necessários para embarque">
+                <textarea
+                  className="input-field min-h-[140px] resize-y font-mono text-sm"
+                  value={form.required_documents}
+                  onChange={(e) => set("required_documents", e.target.value)}
+                  placeholder={`Ex:\n• RG com menos de 10 anos de emissão\n• CNH física dentro da validade\n• Passaporte dentro da validade\n\nMenores de 18 anos: RG físico e acompanhado pelos pais.\nNa ausência de um dos responsáveis, necessário autorização registrada em cartório.`}
+                />
+                <p className="text-xs text-gray-400 mt-1">Use • para marcar itens. Cada linha vira um parágrafo no site.</p>
               </Field>
               <Field label="Tag (opcional)">
                 <input className="input-field" value={form.tag}

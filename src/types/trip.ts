@@ -20,6 +20,7 @@ export interface Trip {
   excludes: string[];
   optionals: { name: string; price: number }[];
   itinerary: { day: number; title: string; description: string }[];
+  required_documents: string | null;
   category: string;
   tag: string | null;
   status: string;
