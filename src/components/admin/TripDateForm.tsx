@@ -51,6 +51,18 @@ function toISO(date: string, time: string): string {
 /* ── DateRangePicker ── */
 const WEEK_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const MONTHS_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function fmtCardDate(dateStr: string) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + "T12:00:00");
+  return {
+    day: d.getDate(),
+    weekday: d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""),
+    month: MONTHS_SHORT[d.getMonth()],
+    year: d.getFullYear(),
+  };
+}
 
 function DateRangePicker({
   depDate, retDate, onChange,
@@ -62,15 +74,12 @@ function DateRangePicker({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [viewYear, setViewYear] = useState(() => {
-    if (depDate) return parseInt(depDate.slice(0, 4));
-    return today.getFullYear();
-  });
-  const [viewMonth, setViewMonth] = useState(() => {
-    if (depDate) return parseInt(depDate.slice(5, 7)) - 1;
-    return today.getMonth();
-  });
-  // "dep" = waiting for departure click, "ret" = waiting for return click
+  const [viewYear, setViewYear] = useState(() =>
+    depDate ? parseInt(depDate.slice(0, 4)) : today.getFullYear()
+  );
+  const [viewMonth, setViewMonth] = useState(() =>
+    depDate ? parseInt(depDate.slice(5, 7)) - 1 : today.getMonth()
+  );
   const [phase, setPhase] = useState<"dep" | "ret">(depDate ? "ret" : "dep");
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -84,70 +93,62 @@ function DateRangePicker({
   };
 
   const handleDayClick = (dateStr: string) => {
-    const d = new Date(dateStr + "T12:00:00");
-    if (d < today) return; // past
+    if (new Date(dateStr + "T12:00:00") < today) return;
     if (phase === "dep") {
       onChange(dateStr, "");
       setPhase("ret");
     } else {
       if (dateStr < depDate) {
-        // clicked before departure → new departure
         onChange(dateStr, "");
         setPhase("ret");
       } else {
         onChange(depDate, dateStr);
-        setPhase("dep"); // reset for next use
+        setPhase("dep");
       }
     }
   };
 
-  // Build two months for sm+, one for mobile
   const renderMonth = (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+    const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells: (string | null)[] = Array(firstDay).fill(null);
     for (let d = 1; d <= daysInMonth; d++) {
-      const mm = String(month + 1).padStart(2, "0");
-      const dd = String(d).padStart(2, "0");
-      cells.push(`${year}-${mm}-${dd}`);
+      cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
     }
-    // pad to full rows
     while (cells.length % 7 !== 0) cells.push(null);
 
     return (
       <div key={`${year}-${month}`} className="flex-1 min-w-0">
-        <p className="text-center text-sm font-bold text-navy-800 mb-3">
+        <p className="text-center text-sm font-bold text-navy-800 mb-4">
           {MONTHS_PT[month]} {year}
         </p>
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7">
           {WEEK_DAYS.map(w => (
-            <div key={w} className="text-center text-[11px] text-gray-400 font-semibold pb-1">{w}</div>
+            <div key={w} className="text-center text-[11px] text-gray-400 font-semibold py-1.5">{w}</div>
           ))}
           {cells.map((dateStr, i) => {
-            if (!dateStr) return <div key={i} />;
+            if (!dateStr) return <div key={i} className="h-9" />;
 
             const isPast = new Date(dateStr + "T12:00:00") < today;
+            const isToday = dateStr === today.toISOString().slice(0, 10);
             const isDep = dateStr === depDate;
             const isRet = dateStr === retDate;
-            const isEnd = isDep || isRet;
 
-            // range highlight
-            const rangeEnd = phase === "ret" && hovered && depDate
-              ? (hovered >= depDate ? hovered : depDate)
-              : retDate;
-            const rangeStart = phase === "ret" && hovered && depDate
-              ? (hovered >= depDate ? depDate : hovered)
-              : depDate;
-            const inRange = rangeStart && rangeEnd && dateStr > rangeStart && dateStr < rangeEnd;
-            const isRangeStart = dateStr === rangeStart && rangeEnd && rangeStart !== rangeEnd;
-            const isRangeEnd = dateStr === rangeEnd && rangeStart && rangeStart !== rangeEnd;
+            const previewEnd = phase === "ret" && hovered && depDate
+              ? (hovered >= depDate ? hovered : null) : retDate;
+            const inRange = depDate && previewEnd && dateStr > depDate && dateStr < previewEnd;
+            const isRangeStart = isDep && previewEnd && depDate !== previewEnd;
+            const isRangeEnd = dateStr === previewEnd && depDate && depDate !== previewEnd;
 
             return (
               <div
                 key={dateStr}
-                className={`relative flex items-center justify-center ${
-                  inRange ? "bg-navy-50" : ""
-                } ${isRangeStart ? "rounded-l-full" : ""} ${isRangeEnd ? "rounded-r-full" : ""}`}
+                className={[
+                  "relative h-9 flex items-center justify-center",
+                  inRange ? "bg-navy-50" : "",
+                  isRangeStart ? "rounded-l-full bg-navy-50" : "",
+                  isRangeEnd ? "rounded-r-full bg-navy-50" : "",
+                ].join(" ")}
               >
                 <button
                   type="button"
@@ -155,14 +156,19 @@ function DateRangePicker({
                   onClick={() => handleDayClick(dateStr)}
                   onMouseEnter={() => phase === "ret" && setHovered(dateStr)}
                   onMouseLeave={() => setHovered(null)}
-                  className={`w-8 h-8 text-sm rounded-full flex items-center justify-center transition-all font-medium
-                    ${isPast ? "text-gray-300 cursor-not-allowed" : "cursor-pointer"}
-                    ${isEnd ? "bg-navy-700 text-white font-bold" : ""}
-                    ${!isEnd && !isPast ? "hover:bg-navy-100 text-gray-700" : ""}
-                    ${!isEnd && isPast ? "" : ""}
-                  `}
+                  title={isDep ? "Saída" : isRet ? "Volta" : undefined}
+                  className={[
+                    "relative w-9 h-9 text-sm rounded-full flex flex-col items-center justify-center transition-all leading-none",
+                    isPast ? "text-gray-300 cursor-not-allowed" : "cursor-pointer",
+                    isDep ? "bg-navy-700 text-white font-black shadow-md" : "",
+                    isRet ? "bg-gold-500 text-navy-900 font-black shadow-md" : "",
+                    !isDep && !isRet && !isPast ? "hover:bg-navy-100 text-gray-700" : "",
+                    isToday && !isDep && !isRet ? "font-bold text-navy-600 ring-1 ring-navy-300 ring-offset-1" : "",
+                  ].join(" ")}
                 >
-                  {parseInt(dateStr.slice(8))}
+                  <span className="text-[13px] leading-none">{parseInt(dateStr.slice(8))}</span>
+                  {isDep && <span className="text-[8px] leading-none mt-0.5 font-black tracking-wider opacity-80">IDA</span>}
+                  {isRet && <span className="text-[8px] leading-none mt-0.5 font-black tracking-wider opacity-80">VTA</span>}
                 </button>
               </div>
             );
@@ -172,50 +178,124 @@ function DateRangePicker({
     );
   };
 
-  // second month
   const nextMonthNum = viewMonth === 11 ? 0 : viewMonth + 1;
   const nextYearNum = viewMonth === 11 ? viewYear + 1 : viewYear;
 
+  const depCard = fmtCardDate(depDate);
+  const retCard = fmtCardDate(retDate);
+
   return (
     <div>
-      {/* Phase hint */}
-      <p className="text-xs text-gray-400 mb-3">
-        {phase === "dep"
-          ? "Clique na data de saída"
-          : depDate
-            ? `Saída: ${new Date(depDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — Clique na data de retorno`
-            : "Clique na data de saída"}
-      </p>
+      {/* ── Selector cards ── */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {/* Saída */}
+        <button
+          type="button"
+          onClick={() => { onChange("", ""); setPhase("dep"); }}
+          className={[
+            "text-left rounded-xl border-2 px-4 py-3 transition-all",
+            phase === "dep"
+              ? "border-navy-600 bg-navy-50 shadow-sm"
+              : depCard
+                ? "border-gray-200 hover:border-navy-300 bg-white"
+                : "border-dashed border-gray-300 bg-gray-50 hover:border-navy-300",
+          ].join(" ")}
+        >
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${phase === "dep" ? "text-navy-600" : "text-gray-400"}`}>
+            ✈ Saída
+          </p>
+          {depCard ? (
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-navy-800 leading-none">{depCard.day}</span>
+              <div>
+                <p className="text-xs font-bold text-navy-700 leading-none">{depCard.month} {depCard.year}</p>
+                <p className="text-[11px] text-gray-400 capitalize leading-none mt-0.5">{depCard.weekday}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 mt-1">Selecionar data</p>
+          )}
+          {phase === "dep" && (
+            <div className="mt-2 h-0.5 rounded-full bg-navy-600" />
+          )}
+        </button>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between mb-4">
+        {/* Volta */}
+        <button
+          type="button"
+          onClick={() => depDate && setPhase("ret")}
+          disabled={!depDate}
+          className={[
+            "text-left rounded-xl border-2 px-4 py-3 transition-all",
+            phase === "ret"
+              ? "border-gold-500 bg-amber-50 shadow-sm"
+              : retCard
+                ? "border-gray-200 hover:border-gold-400 bg-white"
+                : depDate
+                  ? "border-dashed border-gray-300 bg-gray-50 hover:border-gold-400 cursor-pointer"
+                  : "border-dashed border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed",
+          ].join(" ")}
+        >
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${phase === "ret" ? "text-gold-600" : "text-gray-400"}`}>
+            🏁 Volta
+          </p>
+          {retCard ? (
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-navy-800 leading-none">{retCard.day}</span>
+              <div>
+                <p className="text-xs font-bold text-navy-700 leading-none">{retCard.month} {retCard.year}</p>
+                <p className="text-[11px] text-gray-400 capitalize leading-none mt-0.5">{retCard.weekday}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 mt-1">{depDate ? "Selecionar data" : "Defina a saída primeiro"}</p>
+          )}
+          {phase === "ret" && (
+            <div className="mt-2 h-0.5 rounded-full bg-gold-500" />
+          )}
+        </button>
+      </div>
+
+      {/* ── Calendar navigation ── */}
+      <div className="flex items-center justify-between mb-2">
         <button type="button" onClick={prevMonth}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500">
+          className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500 hover:text-navy-700">
           <ChevronLeft size={18} />
         </button>
-        <div className="flex-1" /> {/* spacer — month labels are inside each grid */}
+        <div className="flex-1" />
         <button type="button" onClick={nextMonth}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500">
+          className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500 hover:text-navy-700">
           <ChevronRight size={18} />
         </button>
       </div>
 
-      {/* One month on mobile, two on sm+ */}
+      {/* ── Calendar grid (1 month mobile, 2 desktop) ── */}
       <div className="flex gap-6">
         {renderMonth(viewYear, viewMonth)}
         <div className="hidden sm:block w-px bg-gray-100 flex-shrink-0" />
-        <div className="hidden sm:block flex-1 min-w-0">
+        <div className="hidden sm:flex flex-1 min-w-0">
           {renderMonth(nextYearNum, nextMonthNum)}
         </div>
       </div>
 
-      {/* Reset link */}
-      {(depDate || retDate) && (
-        <button type="button" onClick={() => { onChange("", ""); setPhase("dep"); }}
-          className="mt-3 text-xs text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors">
-          Limpar datas
-        </button>
-      )}
+      {/* ── Legend ── */}
+      <div className="mt-4 flex items-center gap-4 text-xs text-gray-400">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-navy-700 inline-block" /> Saída
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-gold-500 inline-block" /> Volta
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-navy-50 border border-navy-200 inline-block" /> Período
+        </span>
+        {(depDate || retDate) && (
+          <button type="button" onClick={() => { onChange("", ""); setPhase("dep"); }}
+            className="ml-auto text-gray-400 hover:text-red-500 transition-colors underline underline-offset-2">
+            Limpar
+          </button>
+        )}
+      </div>
     </div>
   );
 }
