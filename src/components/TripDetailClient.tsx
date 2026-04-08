@@ -1415,41 +1415,49 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
                   <div className="border-t border-gray-100 divide-y divide-gray-100">
 
-                    {/* Selected date row */}
-                    <button
-                      type="button"
-                      onClick={() => setShowDatePicker(v => !v)}
-                      className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <div>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
-                        {selectedTrip ? (
-                          <p className="text-sm font-bold text-navy-800">
-                            {new Date(selectedTrip.departure_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}
-                            {" → "}
-                            {new Date(selectedTrip.return_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}
-                          </p>
-                        ) : (
-                          <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
+                    {/* Selected date row — dropdown trigger */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowDatePicker(v => !v)}
+                        className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
+                          {selectedTrip ? (
+                            <p className="text-sm font-bold text-navy-800">
+                              {new Date(selectedTrip.departure_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}
+                              {" → "}
+                              {new Date(selectedTrip.return_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}
+                            </p>
+                          ) : (
+                            <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
+                          )}
+                        </div>
+                        {siblingTrips.length > 1 && (
+                          <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
+                            {showDatePicker ? <><ChevronUp size={14}/> Fechar</> : <><ChevronDown size={14}/> Trocar</>}
+                          </span>
                         )}
-                      </div>
-                      <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
-                        {siblingTrips.length > 1 ? (showDatePicker ? <><ChevronUp size={14}/> Fechar</> : <><ChevronDown size={14}/> Trocar</>) : null}
-                      </span>
-                    </button>
+                      </button>
 
-                    {/* Expandable date list */}
-                    {showDatePicker && siblingTrips.length > 1 && (
-                      <div className="px-3 py-3 bg-gray-50">
-                        <DateSelector
-                          trips={siblingTrips}
-                          selected={selectedTrip}
-                          onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
-                          hasError={dateError}
-                          sidebar
-                        />
-                      </div>
-                    )}
+                      {/* Floating dropdown — does not push layout */}
+                      {showDatePicker && siblingTrips.length > 1 && (
+                        <>
+                          {/* Backdrop to close on outside click */}
+                          <div className="fixed inset-0 z-30" onClick={() => setShowDatePicker(false)} />
+                          <div className="absolute left-0 right-0 top-full z-40 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 max-h-[60vh] overflow-y-auto date-scroll">
+                            <DateSelector
+                              trips={siblingTrips}
+                              selected={selectedTrip}
+                              onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
+                              hasError={dateError}
+                              sidebar
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                     {/* People selector row */}
                     <div className="px-5 py-3.5">
