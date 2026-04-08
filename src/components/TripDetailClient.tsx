@@ -1162,7 +1162,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             {/* ── Left column ── */}
             <div className="lg:col-span-2 space-y-6">
               {/* Key info — uses activeTrip so it updates with date selection */}
-              <div className="bg-white rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm">
+              <div className="bg-white rounded-2xl p-5 grid grid-cols-2 gap-4 shadow-sm">
                 <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
                   value={selectedTrip
                     ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
@@ -1375,8 +1375,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 </div>
               )}
 
-              {/* Trust Block */}
-              <TrustBlock maxInstallments={activeTrip.max_installments} />
+              {/* Trust Block — hidden on mobile */}
+              <div className="hidden sm:block">
+                <TrustBlock maxInstallments={activeTrip.max_installments} />
+              </div>
 
               {/* Related Trips */}
               <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />
@@ -1384,9 +1386,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="space-y-4 sticky top-20">
+              <div className="space-y-4">
 
-                {/* Date Selector — desktop sidebar */}
+                {/* Date Selector — desktop sidebar (not sticky, scrolls normally) */}
                 {siblingTrips.length > 0 && (
                   <DateSelector
                     trips={siblingTrips}
@@ -1397,7 +1399,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                   />
                 )}
 
-                {/* Price card */}
+                {/* Price card — sticky so it's always visible */}
+                <div className="sticky top-20 space-y-4">
                 <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
                   {!selectedTrip && siblingTrips.length > 1 ? (
                     <p className="text-sm text-gray-400 text-center py-2">Selecione uma data para ver o preço</p>
@@ -1471,6 +1474,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     Falar agora
                   </a>
                 </div>
+                </div>{/* end sticky */}
               </div>
             </div>
           </div>
