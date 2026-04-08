@@ -82,6 +82,7 @@ function buildWhatsAppMessage(
   trip: Trip, user: StoredUser, phone: string, cpf: string,
   birthDate: string, people: number, companions: CompanionForm[],
   note: string, bookingCode: string,
+  optionals: { name: string; price: number }[],
 ) {
   const fmt = (d: string) => { if (!d) return "-"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; };
   let msg =
@@ -100,7 +101,13 @@ function buildWhatsAppMessage(
     msg += `\n*Acompanhante ${i + 1}:*\n   Nome: ${c.full_name}\n   CPF: ${c.cpf}\n   Nascimento: ${fmt(c.birth_date)}\n`;
   });
   msg += `\n*Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
-  msg += `*Valor estimado:* R$ ${fmtBRL(people * trip.price_per_person)}`;
+  const optsTotal = optionals.reduce((s, o) => s + o.price, 0);
+  msg += `*Passagem:* R$ ${fmtBRL(people * trip.price_per_person)}`;
+  if (optionals.length > 0) {
+    msg += `\n*Opcionais selecionados:*`;
+    optionals.forEach(o => { msg += `\n   - ${o.name}: R$ ${fmtBRL(o.price * people)} (${people}x R$ ${fmtBRL(o.price)})`; });
+    msg += `\n*Total com opcionais:* R$ ${fmtBRL(people * trip.price_per_person + optsTotal * people)}`;
+  }
   if (note) msg += `\n\nObservacao: ${note}`;
   return msg;
 }
@@ -510,7 +517,7 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
 /* ═══════════════════════════════════════════
    10. Booking Modal
 ═══════════════════════════════════════════ */
-function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; onClose: () => void }) {
+function BookingModal({ trip, user, onClose, selectedOptionals }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fullName, setFullName] = useState(user.full_name || "");
@@ -561,7 +568,7 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
       const bookingRes = await fetch(`${API}/bookings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined }),
+        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined, selected_optionals: selectedOptionals }),
       });
       if (!bookingRes.ok) {
         const err = await bookingRes.json();
@@ -570,7 +577,7 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
       }
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
-      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code);
+      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals);
       const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
       onClose();
       // Redireciona para o WhatsApp direto na mesma aba — evita bloqueio de popup após async
@@ -680,9 +687,21 @@ function BookingModal({ trip, user, onClose }: { trip: Trip; user: StoredUser; o
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 resize-none" />
           </div>
 
-          <div className="bg-navy-50 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm text-navy-600 font-medium">{people} × R$ {fmtBRL(trip.price_per_person)}</span>
-            <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(people * trip.price_per_person)}</span>
+          <div className="bg-navy-50 rounded-xl p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-navy-600 font-medium">{people} × R$ {fmtBRL(trip.price_per_person)}</span>
+              <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(people * trip.price_per_person)}</span>
+            </div>
+            {selectedOptionals.map((opt) => (
+              <div key={opt.name} className="flex items-center justify-between text-amber-700">
+                <span className="text-xs font-medium">{people} × {opt.name}</span>
+                <span className="text-xs font-bold">+ R$ {fmtBRL(opt.price * people)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between pt-1 border-t border-navy-200">
+              <span className="text-sm text-navy-700 font-semibold">Total</span>
+              <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(people * trip.price_per_person + selectedOptionals.reduce((s, o) => s + o.price * people, 0))}</span>
+            </div>
           </div>
 
           <button type="submit" disabled={loading}
@@ -841,6 +860,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const [siblingTrips, setSiblingTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [dateError, setDateError] = useState(false);
+  const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>([]);
 
   // activeTrip: the trip whose price/availability drives the UI
   const activeTrip = selectedTrip || trip;
@@ -976,7 +996,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
       {/* Booking Modal */}
       {bookingUser && selectedTrip && (
-        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} />
+        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} />
       )}
 
       {/* Sticky Mobile CTA */}
@@ -1116,6 +1136,56 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Opcionais */}
+              {trip.optionals?.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm">
+                  <h3 className="font-display font-bold text-navy-800 mb-1 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-sm">✨</span>
+                    Serviços Opcionais
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-4">Selecione os extras que deseja adicionar à sua viagem. O valor é por pessoa.</p>
+                  <div className="space-y-2">
+                    {trip.optionals.map((opt, i) => {
+                      const isSelected = selectedOptionals.some(o => o.name === opt.name);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setSelectedOptionals(prev =>
+                            isSelected
+                              ? prev.filter(o => o.name !== opt.name)
+                              : [...prev, opt]
+                          )}
+                          className={`w-full flex items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all text-left ${
+                            isSelected
+                              ? "border-amber-400 bg-amber-50"
+                              : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
+                          }`}
+                        >
+                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
+                          }`}>
+                            {isSelected && <Check size={11} className="text-white" />}
+                          </span>
+                          <span className="flex-1 text-sm font-medium text-gray-700">{opt.name}</span>
+                          <span className="text-sm font-black text-amber-600 flex-shrink-0">
+                            + R$ {fmtBRL(opt.price)}<span className="text-xs font-normal text-gray-400">/pessoa</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedOptionals.length > 0 && (
+                    <div className="mt-3 flex items-center justify-between bg-amber-50 rounded-xl px-4 py-2.5 border border-amber-200">
+                      <span className="text-xs text-amber-700 font-semibold">{selectedOptionals.length} opcional{selectedOptionals.length > 1 ? "is" : ""} selecionado{selectedOptionals.length > 1 ? "s" : ""}</span>
+                      <span className="text-sm font-black text-amber-700">
+                        + R$ {fmtBRL(selectedOptionals.reduce((s, o) => s + o.price, 0))}/pessoa
+                      </span>
                     </div>
                   )}
                 </div>

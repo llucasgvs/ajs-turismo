@@ -22,6 +22,7 @@ interface TemplateFormData {
   image_url: string;
   includes: string[];
   excludes: string[];
+  optionals: { name: string; price: string }[];
   itinerary: ItineraryDay[];
   gallery: string[];
   is_featured: boolean;
@@ -31,7 +32,7 @@ interface TemplateFormData {
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", image_url: "",
-  includes: [], excludes: [], itinerary: [], gallery: [],
+  includes: [], excludes: [], optionals: [], itinerary: [], gallery: [],
   is_featured: false, is_active: true,
 };
 
@@ -43,12 +44,22 @@ export default function TemplateForm({
   initialData?: Partial<TemplateFormData>;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<TemplateFormData>({ ...EMPTY, ...initialData });
+  const [form, setForm] = useState<TemplateFormData>({
+    ...EMPTY,
+    ...initialData,
+    // normaliza optionals: price pode vir como number da API, converte p/ string
+    optionals: (initialData?.optionals ?? []).map((o) => ({
+      name: String(o.name ?? ""),
+      price: String((o as { name: string; price: number | string }).price ?? ""),
+    })),
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [newInclude, setNewInclude] = useState("");
   const [newExclude, setNewExclude] = useState("");
+  const [newOptName, setNewOptName] = useState("");
+  const [newOptPrice, setNewOptPrice] = useState("");
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -87,7 +98,13 @@ export default function TemplateForm({
     try {
       const res = await apiFetch(
         templateId ? `/templates/${templateId}` : "/templates/",
-        { method: templateId ? "PUT" : "POST", body: JSON.stringify(form) }
+        { method: templateId ? "PUT" : "POST", body: JSON.stringify({
+          ...form,
+          // converte price de string para number antes de enviar
+          optionals: form.optionals
+            .filter(o => o.name.trim())
+            .map(o => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
+        }) }
       );
       const data = await res.json();
       if (!res.ok) {
@@ -200,6 +217,45 @@ export default function TemplateForm({
               onAdd={() => addToList("excludes", newExclude, () => setNewExclude(""))}
               onRemove={(i) => removeFromList("excludes", i)}
               placeholder="Ex: Passagem aérea, Almoços..." />
+          </Section>
+
+          <Section title="Opcionais (cliente escolhe)">
+            <p className="text-xs text-gray-400 mb-3">
+              O cliente poderá selecionar esses itens ao fazer a reserva. O valor é por pessoa.
+            </p>
+            <div className="space-y-2">
+              {form.optionals.map((opt, i) => (
+                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                  <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                    R$ {parseFloat(opt.price || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                  <p className="flex-1 text-sm text-gray-700 truncate">{opt.name}</p>
+                  <button type="button"
+                    onClick={() => setForm(f => ({ ...f, optionals: f.optionals.filter((_, j) => j !== i) }))}
+                    className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <input className="input-field flex-1 py-2 text-sm" value={newOptName}
+                  onChange={e => setNewOptName(e.target.value)}
+                  placeholder="Ex: Transfer Paraguai, Tour Argentina..."
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (newOptName.trim() && newOptPrice) { setForm(f => ({ ...f, optionals: [...f.optionals, { name: newOptName.trim(), price: newOptPrice }] })); setNewOptName(""); setNewOptPrice(""); } } }} />
+                <div className="relative flex-shrink-0 w-28">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                  <input className="input-field py-2 text-sm pl-8 w-full" type="number" min="0" step="0.01"
+                    value={newOptPrice} onChange={e => setNewOptPrice(e.target.value)}
+                    placeholder="0,00"
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (newOptName.trim() && newOptPrice) { setForm(f => ({ ...f, optionals: [...f.optionals, { name: newOptName.trim(), price: newOptPrice }] })); setNewOptName(""); setNewOptPrice(""); } } }} />
+                </div>
+                <button type="button"
+                  onClick={() => { if (newOptName.trim() && newOptPrice) { setForm(f => ({ ...f, optionals: [...f.optionals, { name: newOptName.trim(), price: newOptPrice }] })); setNewOptName(""); setNewOptPrice(""); } }}
+                  className="px-3 bg-amber-500 text-white rounded-xl hover:bg-amber-400 transition-colors flex-shrink-0">
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
           </Section>
 
           <Section title="Roteiro Dia a Dia">
