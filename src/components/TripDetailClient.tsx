@@ -519,7 +519,7 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
 /* ═══════════════════════════════════════════
    10. Booking Modal
 ═══════════════════════════════════════════ */
-function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[] }) {
+function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals, initialPeople = 1 }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[]; initialPeople?: number }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>(initialOptionals);
@@ -527,7 +527,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const [phone, setPhone] = useState(user.phone || "");
   const [cpf, setCpf] = useState(user.cpf || "");
   const [birthDate, setBirthDate] = useState(user.birth_date || "");
-  const [people, setPeople] = useState(1);
+  const [people, setPeople] = useState(initialPeople);
   const [companions, setCompanions] = useState<CompanionForm[]>([]);
   const [note, setNote] = useState("");
 
@@ -958,6 +958,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [dateError, setDateError] = useState(false);
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>([]);
+  const [sidebarPeople, setSidebarPeople] = useState(1);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // activeTrip: the trip whose price/availability drives the UI
   const activeTrip = selectedTrip || trip;
@@ -988,12 +990,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         setSiblingTrips(sorted);
         // Only auto-select if no ?book= param (post-login redirect handles its own selection)
         if (!initialBookId.current) {
-          if (sorted.length === 1) {
-            setSelectedTrip(sorted[0]);
-          } else {
-            const current = sorted.find(t => t.id === trip.id);
-            if (current) setSelectedTrip(current);
-          }
+          // Always auto-select the nearest available date
+          const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out") || sorted[0];
+          if (nearest) setSelectedTrip(nearest);
         }
       })
       .catch(() => {});
@@ -1093,7 +1092,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
       {/* Booking Modal */}
       {bookingUser && selectedTrip && (
-        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} />
+        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} initialPeople={sidebarPeople} />
       )}
 
       {/* Sticky Mobile CTA */}
@@ -1386,76 +1385,125 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="space-y-4 sticky top-20">
+              <div className="sticky top-20 space-y-3">
 
-                {/* Date Selector — desktop sidebar */}
-                {siblingTrips.length > 0 && (
-                  <DateSelector
-                    trips={siblingTrips}
-                    selected={selectedTrip}
-                    onSelect={handleSelectDate}
-                    hasError={dateError}
-                    sidebar
-                  />
-                )}
+                {/* Main booking card */}
+                <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
 
-                <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
-                  {!selectedTrip && siblingTrips.length > 1 ? (
-                    <p className="text-sm text-gray-400 text-center py-2">Selecione uma data para ver o preço</p>
-                  ) : (
-                    <>
-                      <p className="text-xs text-gray-400 mb-1">{selectedTrip ? "Preço para a data selecionada" : "A partir de"}</p>
+                  {/* Price header */}
+                  <div className="p-5 pb-4">
+                    <p className="text-xs text-gray-400 mb-0.5">{selectedTrip ? "Preço por pessoa" : "A partir de"}</p>
+                    <div className="flex items-end gap-2 mb-0.5">
                       {activeTrip.original_price && (
-                        <p className="text-sm text-gray-400 line-through leading-none">
-                          R$ {fmtBRL(activeTrip.original_price)}
-                        </p>
+                        <span className="text-sm text-gray-400 line-through leading-none mb-0.5">R$ {fmtBRL(activeTrip.original_price)}</span>
                       )}
-                      <p className="font-display font-black text-4xl text-navy-700 leading-tight">
+                      <span className="font-display font-black text-4xl text-navy-700 leading-tight">
                         R$ {fmtBRL(activeTrip.price_per_person)}
-                      </p>
-                      <p className="text-xs text-gray-500 mb-1">por pessoa</p>
-                      <p className="text-sm text-emerald-600 font-semibold mb-4">
+                      </span>
+                    </div>
+                    {activeTrip.max_installments > 1 && (
+                      <p className="text-xs text-emerald-600 font-semibold">
                         {activeTrip.max_installments}x de R$ {fmtInstallment(activeTrip.price_per_person, activeTrip.max_installments)} sem juros
                       </p>
-                    </>
-                  )}
+                    )}
+                    {activeTrip.original_price && discount && discount > 0 && (
+                      <div className="mt-2 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center border border-emerald-100">
+                        Economia de R$ {fmtBRL(activeTrip.original_price - activeTrip.price_per_person)} por pessoa
+                      </div>
+                    )}
+                  </div>
 
-                  {activeTrip.original_price && discount && discount > 0 && (
-                    <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center mb-4 border border-emerald-100">
-                      Economia de R$ {fmtBRL(activeTrip.original_price - activeTrip.price_per_person)} por pessoa
-                    </div>
-                  )}
+                  <div className="border-t border-gray-100 divide-y divide-gray-100">
 
-                  {lowStock && !sold && (
-                    <div className="bg-orange-50 text-orange-700 text-xs font-semibold px-3 py-2 rounded-xl text-center mb-4 border border-orange-100 flex items-center justify-center gap-2">
-                      <AlertTriangle size={13} />
-                      Apenas {activeTrip.available_spots} vagas restantes
-                    </div>
-                  )}
-
-                  {sold ? (
-                    <div className="space-y-3">
-                      <div className="bg-gray-100 text-gray-500 font-bold py-3.5 rounded-xl text-center">Pacote esgotado</div>
-                      <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
-                        className="block text-center text-sm text-emerald-600 hover:text-emerald-700 font-semibold py-2 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors">
-                        Entrar na lista de espera →
-                      </a>
-                    </div>
-                  ) : (
-                    <button onClick={handleOpenBooking}
-                      className={`w-full font-bold py-4 rounded-xl text-center transition-all text-lg ${
-                        selectedTrip
-                          ? "bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20"
-                          : "bg-gray-200 text-gray-500 cursor-pointer"
-                      }`}>
-                      {selectedTrip ? "Reservar agora" : "Selecione uma data"}
+                    {/* Selected date row */}
+                    <button
+                      type="button"
+                      onClick={() => setShowDatePicker(v => !v)}
+                      className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
+                        {selectedTrip ? (
+                          <p className="text-sm font-bold text-navy-800">
+                            {new Date(selectedTrip.departure_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}
+                            {" → "}
+                            {new Date(selectedTrip.return_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}
+                          </p>
+                        ) : (
+                          <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
+                        )}
+                      </div>
+                      <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
+                        {siblingTrips.length > 1 ? (showDatePicker ? <><ChevronUp size={14}/> Fechar</> : <><ChevronDown size={14}/> Trocar</>) : null}
+                      </span>
                     </button>
-                  )}
 
-                  <p className="text-xs text-gray-400 text-center mt-3">
-                    Mín. {trip.min_group_size} {trip.min_group_size === 1 ? "pessoa" : "pessoas"}
-                  </p>
+                    {/* Expandable date list */}
+                    {showDatePicker && siblingTrips.length > 1 && (
+                      <div className="px-3 py-3 bg-gray-50">
+                        <DateSelector
+                          trips={siblingTrips}
+                          selected={selectedTrip}
+                          onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
+                          hasError={dateError}
+                          sidebar
+                        />
+                      </div>
+                    )}
+
+                    {/* People selector row */}
+                    <div className="px-5 py-3.5">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
+                      <div className="flex items-center gap-3">
+                        <button type="button"
+                          onClick={() => setSidebarPeople(p => Math.max(1, p - 1))}
+                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">−</button>
+                        <span className="flex-1 text-center font-bold text-navy-800 text-base">{sidebarPeople} pessoa{sidebarPeople > 1 ? "s" : ""}</span>
+                        <button type="button"
+                          onClick={() => setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1))}
+                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total + CTA */}
+                  <div className="p-5 pt-4">
+                    {sidebarPeople > 1 && (
+                      <div className="flex items-center justify-between mb-3 text-sm">
+                        <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
+                        <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
+                      </div>
+                    )}
+
+                    {lowStock && !sold && (
+                      <div className="bg-orange-50 text-orange-700 text-xs font-semibold px-3 py-2 rounded-xl text-center mb-3 border border-orange-100 flex items-center justify-center gap-2">
+                        <AlertTriangle size={13} /> Apenas {activeTrip.available_spots} vagas restantes
+                      </div>
+                    )}
+
+                    {sold ? (
+                      <div className="space-y-2">
+                        <div className="bg-gray-100 text-gray-500 font-bold py-3.5 rounded-xl text-center">Pacote esgotado</div>
+                        <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
+                          className="block text-center text-sm text-emerald-600 hover:text-emerald-700 font-semibold py-2 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors">
+                          Entrar na lista de espera →
+                        </a>
+                      </div>
+                    ) : (
+                      <button onClick={handleOpenBooking}
+                        className={`w-full font-bold py-4 rounded-xl text-center transition-all text-lg ${
+                          selectedTrip
+                            ? "bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20"
+                            : "bg-gray-200 text-gray-500 cursor-pointer"
+                        }`}>
+                        {selectedTrip ? "Reservar agora" : "Selecione uma data"}
+                      </button>
+                    )}
+
+                    <p className="text-xs text-gray-400 text-center mt-2">
+                      Mín. {trip.min_group_size} {trip.min_group_size === 1 ? "pessoa" : "pessoas"}
+                    </p>
+                  </div>
                 </div>
 
                 {/* WhatsApp help card */}
@@ -1472,7 +1520,6 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     </svg>
                     Falar agora
                   </a>
-                </div>
                 </div>
               </div>
             </div>
