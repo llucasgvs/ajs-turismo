@@ -86,7 +86,7 @@ export default function HowItWorks() {
             Pronto para começar?
           </h3>
           <p className="text-white/70 mb-8 max-w-xl mx-auto">
-            Mais de 5.000 famílias já viajaram com a AJS Turismo. Junte-se a eles!
+            Mais de 16.000 famílias já viajaram com a AJS Turismo. Junte-se a eles!
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a

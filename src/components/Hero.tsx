@@ -23,7 +23,7 @@ const heroSlides = [
 ];
 
 const stats = [
-  { icon: Users, value: "5.000+", label: "Clientes felizes" },
+  { icon: Users, value: "16.000+", label: "Clientes felizes" },
   { icon: MapPin, value: "80+", label: "Destinos disponíveis" },
   { icon: Star, value: "4.9", label: "Avaliação média" },
 ];

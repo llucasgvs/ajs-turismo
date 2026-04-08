@@ -95,7 +95,7 @@ export default function Testimonials() {
             <span className="text-gold-400">Clientes Dizem</span>
           </h2>
           <p className="text-white/60 max-w-xl mx-auto">
-            Mais de 5.000 famílias já viajaram com a AJS. Veja o que elas falam sobre nós.
+            Mais de 16.000 famílias já viajaram com a AJS. Veja o que elas falam sobre nós.
           </p>
         </div>
 

@@ -140,7 +140,7 @@ export default function CadastroPage() {
 
           <div>
             <h2 className="text-white font-display font-black text-3xl mb-4">
-              Junte-se a mais de 5.000 viajantes!
+              Junte-se a mais de 16.000 viajantes!
             </h2>
             <ul className="space-y-3">
               {[

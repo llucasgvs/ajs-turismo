@@ -299,12 +299,15 @@ function ScarcityBanner({ spots }: { spots: number }) {
 /* ═══════════════════════════════════════════
    4. Trust Block
 ═══════════════════════════════════════════ */
-function TrustBlock() {
+function TrustBlock({ maxInstallments }: { maxInstallments: number }) {
+  const paymentDesc = maxInstallments > 1
+    ? `Parcele em até ${maxInstallments}x sem juros com total segurança`
+    : "Pagamento seguro e à vista com total tranquilidade";
   const items = [
     { icon: Award, title: "10+ anos de experiência", desc: "Mais de uma década levando viajantes com segurança e qualidade" },
-    { icon: Shield, title: "Pagamento seguro", desc: "Parcele em até 12x sem juros com total segurança" },
+    { icon: Shield, title: "Pagamento seguro", desc: paymentDesc },
     { icon: Headphones, title: "Suporte via WhatsApp", desc: "Nossa equipe responde em minutos, antes e durante a viagem" },
-    { icon: Users, title: "+5.000 viajantes felizes", desc: "Avaliação média de 4.9 estrelas pelos nossos clientes" },
+    { icon: Users, title: "+16.000 viajantes felizes", desc: "Avaliação média de 4.9 estrelas pelos nossos clientes" },
   ];
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -1318,7 +1321,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               )}
 
               {/* Trust Block */}
-              <TrustBlock />
+              <TrustBlock maxInstallments={activeTrip.max_installments} />
 
               {/* Related Trips */}
               <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />

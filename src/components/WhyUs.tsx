@@ -25,7 +25,7 @@ const reasons = [
   {
     icon: Award,
     title: "Qualidade Comprovada",
-    description: "Nota 4.9/5 nas avaliações de clientes. Mais de 5.000 famílias atendidas com excelência.",
+    description: "Nota 4.9/5 nas avaliações de clientes. Mais de 16.000 famílias atendidas com excelência.",
     color: "text-gold-600",
     bg: "bg-gold-50",
   },
