@@ -30,8 +30,19 @@ const EMPTY: TripDateFormData = {
 function toDatetimeInput(iso: string | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
-  // "sv" locale produz formato "YYYY-MM-DD HH:MM:SS"
   return d.toLocaleString("sv", { timeZone: "America/Sao_Paulo" }).slice(0, 16).replace(" ", "T");
+}
+
+/** Adiciona N dias a um datetime-local string "YYYY-MM-DDTHH:MM", mantendo o horário */
+function addDays(dt: string, n: number): string {
+  if (!dt) return "";
+  const [datePart, timePart = "22:00"] = dt.split("T");
+  const d = new Date(datePart + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}T${timePart}`;
 }
 
 interface TripDateInitialData {
@@ -49,11 +60,13 @@ export default function TripDateForm({
   tripId,
   initialData,
   templateTitle,
+  templateDurationNights,
 }: {
   templateId: number;
   tripId?: number;
   initialData?: TripDateInitialData;
   templateTitle?: string;
+  templateDurationNights?: number;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<TripDateFormData>({
@@ -191,19 +204,65 @@ export default function TripDateForm({
             <Calendar size={13} /> Datas da Viagem
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Saída */}
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-1.5">Data e hora de saída *</label>
-              <input className="input-field" type="datetime-local" required value={form.departure_date}
-                onChange={(e) => set("departure_date", e.target.value)} />
+              <input
+                className="input-field"
+                type="datetime-local"
+                required
+                value={form.departure_date}
+                onChange={(e) => {
+                  const dep = e.target.value;
+                  setForm((f) => {
+                    // Auto-preenche retorno se ainda vazio
+                    const shouldAutoFill = !f.return_date;
+                    const autoReturn = shouldAutoFill
+                      ? addDays(dep, templateDurationNights ?? 2)
+                      : f.return_date;
+                    return { ...f, departure_date: dep, return_date: autoReturn };
+                  });
+                }}
+              />
               <p className="text-[11px] text-gray-400 mt-1">Horário de Brasília (GMT-3)</p>
             </div>
+
+            {/* Retorno */}
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-1.5">Data e hora de retorno *</label>
-              <input className="input-field" type="datetime-local" required value={form.return_date}
-                onChange={(e) => set("return_date", e.target.value)} />
-              <p className="text-[11px] text-gray-400 mt-1">Horário de Brasília (GMT-3)</p>
+              <input
+                className="input-field"
+                type="datetime-local"
+                required
+                value={form.return_date}
+                onChange={(e) => set("return_date", e.target.value)}
+              />
+              {/* Botões de atalho: +N dias a partir da saída */}
+              {form.departure_date && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[1, 2, 3, 4, 7].map((n) => {
+                    const isDefault = n === templateDurationNights;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => set("return_date", addDays(form.departure_date, n))}
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
+                          isDefault
+                            ? "bg-gold-50 border-gold-400 text-gold-700 hover:bg-gold-100"
+                            : "bg-gray-50 border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
+                        }`}
+                      >
+                        +{n}{n === 1 ? " dia" : " dias"}{isDefault ? " ★" : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Preview duração */}
           {nights > 0 && (
             <div className="mt-3 flex items-center gap-3 bg-navy-50 rounded-xl px-4 py-3">
               <span className="text-navy-500 text-sm font-semibold">{days} {days === 1 ? "dia" : "dias"}</span>
@@ -212,6 +271,11 @@ export default function TripDateForm({
               {depHour >= 18 && (
                 <span className="ml-auto text-[11px] text-gray-400">Saída noturna detectada</span>
               )}
+            </div>
+          )}
+          {nights === 0 && form.departure_date && form.return_date && depDateOnly === retDateOnly && (
+            <div className="mt-3 bg-navy-50 rounded-xl px-4 py-3">
+              <span className="text-navy-500 text-sm font-semibold">Bate e volta</span>
             </div>
           )}
         </div>
