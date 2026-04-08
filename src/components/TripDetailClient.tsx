@@ -798,22 +798,23 @@ function DescriptionBlock({ description }: { description: string }) {
 const DATE_INITIAL = 4;
 
 function DateSelector({
-  trips, selected, onSelect, hasError, sidebar = false,
+  trips, selected, onSelect, hasError, sidebar = false, forceExpanded = false,
 }: {
   trips: Trip[];
   selected: Trip | null;
   onSelect: (t: Trip) => void;
   hasError: boolean;
   sidebar?: boolean;
+  forceExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (trips.length === 0) return null;
 
   const selectedIdx = selected ? trips.findIndex(t => t.id === selected.id) : -1;
-  const needsExpand = trips.length > DATE_INITIAL;
+  const needsExpand = !forceExpanded && trips.length > DATE_INITIAL;
   // If selected date is beyond initial view, auto-expand
-  const forceExpand = selectedIdx >= DATE_INITIAL;
-  const showAll = expanded || forceExpand;
+  const forceExpandSelected = selectedIdx >= DATE_INITIAL;
+  const showAll = forceExpanded || expanded || forceExpandSelected;
   const visible = showAll ? trips : trips.slice(0, DATE_INITIAL);
   const hidden = trips.length - DATE_INITIAL;
 
@@ -1453,6 +1454,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                               onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
                               hasError={dateError}
                               sidebar
+                              forceExpanded
                             />
                           </div>
                         </>
