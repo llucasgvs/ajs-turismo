@@ -1098,7 +1098,7 @@ function OpenDateCalendar({
                 .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             </p>
           ) : (
-            <p className="text-xs text-gray-400 mt-0.5">Bate e volta — selecione o dia que deseja ir</p>
+            <p className="text-xs text-gray-400 mt-0.5">Saídas todos os dias — escolha o dia que deseja ir</p>
           )}
         </div>
         {hasError && (
@@ -1466,14 +1466,16 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         return `${days} dias / ${nights} noites`;
                       })()} />
                   </div>
-                  <div className="p-5">
-                    <InfoStat
-                      icon={<Users size={16} className="text-gold-500" />}
-                      label="Vagas"
-                      value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
-                      valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
-                    />
-                  </div>
+                  {!trip.is_open_date && (
+                    <div className="p-5">
+                      <InfoStat
+                        icon={<Users size={16} className="text-gold-500" />}
+                        label="Vagas"
+                        value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
+                        valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1859,9 +1861,6 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       </button>
                     )}
 
-                    <p className="text-xs text-gray-400 text-center mt-2">
-                      Mín. {trip.min_group_size} {trip.min_group_size === 1 ? "pessoa" : "pessoas"}
-                    </p>
                   </div>
                 </div>
 
