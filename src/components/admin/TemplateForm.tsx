@@ -28,6 +28,12 @@ interface TemplateFormData {
   gallery: string[];
   is_featured: boolean;
   is_active: boolean;
+  // Saídas diárias
+  is_open_date: boolean;
+  open_date_price: string;
+  open_date_spots_per_day: string;
+  open_date_min_advance: string;
+  open_date_max_advance: string;
 }
 
 const EMPTY: TemplateFormData = {
@@ -35,6 +41,8 @@ const EMPTY: TemplateFormData = {
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: [], excludes: [], optionals: [], itinerary: [], gallery: [],
   is_featured: false, is_active: true,
+  is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
+  open_date_min_advance: "1", open_date_max_advance: "180",
 };
 
 export default function TemplateForm({
@@ -53,6 +61,11 @@ export default function TemplateForm({
       name: String(o.name ?? ""),
       price: String((o as { name: string; price: number | string }).price ?? ""),
     })),
+    // normaliza open_date: number → string para os inputs
+    open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
+    open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
+    open_date_min_advance: String((initialData as Record<string, unknown>)?.open_date_min_advance ?? "1"),
+    open_date_max_advance: String((initialData as Record<string, unknown>)?.open_date_max_advance ?? "180"),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -105,6 +118,11 @@ export default function TemplateForm({
           optionals: form.optionals
             .filter(o => o.name.trim())
             .map(o => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
+          // converte open_date campos de string para number
+          open_date_price: form.open_date_price ? parseFloat(form.open_date_price) : null,
+          open_date_spots_per_day: parseInt(form.open_date_spots_per_day) || 0,
+          open_date_min_advance: parseInt(form.open_date_min_advance) || 1,
+          open_date_max_advance: parseInt(form.open_date_max_advance) || 180,
         }) }
       );
       const data = await res.json();
@@ -205,6 +223,66 @@ export default function TemplateForm({
                   onChange={(e) => set("tag", e.target.value)}
                   placeholder="Ex: Mais Vendido, Promoção" />
               </Field>
+            </div>
+          </Section>
+
+          <Section title="Tipo de saída">
+            <div className="space-y-4">
+              {/* Toggle */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5">
+                  <input type="checkbox" className="sr-only peer"
+                    checked={form.is_open_date}
+                    onChange={e => set("is_open_date", e.target.checked)} />
+                  <div className="w-11 h-6 bg-gray-200 peer-checked:bg-navy-700 rounded-full transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-navy-800 text-sm">Saídas diárias (data livre)</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Ideal para Beto Carrero, parques temáticos, city tours. O sistema gera datas automaticamente.
+                    O cliente escolhe qualquer data disponível no calendário.
+                  </p>
+                </div>
+              </label>
+
+              {/* Campos open_date */}
+              {form.is_open_date && (
+                <div className="bg-navy-50 rounded-2xl p-4 space-y-3 border border-navy-100">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Preço por pessoa *</label>
+                      <input type="number" className="input-field text-sm" placeholder="Ex: 199.90"
+                        value={form.open_date_price} min="0" step="0.01"
+                        onChange={e => set("open_date_price", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">
+                        Vagas por dia <span className="text-gray-400 font-normal">(0 = ilimitado)</span>
+                      </label>
+                      <input type="number" className="input-field text-sm" placeholder="0"
+                        value={form.open_date_spots_per_day} min="0"
+                        onChange={e => set("open_date_spots_per_day", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Antecedência mínima (dias)</label>
+                      <input type="number" className="input-field text-sm" value={form.open_date_min_advance}
+                        min="0" onChange={e => set("open_date_min_advance", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Disponível até (dias à frente)</label>
+                      <input type="number" className="input-field text-sm" value={form.open_date_max_advance}
+                        min="1" max="730" onChange={e => set("open_date_max_advance", e.target.value)} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-navy-600 bg-white rounded-xl px-3 py-2 border border-navy-100">
+                    ✅ O sistema vai gerar automaticamente todas as datas até <strong>{form.open_date_max_advance || 180} dias</strong> à frente ao salvar.
+                    A cada deploy, datas futuras são renovadas automaticamente.
+                  </p>
+                </div>
+              )}
             </div>
           </Section>
 

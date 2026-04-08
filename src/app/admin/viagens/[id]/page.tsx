@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Plus, Pencil, EyeOff, RefreshCw, Calendar, Users,
-  MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List,
+  MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List, Layers,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -125,6 +125,230 @@ function HideModal({ date, onClose, onConfirm, loading }: {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Modal Gerar datas em lote ─────────────────────────────────────────── */
+const WEEK_DAYS = [
+  { label: "Seg", value: 0 }, { label: "Ter", value: 1 }, { label: "Qua", value: 2 },
+  { label: "Qui", value: 3 }, { label: "Sex", value: 4 }, { label: "Sáb", value: 5 }, { label: "Dom", value: 6 },
+];
+
+function BulkModal({ templateId, onClose, onDone }: {
+  templateId: number; onClose: () => void; onDone: () => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState("");
+  const [selectedDays, setSelectedDays] = useState<number[]>([]); // vazio = todos
+  const [price, setPrice] = useState("");
+  const [originalPrice, setOriginalPrice] = useState("");
+  const [spots, setSpots] = useState("40");
+  const [maxInstallments, setMaxInstallments] = useState("12");
+  const [skipExisting, setSkipExisting] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [error, setError] = useState("");
+
+  // Preview: quantas datas serão criadas
+  const previewCount = (() => {
+    if (!startDate || !endDate) return 0;
+    const s = new Date(startDate + "T12:00:00");
+    const e = new Date(endDate + "T12:00:00");
+    if (e < s) return 0;
+    let count = 0;
+    const cur = new Date(s);
+    while (cur <= e) {
+      const wd = (cur.getDay() + 6) % 7; // JS: 0=Dom → Python: 0=Seg
+      if (selectedDays.length === 0 || selectedDays.includes(wd)) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  })();
+
+  const toggleDay = (d: number) =>
+    setSelectedDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+
+  const handleSubmit = async () => {
+    if (!endDate) { setError("Informe a data de fim."); return; }
+    if (!price || parseFloat(price) <= 0) { setError("Informe o preço por pessoa."); return; }
+    setError(""); setLoading(true);
+    try {
+      const res = await apiFetch(`/templates/${templateId}/bulk-trips`, {
+        method: "POST",
+        body: JSON.stringify({
+          start_date: startDate,
+          end_date: endDate,
+          days_of_week: selectedDays,
+          price_per_person: parseFloat(price),
+          original_price: originalPrice ? parseFloat(originalPrice) : null,
+          max_installments: parseInt(maxInstallments),
+          total_spots: parseInt(spots),
+          available_spots: parseInt(spots),
+          skip_existing: skipExisting,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err.detail || "Erro ao gerar datas.");
+      } else {
+        const data = await res.json();
+        setResult(data);
+        onDone();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="font-black text-navy-800 text-base flex items-center gap-2">
+              <Layers size={16} className="text-navy-600" /> Gerar datas em lote
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">Ideal para roteiros com saídas diárias</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+          {result ? (
+            <div className="text-center py-6 space-y-3">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 size={32} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-lg font-black text-navy-800">{result.created} datas criadas!</p>
+                {result.skipped > 0 && (
+                  <p className="text-sm text-gray-400 mt-1">{result.skipped} datas já existiam e foram ignoradas.</p>
+                )}
+              </div>
+              <button onClick={onClose}
+                className="bg-navy-800 text-white font-semibold px-6 py-3 rounded-xl hover:bg-navy-700 transition-colors">
+                Fechar
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Período */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Período</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">De</label>
+                    <input type="date" className="input-field text-sm" value={startDate}
+                      min={today} onChange={e => setStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Até</label>
+                    <input type="date" className="input-field text-sm" value={endDate}
+                      min={startDate} onChange={e => setEndDate(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dias da semana */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                  Dias da semana <span className="text-gray-400 font-normal normal-case">(vazio = todos os dias)</span>
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {WEEK_DAYS.map(d => (
+                    <button key={d.value} type="button" onClick={() => toggleDay(d.value)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                        selectedDays.includes(d.value)
+                          ? "bg-navy-800 border-navy-800 text-white"
+                          : "border-gray-200 text-gray-600 hover:border-navy-300"
+                      }`}>
+                      {d.label}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => setSelectedDays([])}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold border-2 border-dashed border-gray-200 text-gray-400 hover:border-navy-300 transition-colors">
+                    Todos
+                  </button>
+                </div>
+              </div>
+
+              {/* Preço */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Preço</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Preço por pessoa *</label>
+                    <input type="number" className="input-field text-sm" placeholder="Ex: 199.90"
+                      value={price} min="0" step="0.01" onChange={e => setPrice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Preço original (opcional)</label>
+                    <input type="number" className="input-field text-sm" placeholder="Ex: 249.90"
+                      value={originalPrice} min="0" step="0.01" onChange={e => setOriginalPrice(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Vagas e parcelas */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Vagas por data</label>
+                  <input type="number" className="input-field text-sm" value={spots}
+                    min="1" onChange={e => setSpots(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Parcelas (máx)</label>
+                  <input type="number" className="input-field text-sm" value={maxInstallments}
+                    min="1" max="24" onChange={e => setMaxInstallments(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Opções */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-navy-700"
+                  checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} />
+                <span className="text-sm text-gray-600">Ignorar datas já cadastradas</span>
+              </label>
+
+              {error && (
+                <p className="text-sm text-red-500 flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> {error}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!result && (
+          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
+            {previewCount > 0 && (
+              <div className="bg-navy-50 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <span className="text-sm text-navy-700">Datas a criar</span>
+                <span className="text-lg font-black text-navy-800">{previewCount}</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={onClose}
+                className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+                Cancelar
+              </button>
+              <button onClick={handleSubmit} disabled={loading || previewCount === 0}
+                className="flex-1 bg-navy-800 text-white font-semibold py-3 rounded-xl hover:bg-navy-700 transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {loading ? <Loader2 size={15} className="animate-spin" /> : <Layers size={15} />}
+                {loading ? "Criando..." : `Criar ${previewCount > 0 ? previewCount : ""} datas`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -287,6 +511,7 @@ export default function TemplateDetailPage() {
   const [hideLoading, setHideLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // Carregar template
   useEffect(() => {
@@ -391,13 +616,18 @@ export default function TemplateDetailPage() {
         </div>
       </div>
 
-      {/* Ações — 2 botões */}
-      <div className="flex gap-2">
+      {/* Ações */}
+      <div className="flex flex-wrap gap-2">
         <Link href={`/admin/viagens/${templateId}/datas/nova`}
           className="flex items-center justify-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
           <Plus size={15} />
           <span>Nova data</span>
         </Link>
+        <button onClick={() => setBulkOpen(true)}
+          className="flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-emerald-500 transition-colors">
+          <Layers size={15} />
+          <span>Gerar em lote</span>
+        </button>
         <Link href={`/admin/viagens/${templateId}/editar`}
           className="flex items-center justify-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
           <Pencil size={15} />
@@ -538,6 +768,14 @@ export default function TemplateDetailPage() {
 
       {drawerOpen && template && (
         <TemplateDrawer template={template} onClose={() => setDrawerOpen(false)} />
+      )}
+
+      {bulkOpen && (
+        <BulkModal
+          templateId={templateId}
+          onClose={() => setBulkOpen(false)}
+          onDone={() => { fetchCounts(); fetchDates(); }}
+        />
       )}
     </div>
   );

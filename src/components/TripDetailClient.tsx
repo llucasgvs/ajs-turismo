@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -937,6 +937,246 @@ function DateSelector({
 }
 
 /* ═══════════════════════════════════════════
+   11b. Compact Date Selector (many dates — grouped by month)
+═══════════════════════════════════════════ */
+const COMPACT_THRESHOLD = 20; // acima disso usa o modo compacto
+
+function CompactDateSelector({
+  trips, selected, onSelect, hasError,
+}: {
+  trips: Trip[]; selected: Trip | null; onSelect: (t: Trip) => void; hasError: boolean;
+}) {
+  const MONTHS_INITIAL = 2;
+  const [shownMonths, setShownMonths] = useState(MONTHS_INITIAL);
+
+  // Agrupar por "YYYY-MM"
+  const grouped = trips.reduce<Record<string, Trip[]>>((acc, t) => {
+    const key = t.departure_date.slice(0, 7); // "2026-04"
+    (acc[key] ||= []).push(t);
+    return acc;
+  }, {});
+  const allMonthKeys = Object.keys(grouped).sort();
+  const visibleKeys = allMonthKeys.slice(0, shownMonths);
+  const remaining = allMonthKeys.length - shownMonths;
+
+  const fmtMonthLabel = (key: string) => {
+    const [y, m] = key.split("-");
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+  const fmtDay = (d: string) =>
+    new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
+  return (
+    <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{trips.length} datas disponíveis</p>
+        </div>
+        {hasError && (
+          <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
+            <AlertTriangle size={13} /> Selecione uma data
+          </span>
+        )}
+      </div>
+
+      <div className="px-4 pb-4 space-y-4">
+        {visibleKeys.map(monthKey => (
+          <div key={monthKey}>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 capitalize">
+              {fmtMonthLabel(monthKey)}
+            </p>
+            <div className="space-y-1.5">
+              {grouped[monthKey].map(t => {
+                const isSold = t.available_spots === 0 || t.status === "sold_out";
+                const isSelected = selected?.id === t.id;
+                const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
+                return (
+                  <button
+                    key={t.id}
+                    disabled={isSold}
+                    onClick={() => !isSold && onSelect(t)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-all text-left ${
+                      isSelected
+                        ? "border-navy-700 bg-navy-50"
+                        : isSold
+                        ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
+                        : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
+                    }`}
+                  >
+                    <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
+                    <span className={`flex-1 text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                      {fmtDay(t.departure_date)}
+                    </span>
+                    {isSold ? (
+                      <span className="text-xs text-gray-400 font-semibold">Esgotado</span>
+                    ) : (
+                      <>
+                        <span className={`text-sm font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
+                          R$ {fmtBRL(t.price_per_person)}
+                        </span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {isLow ? `⚠ ${t.available_spots}` : `${t.available_spots}`} vagas
+                        </span>
+                      </>
+                    )}
+                    {isSelected && (
+                      <span className="w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Check size={11} className="text-white" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {remaining > 0 && (
+          <button
+            type="button"
+            onClick={() => setShownMonths(v => v + 3)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-navy-300 text-navy-600 text-sm font-semibold hover:bg-navy-50 transition-colors"
+          >
+            <ChevronDown size={15} /> Ver mais {remaining} {remaining === 1 ? "mês" : "meses"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   11c. Open Date Calendar (saídas diárias)
+═══════════════════════════════════════════ */
+const WEEK_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function OpenDateCalendar({
+  trips, selected, onSelect, hasError, minAdvance, maxAdvance,
+}: {
+  trips: Trip[]; selected: Trip | null; onSelect: (t: Trip) => void;
+  hasError: boolean; minAdvance: number; maxAdvance: number;
+}) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const minDate = new Date(today); minDate.setDate(today.getDate() + minAdvance);
+  const maxDate = new Date(today); maxDate.setDate(today.getDate() + maxAdvance);
+
+  const [displayMonth, setDisplayMonth] = useState(() => new Date(minDate));
+
+  // Map: "YYYY-MM-DD" → Trip
+  const tripsByDate = useMemo(() => {
+    const map: Record<string, Trip> = {};
+    trips.forEach(t => { map[t.departure_date.slice(0, 10)] = t; });
+    return map;
+  }, [trips]);
+
+  const year = displayMonth.getFullYear();
+  const month = displayMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay(); // 0=Sun
+
+  const prevMonth = () => setDisplayMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const nextMonth = () => setDisplayMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+
+  const canPrev = new Date(year, month - 1 + 1, 0) >= minDate; // last day of prev month >= minDate
+  const canNext = new Date(year, month + 1, 1) <= maxDate;
+
+  const monthLabel = displayMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  return (
+    <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
+      {/* Header */}
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div>
+          <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
+          {selected ? (
+            <p className="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
+              <Check size={12} />
+              {new Date(selected.departure_date.slice(0, 10) + "T12:00:00")
+                .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-0.5">Bate e volta — selecione o dia que deseja ir</p>
+          )}
+        </div>
+        {hasError && (
+          <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
+            <AlertTriangle size={13} /> Selecione uma data
+          </span>
+        )}
+      </div>
+
+      {/* Month navigation */}
+      <div className="px-5 pb-2 flex items-center justify-between">
+        <button type="button" onClick={prevMonth} disabled={!canPrev}
+          className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 disabled:opacity-30 transition-colors">
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-bold text-navy-800 capitalize">{monthLabel}</span>
+        <button type="button" onClick={nextMonth} disabled={!canNext}
+          className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 disabled:opacity-30 transition-colors">
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 px-3 mb-1">
+        {WEEK_LABELS.map(d => (
+          <div key={d} className="text-[10px] font-bold text-gray-400 text-center py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-0.5 px-3 pb-5">
+        {/* Empty offset cells */}
+        {Array.from({ length: firstWeekday }).map((_, i) => (
+          <div key={`e-${i}`} />
+        ))}
+        {/* Day cells */}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+          const d = new Date(year, month, day); d.setHours(0, 0, 0, 0);
+          const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const trip = tripsByDate[key];
+          const isPast = d < minDate;
+          const isBeyond = d > maxDate;
+          const isSold = trip?.available_spots === 0 || trip?.status === "sold_out";
+          const isUnavailable = isPast || isBeyond || !trip || isSold;
+          const isSelected = selected?.departure_date.slice(0, 10) === key;
+          const isToday = d.getTime() === today.getTime();
+
+          return (
+            <button key={day} type="button"
+              disabled={isUnavailable}
+              onClick={() => trip && !isUnavailable && onSelect(trip)}
+              className={`aspect-square flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+                isSelected
+                  ? "bg-navy-700 text-white shadow-md"
+                  : isUnavailable
+                  ? "text-gray-300 cursor-not-allowed"
+                  : isToday
+                  ? "border-2 border-navy-300 text-navy-700 hover:bg-navy-50"
+                  : "text-navy-800 hover:bg-navy-50 hover:text-navy-700"
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Price hint */}
+      {trips.length > 0 && (
+        <div className="px-5 pb-4 text-center text-xs text-gray-400">
+          R$ {fmtBRL(trips[0].price_per_person)} por pessoa · Bate e volta
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    12. Main Component
 ═══════════════════════════════════════════ */
 export default function TripDetailClient({ trip }: { trip: Trip }) {
@@ -1003,7 +1243,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   // Load all dates for same template
   useEffect(() => {
     if (!trip.template_id) return;
-    fetch(`${API}/trips/?template_id=${trip.template_id}&limit=50`)
+    fetch(`${API}/trips/?template_id=${trip.template_id}&limit=500&future_only=true`)
       .then(r => r.json())
       .then((data: Trip[]) => {
         if (!Array.isArray(data) || data.length === 0) return;
@@ -1163,12 +1403,30 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           {/* Date Selector — mobile: before key info; desktop: in right sidebar */}
           {siblingTrips.length > 0 && (
             <div className="mb-6 lg:hidden">
-              <DateSelector
-                trips={siblingTrips}
-                selected={selectedTrip}
-                onSelect={handleSelectDate}
-                hasError={dateError}
-              />
+              {trip.is_open_date ? (
+                <OpenDateCalendar
+                  trips={siblingTrips}
+                  selected={selectedTrip}
+                  onSelect={handleSelectDate}
+                  hasError={dateError}
+                  minAdvance={trip.open_date_min_advance}
+                  maxAdvance={trip.open_date_max_advance}
+                />
+              ) : siblingTrips.length >= COMPACT_THRESHOLD ? (
+                <CompactDateSelector
+                  trips={siblingTrips}
+                  selected={selectedTrip}
+                  onSelect={handleSelectDate}
+                  hasError={dateError}
+                />
+              ) : (
+                <DateSelector
+                  trips={siblingTrips}
+                  selected={selectedTrip}
+                  onSelect={handleSelectDate}
+                  hasError={dateError}
+                />
+              )}
             </div>
           )}
 
@@ -1494,11 +1752,16 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                             <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
                           )}
                         </div>
-                        {siblingTrips.length > 1 && (
+                        {siblingTrips.length > 1 && !trip.is_open_date && (
                           <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
                             {showDatePicker
                               ? <><ChevronUp size={14}/> Fechar</>
                               : <><ChevronDown size={14}/> Trocar</>}
+                          </span>
+                        )}
+                        {trip.is_open_date && (
+                          <span className="text-xs text-navy-500 font-semibold flex items-center gap-1 flex-shrink-0">
+                            <Calendar size={12}/> Alterar
                           </span>
                         )}
                       </button>
@@ -1516,14 +1779,32 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                               maxHeight: `calc(100vh - ${dropdownPos.top}px - 24px)`,
                             }}
                           >
-                            <DateSelector
-                              trips={siblingTrips}
-                              selected={selectedTrip}
-                              onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
-                              hasError={dateError}
-                              sidebar
-                              forceExpanded
-                            />
+                            {trip.is_open_date ? (
+                              <OpenDateCalendar
+                                trips={siblingTrips}
+                                selected={selectedTrip}
+                                onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
+                                hasError={dateError}
+                                minAdvance={trip.open_date_min_advance}
+                                maxAdvance={trip.open_date_max_advance}
+                              />
+                            ) : siblingTrips.length >= COMPACT_THRESHOLD ? (
+                              <CompactDateSelector
+                                trips={siblingTrips}
+                                selected={selectedTrip}
+                                onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
+                                hasError={dateError}
+                              />
+                            ) : (
+                              <DateSelector
+                                trips={siblingTrips}
+                                selected={selectedTrip}
+                                onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
+                                hasError={dateError}
+                                sidebar
+                                forceExpanded
+                              />
+                            )}
                           </div>
                         </>
                       )}

@@ -21,6 +21,11 @@ export interface Trip {
   optionals: { name: string; price: number }[];
   itinerary: { day: number; title: string; description: string }[];
   required_documents: string | null;
+  is_open_date: boolean;
+  open_date_price: number | null;
+  open_date_spots_per_day: number;
+  open_date_min_advance: number;
+  open_date_max_advance: number;
   category: string;
   tag: string | null;
   status: string;
