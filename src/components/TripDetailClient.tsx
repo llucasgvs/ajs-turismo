@@ -1443,30 +1443,47 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             <div className="lg:col-span-2 space-y-6">
               {/* Key info — uses activeTrip so it updates with date selection */}
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-gray-100 sm:divide-y-0 sm:divide-x sm:divide-gray-100">
-                  <div className="p-5">
-                    <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
-                      value={selectedTrip
-                        ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                        : "—"} />
+                {trip.is_open_date ? (
+                  /* Open date: 3 colunas — Saída (hora), Retorno (hora), Duração */
+                  <div className="grid grid-cols-3 divide-x divide-gray-100">
+                    <div className="p-5">
+                      <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Saída"
+                        value={selectedTrip ? fmtTimeSP(activeTrip.departure_date) : "—"} />
+                    </div>
+                    <div className="p-5">
+                      <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Retorno"
+                        value={selectedTrip ? fmtTimeSP(activeTrip.return_date) : "—"} />
+                    </div>
+                    <div className="p-5">
+                      <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Duração"
+                        value="Bate e volta" />
+                    </div>
                   </div>
-                  <div className="p-5">
-                    <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
-                      value={selectedTrip
-                        ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                        : "—"} />
-                  </div>
-                  <div className="p-5">
-                    <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
-                      value={(() => {
-                        const nights = activeTrip.duration_nights;
-                        if (nights === 0) return "Bate e volta";
-                        const days = calcDays(nights, activeTrip.departure_date);
-                        if (nights === 1) return `${days} dia / ${nights} noite`;
-                        return `${days} dias / ${nights} noites`;
-                      })()} />
-                  </div>
-                  {!trip.is_open_date && (
+                ) : (
+                  /* Viagem normal: 4 colunas */
+                  <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-gray-100 sm:divide-y-0 sm:divide-x sm:divide-gray-100">
+                    <div className="p-5">
+                      <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
+                        value={selectedTrip
+                          ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                          : "—"} />
+                    </div>
+                    <div className="p-5">
+                      <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
+                        value={selectedTrip
+                          ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                          : "—"} />
+                    </div>
+                    <div className="p-5">
+                      <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
+                        value={(() => {
+                          const nights = activeTrip.duration_nights;
+                          if (nights === 0) return "Bate e volta";
+                          const days = calcDays(nights, activeTrip.departure_date);
+                          if (nights === 1) return `${days} dia / ${nights} noite`;
+                          return `${days} dias / ${nights} noites`;
+                        })()} />
+                    </div>
                     <div className="p-5">
                       <InfoStat
                         icon={<Users size={16} className="text-gold-500" />}
@@ -1475,8 +1492,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Description */}

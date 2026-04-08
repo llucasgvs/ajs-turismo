@@ -56,6 +56,7 @@ interface PublicTemplate {
   category: string;
   tag: string | null;
   is_featured: boolean;
+  is_open_date: boolean;
   short_description: string | null;
   includes: string[];
   price_from: number;
@@ -531,32 +532,41 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
 
         {/* Datas disponíveis */}
         <div className="mb-3">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Datas disponíveis</p>
-          <div className="space-y-1">
-            {shownDates.map((d) => {
-              const isSoldOut = d.status === "sold_out";
-              const isHighlighted = (highlightDate && d.departure_date.slice(0, 10) === highlightDate) ||
-                                    (highlightMonth && d.departure_date.slice(0, 7) === highlightMonth);
-              return (
-                <div key={d.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
-                  isHighlighted ? "bg-gold-50 border border-gold-200" :
-                  isSoldOut ? "bg-gray-50 opacity-60" : "bg-gray-50"
-                }`}>
-                  <span className={`font-semibold ${isSoldOut ? "text-gray-400" : "text-navy-800"}`}>
-                    {fmtDate(d.departure_date)} → {fmtDate(d.return_date)}
-                  </span>
-                  {isSoldOut ? (
-                    <span className="text-red-400 font-bold text-[10px]">Esgotado</span>
-                  ) : (
-                    <span className="font-bold text-gold-600">R$ {fmtBRL(d.price_per_person)}</span>
-                  )}
-                </div>
-              );
-            })}
-            {extraDates > 0 && (
-              <p className="text-xs text-navy-500 font-semibold px-1">+{extraDates} data{extraDates > 1 ? "s" : ""} disponíve{extraDates > 1 ? "is" : "l"}</p>
-            )}
-          </div>
+          {tmpl.is_open_date ? (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-emerald-700">Saídas todos os dias</span>
+            </div>
+          ) : (
+            <>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Datas disponíveis</p>
+              <div className="space-y-1">
+                {shownDates.map((d) => {
+                  const isSoldOut = d.status === "sold_out";
+                  const isHighlighted = (highlightDate && d.departure_date.slice(0, 10) === highlightDate) ||
+                                        (highlightMonth && d.departure_date.slice(0, 7) === highlightMonth);
+                  return (
+                    <div key={d.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
+                      isHighlighted ? "bg-gold-50 border border-gold-200" :
+                      isSoldOut ? "bg-gray-50 opacity-60" : "bg-gray-50"
+                    }`}>
+                      <span className={`font-semibold ${isSoldOut ? "text-gray-400" : "text-navy-800"}`}>
+                        {fmtDate(d.departure_date)} → {fmtDate(d.return_date)}
+                      </span>
+                      {isSoldOut ? (
+                        <span className="text-red-400 font-bold text-[10px]">Esgotado</span>
+                      ) : (
+                        <span className="font-bold text-gold-600">R$ {fmtBRL(d.price_per_person)}</span>
+                      )}
+                    </div>
+                  );
+                })}
+                {extraDates > 0 && (
+                  <p className="text-xs text-navy-500 font-semibold px-1">+{extraDates} data{extraDates > 1 ? "s" : ""} disponíve{extraDates > 1 ? "is" : "l"}</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer: price + CTA */}

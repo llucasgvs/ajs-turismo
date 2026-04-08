@@ -23,6 +23,7 @@ interface PublicTemplate {
   image_url: string | null;
   tag: string | null;
   is_featured: boolean;
+  is_open_date: boolean;
   short_description: string | null;
   includes: string[];
   price_from: number;
@@ -121,24 +122,31 @@ export default function FeaturedPackages() {
                     ))}
                   </ul>
 
-                  {/* Próximas datas */}
-                  {nextDates.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Próximas saídas</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {nextDates.map((d) => (
-                          <span key={d.id} className="inline-flex items-center gap-1 bg-navy-50 text-navy-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                            <Calendar size={9} /> {fmtDate(d.departure_date)}
-                          </span>
-                        ))}
-                        {pkg.dates.filter((d) => d.status === "active").length > 2 && (
-                          <span className="text-xs text-gold-600 font-semibold px-1 py-1">
-                            +{pkg.dates.filter((d) => d.status === "active").length - 2} datas
-                          </span>
-                        )}
+                  {/* Próximas datas / saídas */}
+                  <div className="mb-4">
+                    {pkg.is_open_date ? (
+                      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-emerald-700">Saídas todos os dias</span>
                       </div>
-                    </div>
-                  )}
+                    ) : nextDates.length > 0 && (
+                      <>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Próximas saídas</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {nextDates.map((d) => (
+                            <span key={d.id} className="inline-flex items-center gap-1 bg-navy-50 text-navy-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                              <Calendar size={9} /> {fmtDate(d.departure_date)}
+                            </span>
+                          ))}
+                          {pkg.dates.filter((d) => d.status === "active").length > 2 && (
+                            <span className="text-xs text-gold-600 font-semibold px-1 py-1">
+                              +{pkg.dates.filter((d) => d.status === "active").length - 2} datas
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {/* Price + CTA */}
                   <div className="border-t border-gray-100 pt-4">
