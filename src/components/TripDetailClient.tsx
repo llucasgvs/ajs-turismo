@@ -135,12 +135,15 @@ function getHighlights(trip: Trip): HL[] {
   const text = (trip.description || "").toLowerCase();
   if (!text.trim()) return [];
 
+  // Match whole words only to avoid "mar" inside "marcante", etc.
+  const hasWord = (k: string) => new RegExp(`(?<![a-záàãâéêíóôõúüç])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-záàãâéêíóôõúüç])`).test(text);
+
   const seen = new Set<string>();
   const result: HL[] = [];
 
   for (const rule of DESC_RULES) {
     if (result.length >= 4) break;
-    if (rule.keys.some(k => text.includes(k)) && !seen.has(rule.label)) {
+    if (rule.keys.some(k => k.includes(" ") ? text.includes(k) : hasWord(k)) && !seen.has(rule.label)) {
       seen.add(rule.label);
       result.push({ icon: rule.icon, label: rule.label, sub: rule.sub });
     }
