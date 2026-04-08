@@ -1386,9 +1386,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="space-y-4">
+              <div className="space-y-4 sticky top-20">
 
-                {/* Date Selector — desktop sidebar (not sticky, scrolls normally) */}
+                {/* Date Selector — desktop sidebar */}
                 {siblingTrips.length > 0 && (
                   <DateSelector
                     trips={siblingTrips}
@@ -1399,8 +1399,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                   />
                 )}
 
-                {/* Price card — sticky so it's always visible */}
-                <div className="sticky top-20 space-y-4">
+                <div className="space-y-4">
                 <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
                   {!selectedTrip && siblingTrips.length > 1 ? (
                     <p className="text-sm text-gray-400 text-center py-2">Selecione uma data para ver o preço</p>
@@ -1474,7 +1473,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     Falar agora
                   </a>
                 </div>
-                </div>{/* end sticky */}
+                </div>
               </div>
             </div>
           </div>
