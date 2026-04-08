@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight,
+  MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   ArrowLeft, Phone, User, CreditCard, Cake, Share2, AlertTriangle,
   Shield, Headphones, Award, Camera, Sun, Mountain, Waves,
   TreePine, Globe, Plane, Utensils, CheckCheck, Star,
@@ -764,6 +764,8 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
+const DATE_INITIAL = 4;
+
 function DateSelector({
   trips, selected, onSelect, hasError, sidebar = false,
 }: {
@@ -773,7 +775,16 @@ function DateSelector({
   hasError: boolean;
   sidebar?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (trips.length === 0) return null;
+
+  const selectedIdx = selected ? trips.findIndex(t => t.id === selected.id) : -1;
+  const needsExpand = trips.length > DATE_INITIAL;
+  // If selected date is beyond initial view, auto-expand
+  const forceExpand = selectedIdx >= DATE_INITIAL;
+  const showAll = expanded || forceExpand;
+  const visible = showAll ? trips : trips.slice(0, DATE_INITIAL);
+  const hidden = trips.length - DATE_INITIAL;
 
   return (
     <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
@@ -789,10 +800,9 @@ function DateSelector({
         )}
       </div>
 
-      {/* Scrollable date list */}
-      <div className="px-4 pb-4 max-h-[300px] sm:max-h-[380px] overflow-y-auto overscroll-contain date-scroll">
-        <div className={`grid gap-3 pb-1 ${sidebar ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
-        {trips.map((t) => {
+      <div className="px-4 pb-4">
+        <div className={`grid gap-3 ${sidebar ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+        {visible.map((t) => {
           const isSold = t.available_spots === 0 || t.status === "sold_out";
           const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
           const isSelected = selected?.id === t.id;
@@ -871,6 +881,24 @@ function DateSelector({
           );
         })}
         </div>
+
+        {needsExpand && (
+          <button
+            type="button"
+            onClick={() => setExpanded(v => !v)}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-navy-300 text-navy-600 text-sm font-semibold hover:bg-navy-50 transition-colors"
+          >
+            {showAll ? (
+              <>
+                <ChevronUp size={15} /> Mostrar menos
+              </>
+            ) : (
+              <>
+                <ChevronDown size={15} /> Ver mais {hidden} data{hidden !== 1 ? "s" : ""}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
