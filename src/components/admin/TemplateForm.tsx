@@ -34,6 +34,8 @@ interface TemplateFormData {
   open_date_spots_per_day: string;
   open_date_min_advance: string;
   open_date_max_advance: string;
+  open_date_departure_time: string; // "HH:MM"
+  open_date_return_time: string;    // "HH:MM"
 }
 
 const EMPTY: TemplateFormData = {
@@ -43,6 +45,7 @@ const EMPTY: TemplateFormData = {
   is_featured: false, is_active: true,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
+  open_date_departure_time: "06:00", open_date_return_time: "23:59",
 };
 
 export default function TemplateForm({
@@ -66,6 +69,19 @@ export default function TemplateForm({
     open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
     open_date_min_advance: String((initialData as Record<string, unknown>)?.open_date_min_advance ?? "1"),
     open_date_max_advance: String((initialData as Record<string, unknown>)?.open_date_max_advance ?? "180"),
+    // normaliza hour/minute → "HH:MM"
+    open_date_departure_time: (() => {
+      const d = initialData as Record<string, unknown>;
+      const h = d?.open_date_departure_hour != null ? Number(d.open_date_departure_hour) : 6;
+      const m = d?.open_date_departure_minute != null ? Number(d.open_date_departure_minute) : 0;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    })(),
+    open_date_return_time: (() => {
+      const d = initialData as Record<string, unknown>;
+      const h = d?.open_date_return_hour != null ? Number(d.open_date_return_hour) : 23;
+      const m = d?.open_date_return_minute != null ? Number(d.open_date_return_minute) : 59;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    })(),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -123,6 +139,11 @@ export default function TemplateForm({
           open_date_spots_per_day: parseInt(form.open_date_spots_per_day) || 0,
           open_date_min_advance: parseInt(form.open_date_min_advance) || 1,
           open_date_max_advance: parseInt(form.open_date_max_advance) || 180,
+          // converte "HH:MM" → hora e minuto inteiros
+          open_date_departure_hour: parseInt(form.open_date_departure_time.split(":")[0] ?? "6") || 6,
+          open_date_departure_minute: parseInt(form.open_date_departure_time.split(":")[1] ?? "0") || 0,
+          open_date_return_hour: parseInt(form.open_date_return_time.split(":")[0] ?? "23") || 23,
+          open_date_return_minute: parseInt(form.open_date_return_time.split(":")[1] ?? "59") || 59,
         }) }
       );
       const data = await res.json();
@@ -275,6 +296,18 @@ export default function TemplateForm({
                       <label className="text-xs text-gray-500 font-semibold mb-1 block">Disponível até (dias à frente)</label>
                       <input type="number" className="input-field text-sm" value={form.open_date_max_advance}
                         min="1" max="730" onChange={e => set("open_date_max_advance", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Horário de saída</label>
+                      <input type="time" className="input-field text-sm" value={form.open_date_departure_time}
+                        onChange={e => set("open_date_departure_time", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Horário de retorno</label>
+                      <input type="time" className="input-field text-sm" value={form.open_date_return_time}
+                        onChange={e => set("open_date_return_time", e.target.value)} />
                     </div>
                   </div>
                   <p className="text-xs text-navy-600 bg-white rounded-xl px-3 py-2 border border-navy-100">
