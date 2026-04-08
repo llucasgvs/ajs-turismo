@@ -1189,8 +1189,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               {/* Description */}
               {trip.description && <DescriptionBlock description={trip.description} />}
 
-              {/* Destination Highlights */}
-              <DestinationHighlights trip={trip} />
+              {/* Destination Highlights — hidden on mobile */}
+              <div className="hidden sm:block">
+                <DestinationHighlights trip={trip} />
+              </div>
 
               {/* Includes / Excludes */}
               {(trip.includes?.length > 0 || trip.excludes?.length > 0) && (
