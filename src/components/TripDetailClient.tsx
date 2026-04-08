@@ -112,45 +112,38 @@ function buildWhatsAppMessage(
   return msg;
 }
 
-/* ─── destination highlights ─── */
+/* ─── destination highlights — derived from trip.includes ─── */
 type HL = { icon: React.ElementType; label: string; sub: string };
+
+const INCLUDE_RULES: { keys: string[]; icon: React.ElementType; label: string; sub: string }[] = [
+  { keys: ["hotel", "hospedagem", "hosped", "pousada", "resort", "acomodaç", "quarto"], icon: Mountain, label: "Hospedagem", sub: "Incluso no pacote" },
+  { keys: ["ônibus", "onibus", "transfer", "transporte", "van", "micro", "veículo", "veiculo"], icon: Globe, label: "Transporte", sub: "Incluso no pacote" },
+  { keys: ["café", "cafe", "café da manhã", "refeição", "refeicao", "jantar", "almoço", "almoco", "pensão", "pensao", "alimentaç"], icon: Utensils, label: "Refeições", sub: "Incluso no pacote" },
+  { keys: ["guia", "acompanhante", "monitor"], icon: Users, label: "Guia turístico", sub: "Incluso no pacote" },
+  { keys: ["ingresso", "entrada", "bilhete", "acesso", "ticket"], icon: Camera, label: "Ingressos", sub: "Incluso no pacote" },
+  { keys: ["passeio", "excursão", "excursao", "tour", "city tour", "visita"], icon: MapPin, label: "Passeios", sub: "Incluso no pacote" },
+  { keys: ["seguro", "assistência", "assistencia"], icon: Shield, label: "Seguro viagem", sub: "Incluso no pacote" },
+  { keys: ["aéreo", "aereo", "passagem", "voo", "avião", "aviao"], icon: Plane, label: "Passagem aérea", sub: "Incluso no pacote" },
+  { keys: ["parque", "aquático", "aquatico", "temático", "tematico", "cataratas", "beto carrero", "caldas novas"], icon: Sun, label: "Parques", sub: "Incluso no pacote" },
+  { keys: ["cruzeiro", "barco", "lancha", "embarque", "navio"], icon: Waves, label: "Passeio náutico", sub: "Incluso no pacote" },
+  { keys: ["trilha", "cachoeira", "rapel", "tirolesa", "rafting"], icon: TreePine, label: "Ecoturismo", sub: "Incluso no pacote" },
+];
+
 function getHighlights(trip: Trip): HL[] {
-  const cat = (trip.category || "").toLowerCase();
-  const dest = (trip.destination || "").toLowerCase();
-  if (cat === "praia" || ["maceió", "fortaleza", "natal", "maceio", "florianópolis", "florianopolis", "ilhéus"].some(k => dest.includes(k)))
-    return [
-      { icon: Waves, label: "Praias", sub: "Água cristalina" },
-      { icon: Sun, label: "Clima", sub: "Sol e calor" },
-      { icon: Utensils, label: "Gastronomia", sub: "Frutos do mar" },
-      { icon: Camera, label: "Paisagens", sub: "Vistas únicas" },
-    ];
-  if (cat === "serra" || ["gramado", "canela", "campos do jordão", "petrópolis", "petropolis"].some(k => dest.includes(k)))
-    return [
-      { icon: Mountain, label: "Montanhas", sub: "Paisagens verdes" },
-      { icon: TreePine, label: "Natureza", sub: "Trilhas e parques" },
-      { icon: Utensils, label: "Gastronomia", sub: "Chocolate e fondue" },
-      { icon: Camera, label: "Arquitetura", sub: "Estilo europeu" },
-    ];
-  if (cat === "internacional")
-    return [
-      { icon: Globe, label: "Cultura", sub: "Experiência única" },
-      { icon: Utensils, label: "Gastronomia", sub: "Culinária local" },
-      { icon: Camera, label: "Turismo", sub: "Pontos icônicos" },
-      { icon: Plane, label: "Destino", sub: "Internacional" },
-    ];
-  if (cat === "aventura")
-    return [
-      { icon: Mountain, label: "Aventura", sub: "Adrenalina garantida" },
-      { icon: TreePine, label: "Ecoturismo", sub: "Contato com natureza" },
-      { icon: Waves, label: "Atividades", sub: "Esportes radicais" },
-      { icon: Camera, label: "Experiência", sub: "Inesquecível" },
-    ];
-  return [
-    { icon: Sun, label: "Clima", sub: "Temperatura agradável" },
-    { icon: Utensils, label: "Gastronomia", sub: "Culinária regional" },
-    { icon: Camera, label: "Turismo", sub: "Pontos históricos" },
-    { icon: Globe, label: "Cultura", sub: "História e tradição" },
-  ];
+  const text = (trip.includes || []).join(" ").toLowerCase();
+  if (!text.trim()) return [];
+
+  const seen = new Set<string>();
+  const result: HL[] = [];
+
+  for (const rule of INCLUDE_RULES) {
+    if (result.length >= 4) break;
+    if (rule.keys.some(k => text.includes(k)) && !seen.has(rule.label)) {
+      seen.add(rule.label);
+      result.push({ icon: rule.icon, label: rule.label, sub: rule.sub });
+    }
+  }
+  return result;
 }
 
 /* ═══════════════════════════════════════════
@@ -334,9 +327,10 @@ function TrustBlock({ maxInstallments }: { maxInstallments: number }) {
 ═══════════════════════════════════════════ */
 function DestinationHighlights({ trip }: { trip: Trip }) {
   const highlights = getHighlights(trip);
+  if (highlights.length === 0) return null;
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm">
-      <h3 className="font-display font-black text-lg text-navy-800 mb-5">O que você vai encontrar</h3>
+      <h3 className="font-display font-black text-lg text-navy-800 mb-5">O que está incluso</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {highlights.map(({ icon: Icon, label, sub }) => (
           <div key={label} className="flex flex-col items-center text-center gap-2 p-4 bg-gray-50 rounded-xl">
