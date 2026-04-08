@@ -1184,29 +1184,39 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             {/* ── Left column ── */}
             <div className="lg:col-span-2 space-y-6">
               {/* Key info — uses activeTrip so it updates with date selection */}
-              <div className="bg-white rounded-2xl p-5 grid grid-cols-2 gap-4 shadow-sm">
-                <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
-                  value={selectedTrip
-                    ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                    : "—"} />
-                <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
-                  value={selectedTrip
-                    ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                    : "—"} />
-                <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
-                  value={(() => {
-                    const nights = activeTrip.duration_nights;
-                    if (nights === 0) return "Bate e volta";
-                    const days = calcDays(nights, activeTrip.departure_date);
-                    if (nights === 1) return `${days} dia / ${nights} noite`;
-                    return `${days} dias / ${nights} noites`;
-                  })()} />
-                <InfoStat
-                  icon={<Users size={16} className="text-gold-500" />}
-                  label="Vagas"
-                  value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
-                  valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
-                />
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-gray-100 sm:divide-y-0 sm:divide-x sm:divide-gray-100">
+                  <div className="p-5">
+                    <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
+                      value={selectedTrip
+                        ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                        : "—"} />
+                  </div>
+                  <div className="p-5">
+                    <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
+                      value={selectedTrip
+                        ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                        : "—"} />
+                  </div>
+                  <div className="p-5">
+                    <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
+                      value={(() => {
+                        const nights = activeTrip.duration_nights;
+                        if (nights === 0) return "Bate e volta";
+                        const days = calcDays(nights, activeTrip.departure_date);
+                        if (nights === 1) return `${days} dia / ${nights} noite`;
+                        return `${days} dias / ${nights} noites`;
+                      })()} />
+                  </div>
+                  <div className="p-5">
+                    <InfoStat
+                      icon={<Users size={16} className="text-gold-500" />}
+                      label="Vagas"
+                      value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
+                      valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Description */}
