@@ -656,9 +656,11 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                       }`}>
                         {isSelected && <Check size={11} className="text-white" />}
                       </span>
-                      <span className="flex-1 text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
-                      <span className={`text-sm font-black flex-shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`}>
-                        + R$ {fmtBRL(opt.price)}
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
+                        <span className={`inline-flex items-center mt-1 text-xs font-black px-2 py-0.5 rounded-full ${isSelected ? "bg-amber-200 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                          + R$ {fmtBRL(opt.price)}/pessoa
+                        </span>
                       </span>
                     </button>
                   );
@@ -1262,10 +1264,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                           </span>
                           <span className="flex-1 min-w-0">
                             <span className="block text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
-                            <span className="block sm:hidden text-xs font-black text-amber-600 mt-0.5">+ R$ {fmtBRL(opt.price)}/pessoa</span>
-                          </span>
-                          <span className="hidden sm:block text-sm font-black text-amber-600 flex-shrink-0">
-                            + R$ {fmtBRL(opt.price)}<span className="text-xs font-normal text-gray-400">/pessoa</span>
+                            <span className={`inline-flex items-center mt-1 text-xs font-black px-2 py-0.5 rounded-full ${isSelected ? "bg-amber-200 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                              + R$ {fmtBRL(opt.price)}/pessoa
+                            </span>
                           </span>
                         </button>
                       );
