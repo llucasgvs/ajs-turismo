@@ -335,7 +335,7 @@ function DestinationHighlights({ trip }: { trip: Trip }) {
   if (highlights.length === 0) return null;
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm">
-      <h3 className="font-display font-black text-lg text-navy-800 mb-5">O que está incluso</h3>
+      <h3 className="font-display font-black text-lg text-navy-800 mb-5">Destaques do destino</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {highlights.map(({ icon: Icon, label, sub }) => (
           <div key={label} className="flex flex-col items-center text-center gap-2 p-4 bg-gray-50 rounded-xl">
