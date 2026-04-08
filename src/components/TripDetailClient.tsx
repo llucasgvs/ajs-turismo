@@ -517,9 +517,10 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
 /* ═══════════════════════════════════════════
    10. Booking Modal
 ═══════════════════════════════════════════ */
-function BookingModal({ trip, user, onClose, selectedOptionals }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[] }) {
+function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>(initialOptionals);
   const [fullName, setFullName] = useState(user.full_name || "");
   const [phone, setPhone] = useState(user.phone || "");
   const [cpf, setCpf] = useState(user.cpf || "");
@@ -629,6 +630,40 @@ function BookingModal({ trip, user, onClose, selectedOptionals }: { trip: Trip; 
                 className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
             </div>
           </div>
+
+          {trip.optionals?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+                <span className="text-amber-500">✨</span> Serviços opcionais
+                <span className="font-normal text-gray-400">(por pessoa)</span>
+              </p>
+              <div className="space-y-2">
+                {trip.optionals.map((opt, i) => {
+                  const isSelected = selectedOptionals.some(o => o.name === opt.name);
+                  return (
+                    <button key={i} type="button"
+                      onClick={() => setSelectedOptionals(prev =>
+                        isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
+                      )}
+                      className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 py-3 transition-all text-left active:scale-[0.98] ${
+                        isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300"
+                      }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
+                      }`}>
+                        {isSelected && <Check size={11} className="text-white" />}
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
+                      <span className={`text-sm font-black flex-shrink-0 ${isSelected ? "text-amber-600" : "text-gray-500"}`}>
+                        + R$ {fmtBRL(opt.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="bg-navy-50 rounded-xl p-4 space-y-3">
             <p className="text-xs font-bold text-navy-700 uppercase tracking-wide">Seus dados (titular)</p>
@@ -1143,12 +1178,12 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
               {/* Opcionais */}
               {trip.optionals?.length > 0 && (
-                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                  <h3 className="font-display font-bold text-navy-800 mb-1 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-sm">✨</span>
+                <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm">
+                  <h3 className="font-display font-bold text-navy-800 mb-1 flex items-center gap-2 text-base">
+                    <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-sm flex-shrink-0">✨</span>
                     Serviços Opcionais
                   </h3>
-                  <p className="text-xs text-gray-400 mb-4">Selecione os extras que deseja adicionar à sua viagem. O valor é por pessoa.</p>
+                  <p className="text-xs text-gray-400 mb-3">Selecione os extras que deseja. O valor é por pessoa.</p>
                   <div className="space-y-2">
                     {trip.optionals.map((opt, i) => {
                       const isSelected = selectedOptionals.some(o => o.name === opt.name);
@@ -1157,14 +1192,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                           key={i}
                           type="button"
                           onClick={() => setSelectedOptionals(prev =>
-                            isSelected
-                              ? prev.filter(o => o.name !== opt.name)
-                              : [...prev, opt]
+                            isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
                           )}
-                          className={`w-full flex items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all text-left ${
-                            isSelected
-                              ? "border-amber-400 bg-amber-50"
-                              : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
+                          className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 sm:px-4 py-3.5 transition-all text-left active:scale-[0.99] ${
+                            isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
                           }`}
                         >
                           <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
@@ -1172,8 +1203,11 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                           }`}>
                             {isSelected && <Check size={11} className="text-white" />}
                           </span>
-                          <span className="flex-1 text-sm font-medium text-gray-700">{opt.name}</span>
-                          <span className="text-sm font-black text-amber-600 flex-shrink-0">
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
+                            <span className="block sm:hidden text-xs font-black text-amber-600 mt-0.5">+ R$ {fmtBRL(opt.price)}/pessoa</span>
+                          </span>
+                          <span className="hidden sm:block text-sm font-black text-amber-600 flex-shrink-0">
                             + R$ {fmtBRL(opt.price)}<span className="text-xs font-normal text-gray-400">/pessoa</span>
                           </span>
                         </button>
