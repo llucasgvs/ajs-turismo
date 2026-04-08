@@ -961,6 +961,28 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>([]);
   const [sidebarPeople, setSidebarPeople] = useState(1);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const dateRowRef = useRef<HTMLDivElement>(null);
+
+  // Close date picker on scroll or resize
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const close = () => setShowDatePicker(false);
+    window.addEventListener("scroll", close, { passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close);
+      window.removeEventListener("resize", close);
+    };
+  }, [showDatePicker]);
+
+  const openDatePicker = useCallback(() => {
+    if (dateRowRef.current) {
+      const r = dateRowRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + 6, left: r.left, width: r.width });
+    }
+    setShowDatePicker(true);
+  }, []);
 
   // activeTrip: the trip whose price/availability drives the UI
   const activeTrip = selectedTrip || trip;
@@ -1417,10 +1439,10 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                   <div className="border-t border-gray-100 divide-y divide-gray-100">
 
                     {/* Selected date row — dropdown trigger */}
-                    <div className="relative">
+                    <div ref={dateRowRef}>
                       <button
                         type="button"
-                        onClick={() => setShowDatePicker(v => !v)}
+                        onClick={() => showDatePicker ? setShowDatePicker(false) : openDatePicker()}
                         className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
                       >
                         <div>
@@ -1437,17 +1459,26 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         </div>
                         {siblingTrips.length > 1 && (
                           <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
-                            {showDatePicker ? <><ChevronUp size={14}/> Fechar</> : <><ChevronDown size={14}/> Trocar</>}
+                            {showDatePicker
+                              ? <><ChevronUp size={14}/> Fechar</>
+                              : <><ChevronDown size={14}/> Trocar</>}
                           </span>
                         )}
                       </button>
 
-                      {/* Floating dropdown — does not push layout */}
-                      {showDatePicker && siblingTrips.length > 1 && (
+                      {/* Fixed-position dropdown — not clipped by overflow:hidden */}
+                      {showDatePicker && siblingTrips.length > 1 && dropdownPos && (
                         <>
-                          {/* Backdrop to close on outside click */}
-                          <div className="fixed inset-0 z-30" onClick={() => setShowDatePicker(false)} />
-                          <div className="absolute left-0 right-0 top-full z-40 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 max-h-[60vh] overflow-y-auto date-scroll">
+                          <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
+                          <div
+                            className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-y-auto date-scroll"
+                            style={{
+                              top: dropdownPos.top,
+                              left: dropdownPos.left,
+                              width: dropdownPos.width,
+                              maxHeight: `calc(100vh - ${dropdownPos.top}px - 24px)`,
+                            }}
+                          >
                             <DateSelector
                               trips={siblingTrips}
                               selected={selectedTrip}
