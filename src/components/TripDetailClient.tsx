@@ -767,29 +767,21 @@ function fmtDate(d: string) {
 /* ═══════════════════════════════════════════
    Description Block (collapsible on mobile)
 ═══════════════════════════════════════════ */
+const DESC_THRESHOLD = 220; // chars — abaixo disso não precisa de "ver mais"
+
 function DescriptionBlock({ description }: { description: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [clamped, setClamped] = useState(false);
-  const ref = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    setClamped(el.scrollHeight > el.clientHeight + 2);
-  }, [description]);
+  const isLong = description.length > DESC_THRESHOLD;
 
   return (
     <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm">
       <h2 className="font-display font-black text-xl text-navy-800 mb-3">Sobre o pacote</h2>
-      <p
-        ref={ref}
-        className={`text-gray-600 leading-relaxed whitespace-pre-line transition-all ${
-          !expanded ? "line-clamp-4 sm:line-clamp-none" : ""
-        }`}
-      >
+      <p className={`text-gray-600 leading-relaxed whitespace-pre-line ${
+        isLong && !expanded ? "line-clamp-4 sm:line-clamp-none" : ""
+      }`}>
         {description}
       </p>
-      {(clamped || expanded) && (
+      {isLong && (
         <button
           type="button"
           onClick={() => setExpanded(v => !v)}
