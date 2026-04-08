@@ -1216,7 +1216,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                   </div>
                   {selectedOptionals.length > 0 && (
                     <div className="mt-3 flex items-center justify-between bg-amber-50 rounded-xl px-4 py-2.5 border border-amber-200">
-                      <span className="text-xs text-amber-700 font-semibold">{selectedOptionals.length} opcional{selectedOptionals.length > 1 ? "is" : ""} selecionado{selectedOptionals.length > 1 ? "s" : ""}</span>
+                      <span className="text-xs text-amber-700 font-semibold">{selectedOptionals.length} {selectedOptionals.length > 1 ? "opcionais" : "opcional"} selecionado{selectedOptionals.length > 1 ? "s" : ""}</span>
                       <span className="text-sm font-black text-amber-700">
                         + R$ {fmtBRL(selectedOptionals.reduce((s, o) => s + o.price, 0))}/pessoa
                       </span>
