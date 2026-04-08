@@ -708,12 +708,13 @@ function fmtDate(d: string) {
 }
 
 function DateSelector({
-  trips, selected, onSelect, hasError,
+  trips, selected, onSelect, hasError, sidebar = false,
 }: {
   trips: Trip[];
   selected: Trip | null;
   onSelect: (t: Trip) => void;
   hasError: boolean;
+  sidebar?: boolean;
 }) {
   if (trips.length === 0) return null;
 
@@ -733,7 +734,7 @@ function DateSelector({
 
       {/* Scrollable date list */}
       <div className="px-4 pb-4 max-h-[300px] sm:max-h-[380px] overflow-y-auto overscroll-contain date-scroll">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3 pb-1">
+        <div className={`grid gap-3 pb-1 ${sidebar ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
         {trips.map((t) => {
           const isSold = t.available_spots === 0 || t.status === "sold_out";
           const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
@@ -769,13 +770,13 @@ function DateSelector({
               </span>
 
               {/* Date range */}
-              <div className="flex items-center gap-1.5 mb-2">
-                <Calendar size={13} className={isSelected ? "text-navy-600" : "text-gold-500"} />
-                <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mb-2 min-w-0 pr-6">
+                <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
+                <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
                   {fmtDate(t.departure_date)}
                 </span>
-                <span className="text-gray-400 text-xs">→</span>
-                <span className={`text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                <span className="text-gray-400 text-xs flex-shrink-0">→</span>
+                <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
                   {fmtDate(t.return_date)}
                 </span>
               </div>
@@ -1230,6 +1231,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     selected={selectedTrip}
                     onSelect={handleSelectDate}
                     hasError={dateError}
+                    sidebar
                   />
                 )}
 
