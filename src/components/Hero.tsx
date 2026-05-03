@@ -100,7 +100,7 @@ export default function Hero() {
               isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            Pacotes de viagem incríveis com o melhor custo-benefício do Brasil.
+            Pacotes de viagens incríveis com o melhor custo-benefício do Brasil.
             Destinos nacionais e internacionais, atendimento personalizado e muito mais.
           </p>
 
