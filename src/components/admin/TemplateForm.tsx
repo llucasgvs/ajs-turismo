@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star } from "lucide-react";
+import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api";
 
 interface ItinerarySection {
@@ -74,10 +74,19 @@ const PRESET_CATEGORIES: [string, string][] = [
 ];
 const PRESET_VALUES = new Set(PRESET_CATEGORIES.map(([v]) => v));
 
+const PRESET_DOCUMENTS =
+  `• RG ou\n• CNH dentro da validade ou\n• Passaporte dentro da validade\n\nPara crianças menores de 12 anos, também é aceita a certidão de nascimento.`;
+
+const PRESET_DEPARTURE_LOCATIONS = [
+  "Curitiba · Shopping Curitiba (Rua Lamenha Lins, 447)",
+  "Curitiba · Shopping Estação (Rua Barão do Rio Branco, 805)",
+  "São José dos Pinhais · Posto Pinheirão",
+];
+
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
-  includes: [], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
+  includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
   is_featured: false, is_active: true,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
@@ -146,6 +155,14 @@ export default function TemplateForm({
 
   const removeFromList = (key: "includes" | "excludes" | "departure_locations", index: number) =>
     setForm((f) => ({ ...f, [key]: f[key].filter((_, i) => i !== index) }));
+
+  const toggleDepartureLocation = (loc: string) =>
+    setForm((f) => ({
+      ...f,
+      departure_locations: f.departure_locations.includes(loc)
+        ? f.departure_locations.filter((l) => l !== loc)
+        : [...f.departure_locations, loc],
+    }));
 
   const addSection = () =>
     setForm((f) => ({ ...f, itinerary: [...f.itinerary, { title: "", items: [] }] }));
@@ -318,7 +335,16 @@ export default function TemplateForm({
                   onChange={(e) => set("required_documents", e.target.value)}
                   placeholder={`Ex:\n• RG com menos de 10 anos de emissão\n• CNH física dentro da validade\n• Passaporte dentro da validade\n\nMenores de 18 anos: RG físico e acompanhado pelos pais.\nNa ausência de um dos responsáveis, necessário autorização registrada em cartório.`}
                 />
-                <p className="text-xs text-gray-400 mt-1">Use • para marcar itens. Cada linha vira um parágrafo no site.</p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-400">Use • para marcar itens. Cada linha vira um parágrafo no site.</p>
+                  <button
+                    type="button"
+                    onClick={() => set("required_documents", PRESET_DOCUMENTS)}
+                    className="text-xs text-navy-500 hover:text-gold-600 hover:underline underline-offset-2 transition-colors flex-shrink-0 ml-3"
+                  >
+                    usar modelo padrão
+                  </button>
+                </div>
               </Field>
               <Field label="Tag (opcional)">
                 <input className="input-field" value={form.tag}
@@ -423,12 +449,79 @@ export default function TemplateForm({
 
           <Section title="Locais de Saída">
             <p className="text-xs text-gray-400 mb-3">
-              Pontos de embarque oferecidos. Ex: Shopping Curitiba, Terminal Rodoviário.
+              Selecione os pontos de embarque padrão ou adicione um personalizado.
             </p>
-            <ListEditor items={form.departure_locations} value={newDepartureLocation} onChange={setNewDepartureLocation}
-              onAdd={() => addToList("departure_locations", newDepartureLocation, () => setNewDepartureLocation(""))}
-              onRemove={(i) => removeFromList("departure_locations", i)}
-              placeholder="Ex: Shopping Curitiba, Shopping Estação..." />
+            {/* Chips de locais predefinidos */}
+            <div className="flex flex-col gap-2 mb-4">
+              {PRESET_DEPARTURE_LOCATIONS.map((loc) => {
+                const selected = form.departure_locations.includes(loc);
+                return (
+                  <button
+                    key={loc}
+                    type="button"
+                    onClick={() => toggleDepartureLocation(loc)}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm border transition-colors text-left ${
+                      selected
+                        ? "bg-navy-700 text-white border-navy-700"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-navy-300 hover:bg-navy-50"
+                    }`}
+                  >
+                    <MapPin size={13} className={selected ? "text-gold-300 flex-shrink-0" : "text-gray-400 flex-shrink-0"} />
+                    <span className="flex-1">{loc}</span>
+                    {selected && <Check size={13} className="flex-shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Entradas personalizadas (não-predefinidas) */}
+            {(() => {
+              const customItems = form.departure_locations.filter(
+                (l) => !PRESET_DEPARTURE_LOCATIONS.includes(l)
+              );
+              return (
+                <div className="space-y-2">
+                  {customItems.map((loc) => (
+                    <div key={loc} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                      <p className="flex-1 text-sm text-gray-700 truncate">{loc}</p>
+                      <button type="button"
+                        onClick={() => setForm((f) => ({ ...f, departure_locations: f.departure_locations.filter((l) => l !== loc) }))}
+                        className="text-gray-300 hover:text-red-500 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      className="input-field flex-1 py-2 text-sm"
+                      value={newDepartureLocation}
+                      onChange={(e) => setNewDepartureLocation(e.target.value)}
+                      placeholder="Outro local de embarque..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const v = newDepartureLocation.trim();
+                          if (v && !form.departure_locations.includes(v)) {
+                            setForm((f) => ({ ...f, departure_locations: [...f.departure_locations, v] }));
+                            setNewDepartureLocation("");
+                          }
+                        }
+                      }}
+                    />
+                    <button type="button"
+                      onClick={() => {
+                        const v = newDepartureLocation.trim();
+                        if (v && !form.departure_locations.includes(v)) {
+                          setForm((f) => ({ ...f, departure_locations: [...f.departure_locations, v] }));
+                          setNewDepartureLocation("");
+                        }
+                      }}
+                      className="px-3 bg-navy-700 text-white rounded-xl hover:bg-navy-600 transition-colors flex-shrink-0">
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </Section>
 
           <Section title="Opcionais (cliente escolhe)">
