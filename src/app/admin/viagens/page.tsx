@@ -21,8 +21,19 @@ interface TemplateSummary {
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
-  praia: "Praia", nordeste: "Nordeste", serra: "Serra",
-  aventura: "Aventura", cultural: "Cultural", internacional: "Internacional",
+  praia: "Praia",
+  nordeste: "Nordeste",
+  litoral: "Litoral",
+  sul: "Sul do Brasil",
+  serra: "Serra / Montanha",
+  aventura: "Aventura",
+  natureza: "Natureza / Ecoturismo",
+  cultural: "Cultural",
+  gastronomia: "Gastronomia",
+  religioso: "Religioso / Romaria",
+  parque: "Parque Temático",
+  internacional: "Internacional",
+  outros: "Outros",
 };
 
 

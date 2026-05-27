@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star } from "lucide-react";
@@ -37,6 +37,23 @@ interface TemplateFormData {
   open_date_departure_time: string; // "HH:MM"
   open_date_return_time: string;    // "HH:MM"
 }
+
+const PRESET_CATEGORIES: [string, string][] = [
+  ["praia", "Praia"],
+  ["nordeste", "Nordeste"],
+  ["litoral", "Litoral"],
+  ["sul", "Sul do Brasil"],
+  ["serra", "Serra / Montanha"],
+  ["aventura", "Aventura"],
+  ["natureza", "Natureza / Ecoturismo"],
+  ["cultural", "Cultural"],
+  ["gastronomia", "Gastronomia"],
+  ["religioso", "Religioso / Romaria"],
+  ["parque", "Parque Temático"],
+  ["internacional", "Internacional"],
+  ["outros", "Outros"],
+];
+const PRESET_VALUES = new Set(PRESET_CATEGORIES.map(([v]) => v));
 
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
@@ -83,6 +100,10 @@ export default function TemplateForm({
       return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     })(),
   });
+  const [isCustomCategory, setIsCustomCategory] = useState(
+    () => !!initialData?.category && !PRESET_VALUES.has(initialData.category)
+  );
+  const customCategoryRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -212,12 +233,34 @@ export default function TemplateForm({
                     placeholder="Ex: Ilha do Mel, PR" />
                 </Field>
                 <Field label="Categoria">
-                  <select className="input-field" value={form.category}
-                    onChange={(e) => set("category", e.target.value)}>
-                    {[["praia","Praia"],["nordeste","Nordeste"],["serra","Serra"],
-                      ["aventura","Aventura"],["cultural","Cultural"],["internacional","Internacional"]
-                    ].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  <select
+                    className="input-field"
+                    value={isCustomCategory ? "__outro__" : form.category}
+                    onChange={(e) => {
+                      if (e.target.value === "__outro__") {
+                        setIsCustomCategory(true);
+                        set("category", "");
+                        setTimeout(() => customCategoryRef.current?.focus(), 50);
+                      } else {
+                        setIsCustomCategory(false);
+                        set("category", e.target.value);
+                      }
+                    }}
+                  >
+                    {PRESET_CATEGORIES.map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                    <option value="__outro__">✏️ Outro (digitar)</option>
                   </select>
+                  {isCustomCategory && (
+                    <input
+                      ref={customCategoryRef}
+                      className="input-field mt-2"
+                      placeholder="Ex: Cruzeiro, Camping, City Tour..."
+                      value={form.category}
+                      onChange={(e) => set("category", e.target.value)}
+                    />
+                  )}
                 </Field>
               </div>
               <Field label="Descrição Curta (aparece nos cards)">
