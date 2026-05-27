@@ -1544,6 +1544,25 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 </div>
               )}
 
+              {/* Locais de Saída */}
+              {trip.departure_locations?.length > 0 && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm">
+                  <h3 className="font-display font-bold text-navy-800 mb-4 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-navy-100 rounded-full flex items-center justify-center">
+                      <MapPin size={13} className="text-navy-600" />
+                    </span>
+                    Locais de Saída
+                  </h3>
+                  <ul className="space-y-2">
+                    {trip.departure_locations.map((loc, i) => (
+                      <li key={i} className="flex items-center gap-2 text-gray-700 text-sm">
+                        <MapPin size={14} className="text-gold-500 flex-shrink-0" />{loc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Documentos necessários */}
               {trip.required_documents && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
@@ -1624,6 +1643,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 const isSameDay = trip.departure_date && trip.return_date &&
                   trip.departure_date.slice(0, 10) === trip.return_date.slice(0, 10);
 
+                const isNewFormat = Array.isArray(trip.itinerary[0]?.items);
+
                 const renderDescription = (text: string) => {
                   if (!text) return null;
                   const lines = text.split("\n").filter((l) => l.trim());
@@ -1657,25 +1678,47 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     <h2 className="font-display font-black text-xl text-navy-800 mb-6">
                       {isSameDay ? "Programação do Dia" : "Roteiro dia a dia"}
                     </h2>
-                    <div className="relative">
-                      <div className="absolute left-5 top-0 bottom-0 w-px bg-gray-100" />
-                      <div className="space-y-0">
+                    {isNewFormat ? (
+                      <div className="space-y-5">
                         {trip.itinerary.map((item, idx) => (
-                          <div key={idx} className="flex gap-4 relative pb-6 last:pb-0">
-                            <div className="flex-shrink-0 z-10 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
-                              {item.day ?? idx + 1}
-                            </div>
-                            <div className="flex-1 pt-2">
-                              <h4 className="font-bold text-navy-800">{item.title}</h4>
-                              {item.description && renderDescription(item.description)}
-                            </div>
+                          <div key={idx}>
+                            <h4 className="font-bold text-navy-800 mb-2">{item.title}</h4>
+                            {item.items && item.items.length > 0 && (
+                              <ul className="space-y-1.5 pl-1">
+                                {item.items.map((bullet: string, bi: number) => (
+                                  <li key={bi} className="flex items-start gap-2 text-gray-700 text-sm">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0 mt-1.5" />
+                                    {bullet}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         ))}
                       </div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-5">
-                      * Os horários são previstos e podem variar conforme trânsito e imprevistos.
-                    </p>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <div className="absolute left-5 top-0 bottom-0 w-px bg-gray-100" />
+                          <div className="space-y-0">
+                            {trip.itinerary.map((item, idx) => (
+                              <div key={idx} className="flex gap-4 relative pb-6 last:pb-0">
+                                <div className="flex-shrink-0 z-10 w-10 h-10 rounded-full bg-navy-700 text-white flex items-center justify-center font-bold text-sm">
+                                  {item.day ?? idx + 1}
+                                </div>
+                                <div className="flex-1 pt-2">
+                                  <h4 className="font-bold text-navy-800">{item.title}</h4>
+                                  {item.description && renderDescription(item.description)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-5">
+                          * Os horários são previstos e podem variar conforme trânsito e imprevistos.
+                        </p>
+                      </>
+                    )}
                   </div>
                 );
               })()}

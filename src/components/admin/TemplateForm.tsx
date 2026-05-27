@@ -6,10 +6,28 @@ import Link from "next/link";
 import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api";
 
-interface ItineraryDay {
-  day: number;
+interface ItinerarySection {
   title: string;
-  description: string;
+  items: string[];
+}
+
+function normalizeItinerary(raw: unknown[]): ItinerarySection[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item: unknown, idx) => {
+    const entry = item as Record<string, unknown>;
+    if (Array.isArray(entry.items)) {
+      return { title: String(entry.title ?? ""), items: entry.items as string[] };
+    }
+    // Formato antigo: converte description em items
+    const lines = String(entry.description ?? "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return {
+      title: String(entry.title ?? `Dia ${(entry.day as number) ?? idx + 1}`),
+      items: lines,
+    };
+  });
 }
 
 interface TemplateFormData {
@@ -24,7 +42,8 @@ interface TemplateFormData {
   includes: string[];
   excludes: string[];
   optionals: { name: string; price: string }[];
-  itinerary: ItineraryDay[];
+  itinerary: ItinerarySection[];
+  departure_locations: string[];
   gallery: string[];
   is_featured: boolean;
   is_active: boolean;
@@ -58,7 +77,7 @@ const PRESET_VALUES = new Set(PRESET_CATEGORIES.map(([v]) => v));
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
-  includes: [], excludes: [], optionals: [], itinerary: [], gallery: [],
+  includes: [], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
   is_featured: false, is_active: true,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
@@ -81,6 +100,9 @@ export default function TemplateForm({
       name: String(o.name ?? ""),
       price: String((o as { name: string; price: number | string }).price ?? ""),
     })),
+    // normaliza itinerário: suporta formato antigo {day,title,description} e novo {title,items}
+    itinerary: normalizeItinerary((initialData?.itinerary as unknown[]) ?? []),
+    departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
     open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
@@ -109,31 +131,47 @@ export default function TemplateForm({
   const [success, setSuccess] = useState("");
   const [newInclude, setNewInclude] = useState("");
   const [newExclude, setNewExclude] = useState("");
+  const [newDepartureLocation, setNewDepartureLocation] = useState("");
   const [newOptName, setNewOptName] = useState("");
   const [newOptPrice, setNewOptPrice] = useState("");
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const addToList = (key: "includes" | "excludes", value: string, clear: () => void) => {
+  const addToList = (key: "includes" | "excludes" | "departure_locations", value: string, clear: () => void) => {
     if (!value.trim()) return;
     setForm((f) => ({ ...f, [key]: [...f[key], value.trim()] }));
     clear();
   };
 
-  const removeFromList = (key: "includes" | "excludes", index: number) =>
+  const removeFromList = (key: "includes" | "excludes" | "departure_locations", index: number) =>
     setForm((f) => ({ ...f, [key]: f[key].filter((_, i) => i !== index) }));
 
-  const addDay = () =>
-    setForm((f) => ({ ...f, itinerary: [...f.itinerary, { day: f.itinerary.length + 1, title: "", description: "" }] }));
+  const addSection = () =>
+    setForm((f) => ({ ...f, itinerary: [...f.itinerary, { title: "", items: [] }] }));
 
-  const updateDay = (index: number, field: "title" | "description", value: string) =>
-    setForm((f) => ({ ...f, itinerary: f.itinerary.map((d, i) => (i === index ? { ...d, [field]: value } : d)) }));
+  const updateSectionTitle = (idx: number, value: string) =>
+    setForm((f) => ({ ...f, itinerary: f.itinerary.map((s, i) => i === idx ? { ...s, title: value } : s) }));
 
-  const removeDay = (index: number) =>
+  const removeSection = (idx: number) =>
+    setForm((f) => ({ ...f, itinerary: f.itinerary.filter((_, i) => i !== idx) }));
+
+  const addItemToSection = (sectionIdx: number, text: string) => {
+    if (!text.trim()) return;
     setForm((f) => ({
       ...f,
-      itinerary: f.itinerary.filter((_, i) => i !== index).map((d, i) => ({ ...d, day: i + 1 })),
+      itinerary: f.itinerary.map((s, i) =>
+        i === sectionIdx ? { ...s, items: [...s.items, text.trim()] } : s
+      ),
+    }));
+  };
+
+  const removeItemFromSection = (sectionIdx: number, itemIdx: number) =>
+    setForm((f) => ({
+      ...f,
+      itinerary: f.itinerary.map((s, i) =>
+        i === sectionIdx ? { ...s, items: s.items.filter((_, j) => j !== itemIdx) } : s
+      ),
     }));
 
   // Unified images: [image_url, ...gallery] (first = principal)
@@ -383,6 +421,16 @@ export default function TemplateForm({
               placeholder="Ex: Passagem aérea, Almoços..." />
           </Section>
 
+          <Section title="Locais de Saída">
+            <p className="text-xs text-gray-400 mb-3">
+              Pontos de embarque oferecidos. Ex: Shopping Curitiba, Terminal Rodoviário.
+            </p>
+            <ListEditor items={form.departure_locations} value={newDepartureLocation} onChange={setNewDepartureLocation}
+              onAdd={() => addToList("departure_locations", newDepartureLocation, () => setNewDepartureLocation(""))}
+              onRemove={(i) => removeFromList("departure_locations", i)}
+              placeholder="Ex: Shopping Curitiba, Shopping Estação..." />
+          </Section>
+
           <Section title="Opcionais (cliente escolhe)">
             <p className="text-xs text-gray-400 mb-3">
               O cliente poderá selecionar esses itens ao fazer a reserva. O valor é por pessoa.
@@ -422,29 +470,44 @@ export default function TemplateForm({
             </div>
           </Section>
 
-          <Section title="Roteiro Dia a Dia">
-            <div className="space-y-3">
-              {form.itinerary.map((day, i) => (
-                <div key={i} className="border border-gray-200 rounded-xl p-4 relative">
-                  <button type="button" onClick={() => removeDay(i)}
+          <Section title="Roteiro">
+            <p className="text-xs text-gray-400 mb-4">
+              Organize o roteiro em seções com título livre — pode ser o dia da semana, um tema ou qualquer nome que faça sentido para esta viagem.
+            </p>
+            <div className="space-y-4">
+              {form.itinerary.map((section, si) => (
+                <div key={si} className="border border-gray-200 rounded-xl p-4 space-y-3 relative">
+                  <button type="button" onClick={() => removeSection(si)}
                     className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition-colors">
                     <X size={15} />
                   </button>
-                  <p className="text-xs font-bold text-gold-600 uppercase tracking-wider mb-3">Dia {day.day}</p>
-                  <input className="input-field mb-2 text-sm" value={day.title}
-                    onChange={(e) => updateDay(i, "title", e.target.value)}
-                    placeholder="Título do dia (Ex: Chegada e city tour)" />
-                  <textarea className="input-field resize-y min-h-[120px] text-sm font-mono" value={day.description}
-                    onChange={(e) => updateDay(i, "description", e.target.value)}
-                    placeholder={"Atividades com horário:\n06:00 - Café da manhã no hotel.\n07:30 - Saída para o Paraguai.\n\nSem horário (info / observação):\nBagagens ficam em sala reservada à agência."} />
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Use <span className="font-mono bg-gray-100 px-1 rounded">HH:MM - descrição</span> para atividades com horário fixo. Linhas sem horário aparecem como observação.
-                  </p>
+
+                  <input
+                    className="input-field font-semibold pr-8"
+                    value={section.title}
+                    onChange={(e) => updateSectionTitle(si, e.target.value)}
+                    placeholder="Ex: Sexta-feira, Sábado, Dia de Passeio, Retorno..."
+                  />
+
+                  <div className="space-y-1.5 pl-1">
+                    {section.items.map((item, ii) => (
+                      <div key={ii} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0" />
+                        <p className="flex-1 text-sm text-gray-700">{item}</p>
+                        <button type="button" onClick={() => removeItemFromSection(si, ii)}
+                          className="text-gray-300 hover:text-red-500 transition-colors">
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    <SectionItemInput onAdd={(text) => addItemToSection(si, text)} />
+                  </div>
                 </div>
               ))}
-              <button type="button" onClick={addDay}
+
+              <button type="button" onClick={addSection}
                 className="flex items-center gap-2 text-sm text-navy-600 hover:text-gold-600 font-medium py-2 transition-colors">
-                <Plus size={16} /> Adicionar Dia ao Roteiro
+                <Plus size={16} /> Adicionar seção ao roteiro
               </button>
             </div>
           </Section>
@@ -551,6 +614,30 @@ function ListEditor({ items, value, onChange, onAdd, onRemove, placeholder }: {
           <Plus size={16} />
         </button>
       </div>
+    </div>
+  );
+}
+
+function SectionItemInput({ onAdd }: { onAdd: (text: string) => void }) {
+  const [value, setValue] = useState("");
+  const submit = () => {
+    if (!value.trim()) return;
+    onAdd(value.trim());
+    setValue("");
+  };
+  return (
+    <div className="flex gap-2 pt-1">
+      <input
+        className="input-field flex-1 py-2 text-sm"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Adicionar atividade..."
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
+      />
+      <button type="button" onClick={submit}
+        className="px-3 bg-navy-700 text-white rounded-xl hover:bg-navy-600 transition-colors flex-shrink-0">
+        <Plus size={16} />
+      </button>
     </div>
   );
 }

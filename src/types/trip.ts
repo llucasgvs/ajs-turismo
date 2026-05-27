@@ -19,7 +19,8 @@ export interface Trip {
   includes: string[];
   excludes: string[];
   optionals: { name: string; price: number }[];
-  itinerary: { day: number; title: string; description: string }[];
+  itinerary: { day?: number; title: string; description?: string; items?: string[] }[];
+  departure_locations: string[];
   required_documents: string | null;
   is_open_date: boolean;
   open_date_price: number | null;
