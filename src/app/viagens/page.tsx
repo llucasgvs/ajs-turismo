@@ -100,10 +100,10 @@ export default function ViagensPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Map of departure dates → count (across all templates)
+  // Map de datas → contagem (apenas templates com data fixa; open_date não polui o calendário)
   const datesByDate = useMemo(() => {
     const map: Record<string, number> = {};
-    templates.forEach((t) => t.dates.forEach((d) => {
+    templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
       const key = d.departure_date.slice(0, 10);
       if (key >= today) map[key] = (map[key] || 0) + 1;
     }));
@@ -112,7 +112,7 @@ export default function ViagensPage() {
 
   const datesByMonth = useMemo(() => {
     const map: Record<string, number> = {};
-    templates.forEach((t) => t.dates.forEach((d) => {
+    templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
       const key = d.departure_date.slice(0, 7);
       if (d.departure_date.slice(0, 10) >= today) map[key] = (map[key] || 0) + 1;
     }));
@@ -122,7 +122,8 @@ export default function ViagensPage() {
   const nextMonths = useMemo(() => {
     const months: { key: string; label: string }[] = [];
     let lastMonth = "";
-    templates.forEach((t) => t.dates.forEach((d) => {
+    // Apenas templates com data fixa definem o alcance do calendário
+    templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
       const m = d.departure_date.slice(0, 7);
       if (m > lastMonth) lastMonth = m;
     }));
@@ -168,12 +169,12 @@ export default function ViagensPage() {
     }
     if (selectedDate) {
       result = result.filter((t) =>
-        t.dates.some((d) => d.departure_date.slice(0, 10) === selectedDate)
+        t.is_open_date || t.dates.some((d) => d.departure_date.slice(0, 10) === selectedDate)
       );
     }
     if (selectedMonth) {
       result = result.filter((t) =>
-        t.dates.some((d) => d.departure_date.slice(0, 7) === selectedMonth)
+        t.is_open_date || t.dates.some((d) => d.departure_date.slice(0, 7) === selectedMonth)
       );
     }
     setFiltered(sortTemplates(result, sort));

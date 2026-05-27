@@ -25,6 +25,13 @@ interface TripTemplate {
   excludes: string[];
   itinerary: { day: number; title: string; description: string }[];
   gallery: string[];
+  is_open_date: boolean;
+  open_date_departure_hour: number | null;
+  open_date_departure_minute: number | null;
+  open_date_return_hour: number | null;
+  open_date_return_minute: number | null;
+  open_date_price: number | null;
+  open_date_spots_per_day: number;
 }
 
 interface TripDate {
@@ -512,14 +519,53 @@ export default function TemplateDetailPage() {
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [odDeparture, setOdDeparture] = useState("06:00");
+  const [odReturn, setOdReturn] = useState("23:59");
+  const [odPrice, setOdPrice] = useState("");
+  const [odSpots, setOdSpots] = useState("");
+  const [odSaving, setOdSaving] = useState(false);
+  const [odSuccess, setOdSuccess] = useState(false);
 
   // Carregar template
   useEffect(() => {
     apiFetch(`/templates/${templateId}`)
       .then((r) => r.json())
-      .then((data) => setTemplate(data))
+      .then((data) => {
+        setTemplate(data);
+        if (data.is_open_date) {
+          const dh = data.open_date_departure_hour ?? 6;
+          const dm = data.open_date_departure_minute ?? 0;
+          const rh = data.open_date_return_hour ?? 23;
+          const rm = data.open_date_return_minute ?? 59;
+          setOdDeparture(`${String(dh).padStart(2,"0")}:${String(dm).padStart(2,"0")}`);
+          setOdReturn(`${String(rh).padStart(2,"0")}:${String(rm).padStart(2,"0")}`);
+          setOdPrice(data.open_date_price != null ? String(data.open_date_price) : "");
+          setOdSpots(String(data.open_date_spots_per_day ?? 0));
+        }
+      })
       .finally(() => setLoading(false));
   }, [templateId]);
+
+  const saveOpenDateConfig = async () => {
+    setOdSaving(true);
+    setOdSuccess(false);
+    try {
+      const res = await apiFetch(`/templates/${templateId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          open_date_departure_hour: parseInt(odDeparture.split(":")[0]) || 6,
+          open_date_departure_minute: parseInt(odDeparture.split(":")[1]) || 0,
+          open_date_return_hour: parseInt(odReturn.split(":")[0]) || 23,
+          open_date_return_minute: parseInt(odReturn.split(":")[1]) || 59,
+          open_date_price: odPrice ? parseFloat(odPrice) : null,
+          open_date_spots_per_day: parseInt(odSpots) || 0,
+        }),
+      });
+      if (res.ok) { setOdSuccess(true); setTimeout(() => setOdSuccess(false), 3000); }
+    } finally {
+      setOdSaving(false);
+    }
+  };
 
   // Carregar contagens
   const fetchCounts = useCallback(async () => {
@@ -618,16 +664,20 @@ export default function TemplateDetailPage() {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-2">
-        <Link href={`/admin/viagens/${templateId}/datas/nova`}
-          className="flex items-center justify-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
-          <Plus size={15} />
-          <span>Nova data</span>
-        </Link>
-        <button onClick={() => setBulkOpen(true)}
-          className="flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-emerald-500 transition-colors">
-          <Layers size={15} />
-          <span>Gerar em lote</span>
-        </button>
+        {!template.is_open_date && (
+          <>
+            <Link href={`/admin/viagens/${templateId}/datas/nova`}
+              className="flex items-center justify-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
+              <Plus size={15} />
+              <span>Nova data</span>
+            </Link>
+            <button onClick={() => setBulkOpen(true)}
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-emerald-500 transition-colors">
+              <Layers size={15} />
+              <span>Gerar em lote</span>
+            </button>
+          </>
+        )}
         <Link href={`/admin/viagens/${templateId}/editar`}
           className="flex items-center justify-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
           <Pencil size={15} />
@@ -692,10 +742,60 @@ export default function TemplateDetailPage() {
         </div>
       </button>
 
+      {/* Painel de saídas diárias (open_date) */}
+      {template.is_open_date && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-navy-700 uppercase tracking-wider flex items-center gap-2">
+                <Calendar size={14} /> Saídas Diárias
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {counts.active} data{counts.active !== 1 ? "s" : ""} ativa{counts.active !== 1 ? "s" : ""} · Salvar atualiza automaticamente todos os horários futuros.
+              </p>
+            </div>
+            {odSuccess && (
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <CheckCircle2 size={13} /> Salvo!
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 font-semibold mb-1 block">Horário de saída</label>
+              <input type="time" className="input-field text-sm" value={odDeparture}
+                onChange={(e) => setOdDeparture(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-semibold mb-1 block">Horário de retorno</label>
+              <input type="time" className="input-field text-sm" value={odReturn}
+                onChange={(e) => setOdReturn(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-semibold mb-1 block">Preço por pessoa (R$)</label>
+              <input type="number" className="input-field text-sm" value={odPrice} min="0" step="0.01"
+                placeholder="Ex: 199.90" onChange={(e) => setOdPrice(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-semibold mb-1 block">
+                Vagas por dia <span className="text-gray-400 font-normal">(0 = ilimitado)</span>
+              </label>
+              <input type="number" className="input-field text-sm" value={odSpots} min="0"
+                onChange={(e) => setOdSpots(e.target.value)} />
+            </div>
+          </div>
+          <button onClick={saveOpenDateConfig} disabled={odSaving}
+            className="w-full flex items-center justify-center gap-2 bg-navy-800 text-white font-semibold py-2.5 rounded-xl hover:bg-navy-700 transition-colors text-sm disabled:opacity-50">
+            {odSaving ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {odSaving ? "Salvando..." : "Salvar e atualizar todos os horários"}
+          </button>
+        </div>
+      )}
+
       {/* Seção de datas */}
       <div className="space-y-3">
         <h2 className="text-sm font-bold text-navy-700 uppercase tracking-wider flex items-center gap-2">
-          <Calendar size={14} /> Datas
+          <Calendar size={14} /> {template.is_open_date ? "Datas geradas automaticamente" : "Datas"}
         </h2>
 
         {/* Tabs */}
