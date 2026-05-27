@@ -217,9 +217,9 @@ export default function TemplateForm({
           open_date_max_advance: parseInt(form.open_date_max_advance) || 180,
           // converte "HH:MM" → hora e minuto inteiros
           open_date_departure_hour: parseInt(form.open_date_departure_time.split(":")[0] ?? "6") || 6,
-          open_date_departure_minute: parseInt(form.open_date_departure_time.split(":")[1] ?? "0") || 0,
+          open_date_departure_minute: parseInt(form.open_date_departure_time.split(":")[1] ?? "0"),
           open_date_return_hour: parseInt(form.open_date_return_time.split(":")[0] ?? "23") || 23,
-          open_date_return_minute: parseInt(form.open_date_return_time.split(":")[1] ?? "59") || 59,
+          open_date_return_minute: parseInt(form.open_date_return_time.split(":")[1] ?? "59"),
         }) }
       );
       const data = await res.json();
