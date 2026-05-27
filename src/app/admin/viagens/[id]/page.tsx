@@ -554,9 +554,9 @@ export default function TemplateDetailPage() {
         method: "PUT",
         body: JSON.stringify({
           open_date_departure_hour: parseInt(odDeparture.split(":")[0]) || 6,
-          open_date_departure_minute: parseInt(odDeparture.split(":")[1]) || 0,
+          open_date_departure_minute: parseInt(odDeparture.split(":")[1] ?? "0"),
           open_date_return_hour: parseInt(odReturn.split(":")[0]) || 23,
-          open_date_return_minute: parseInt(odReturn.split(":")[1]) || 59,
+          open_date_return_minute: parseInt(odReturn.split(":")[1] ?? "59"),
           open_date_price: odPrice ? parseFloat(odPrice) : null,
           open_date_spots_per_day: parseInt(odSpots) || 0,
         }),
