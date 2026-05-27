@@ -460,15 +460,22 @@ export default function TemplateForm({
                     key={loc}
                     type="button"
                     onClick={() => toggleDepartureLocation(loc)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm border transition-colors text-left ${
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm border transition-all text-left ${
                       selected
-                        ? "bg-navy-700 text-white border-navy-700"
-                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-navy-300 hover:bg-navy-50"
+                        ? "bg-navy-700 text-white border-navy-700 shadow-sm"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-navy-300 hover:text-gray-700"
                     }`}
                   >
-                    <MapPin size={13} className={selected ? "text-gold-300 flex-shrink-0" : "text-gray-400 flex-shrink-0"} />
+                    {/* Checkbox visual */}
+                    <span className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                      selected
+                        ? "bg-white border-white"
+                        : "border-gray-300"
+                    }`}>
+                      {selected && <Check size={10} className="text-navy-700" strokeWidth={3} />}
+                    </span>
+                    <MapPin size={13} className={selected ? "text-gold-300 flex-shrink-0" : "text-gray-300 flex-shrink-0"} />
                     <span className="flex-1">{loc}</span>
-                    {selected && <Check size={13} className="flex-shrink-0" />}
                   </button>
                 );
               })}
