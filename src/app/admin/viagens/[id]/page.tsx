@@ -561,7 +561,7 @@ export default function TemplateDetailPage() {
           open_date_spots_per_day: parseInt(odSpots) || 0,
         }),
       });
-      if (res.ok) { setOdSuccess(true); setTimeout(() => setOdSuccess(false), 3000); }
+      if (res.ok) { setOdSuccess(true); setTimeout(() => setOdSuccess(false), 3000); fetchCounts(); fetchDates(); }
     } finally {
       setOdSaving(false);
     }
