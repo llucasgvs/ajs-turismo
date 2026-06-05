@@ -104,17 +104,24 @@ function KpiCard({ icon, label, value, sub, color, bg, href }: {
   return href ? <Link href={href} className="block">{inner}</Link> : inner;
 }
 
+/* ─── Cache de módulo ─── */
+type DashCache = { stats: Stats | null; counts: Counts | null; interests: Booking[]; trips: TripInstance[]; templates: Template[]; ts: number };
+const _dashCache: DashCache = { stats: null, counts: null, interests: [], trips: [], templates: [], ts: 0 };
+const DASH_TTL = 60_000; // 60 segundos
+
 /* ─── Main ─── */
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [counts, setCounts] = useState<Counts | null>(null);
-  const [interests, setInterests] = useState<Booking[]>([]);
-  const [trips, setTrips] = useState<TripInstance[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  const hasFreshCache = !!_dashCache.stats && (Date.now() - _dashCache.ts) < DASH_TTL;
+  const [stats, setStats] = useState<Stats | null>(_dashCache.stats);
+  const [counts, setCounts] = useState<Counts | null>(_dashCache.counts);
+  const [interests, setInterests] = useState<Booking[]>(_dashCache.interests);
+  const [trips, setTrips] = useState<TripInstance[]>(_dashCache.trips);
+  const [templates, setTemplates] = useState<Template[]>(_dashCache.templates);
+  const [loading, setLoading] = useState(!hasFreshCache);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const [sR, cR, iR, tR, tmR] = await Promise.all([
         fetch(`${API}/bookings/admin/stats`, { headers: authHeaders() }),
@@ -129,12 +136,23 @@ export default function AdminDashboard() {
       setInterests(iD.items ?? []);
       setTrips(tD.items ?? []);
       setTemplates(Array.isArray(tmD) ? tmD : []);
+      _dashCache.stats = sD; _dashCache.counts = cD; _dashCache.interests = iD.items ?? [];
+      _dashCache.trips = tD.items ?? []; _dashCache.templates = Array.isArray(tmD) ? tmD : [];
+      _dashCache.ts = Date.now();
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (hasFreshCache) {
+      load(true); // atualiza em background silenciosamente
+    } else {
+      load(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Derived */
   const upcoming = trips
@@ -160,8 +178,9 @@ export default function AdminDashboard() {
       {/* ── Header ── */}
       <div className="flex flex-wrap gap-3 items-start justify-between">
         <div>
-          <h1 className="text-2xl font-display font-black text-navy-900">
+          <h1 className="text-2xl font-display font-black text-navy-900 flex items-center gap-2">
             {greet()}, Admin!
+            {refreshing && <Loader2 size={14} className="text-gray-400 animate-spin" />}
           </h1>
           <p className="text-gray-400 text-sm mt-0.5 capitalize">{todayLabel()}</p>
         </div>
