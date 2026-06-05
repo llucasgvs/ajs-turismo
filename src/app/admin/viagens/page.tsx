@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+
+// Cache em nível de módulo — sobrevive a navegações dentro da SPA, reset no F5
+const _cache: { data: TemplateSummary[] | null; ts: number } = { data: null, ts: 0 };
+const CACHE_TTL = 30_000; // 30 segundos
 
 interface TemplateSummary {
   id: number;
@@ -38,36 +42,61 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 
 export default function ViagensPage() {
-  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const isFreshCache = !_cache.data || (Date.now() - _cache.ts) > CACHE_TTL;
+  const [templates, setTemplates] = useState<TemplateSummary[]>(_cache.data ?? []);
+  const [loading, setLoading] = useState(isFreshCache && !_cache.data);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchActive = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true);
+  const fetchTemplates = useCallback(async (isSearch = false) => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+
+    // Com busca ativa: sempre mostra spinner. Sem busca: usa cache se fresco
+    const cached = !debouncedSearch && _cache.data && (Date.now() - _cache.ts) < CACHE_TTL;
+    if (cached && !isSearch) {
+      setTemplates(_cache.data!);
+      setLoading(false);
+      return;
+    }
+
+    if (!_cache.data || debouncedSearch) setLoading(true);
+    else setRefreshing(true);
+
     try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set("search", debouncedSearch);
       const res = await apiFetch(`/templates/admin-list?${params}`);
-      if (res.ok) setTemplates(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data);
+        if (!debouncedSearch) { _cache.data = data; _cache.ts = Date.now(); }
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [debouncedSearch]);
 
-  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+  useEffect(() => {
+    searchActive.current = !!debouncedSearch;
+    fetchTemplates(!!debouncedSearch);
+  }, [fetchTemplates, debouncedSearch]);
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-display font-black text-navy-800">Roteiros</h1>
+          <h1 className="text-xl sm:text-2xl font-display font-black text-navy-800 flex items-center gap-2">
+            Roteiros
+            {refreshing && <Loader2 size={14} className="text-navy-400 animate-spin" />}
+          </h1>
           <p className="text-gray-500 text-sm">{templates.length} roteiro{templates.length !== 1 ? "s" : ""} cadastrado{templates.length !== 1 ? "s" : ""}</p>
         </div>
         <Link
