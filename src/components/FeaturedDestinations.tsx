@@ -1,11 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, ArrowRight } from "lucide-react";
 import { fmtBRL } from "@/lib/format";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface PublicTemplate {
   id: number;
@@ -19,24 +14,10 @@ interface PublicTemplate {
   price_from: number;
 }
 
-export default function FeaturedDestinations() {
-  const [templates, setTemplates] = useState<PublicTemplate[]>([]);
-
-  useEffect(() => {
-    fetch(`${API}/templates/public`)
-      .then((r) => r.json())
-      .then((data: PublicTemplate[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = [...data].sort((a, b) => {
-            if (a.is_featured && !b.is_featured) return -1;
-            if (!a.is_featured && b.is_featured) return 1;
-            return 0;
-          });
-          setTemplates(sorted.slice(0, 6));
-        }
-      })
-      .catch(() => {});
-  }, []);
+export default function FeaturedDestinations({ templates: raw }: { templates: PublicTemplate[] }) {
+  const templates = [...raw]
+    .sort((a, b) => (a.is_featured === b.is_featured ? 0 : a.is_featured ? -1 : 1))
+    .slice(0, 6);
 
   if (templates.length === 0) return null;
 

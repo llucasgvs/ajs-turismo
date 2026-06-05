@@ -1,11 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface PublicDate {
   id: number;
@@ -36,25 +31,10 @@ function fmtDate(d: string) {
   return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-export default function FeaturedPackages() {
-  const [packages, setPackages] = useState<PublicTemplate[]>([]);
-
-  useEffect(() => {
-    fetch(`${API}/templates/public`)
-      .then((r) => r.json())
-      .then((data: PublicTemplate[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          // Prioriza os em destaque, depois pega os 3 primeiros
-          const sorted = [...data].sort((a, b) => {
-            if (a.is_featured && !b.is_featured) return -1;
-            if (!a.is_featured && b.is_featured) return 1;
-            return 0;
-          });
-          setPackages(sorted.slice(0, 3));
-        }
-      })
-      .catch(() => {});
-  }, []);
+export default function FeaturedPackages({ templates: raw }: { templates: PublicTemplate[] }) {
+  const packages = [...raw]
+    .sort((a, b) => (a.is_featured === b.is_featured ? 0 : a.is_featured ? -1 : 1))
+    .slice(0, 3);
 
   if (packages.length === 0) return null;
 
