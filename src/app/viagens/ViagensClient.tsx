@@ -83,7 +83,8 @@ function sortTemplates(templates: PublicTemplate[], sort: string): PublicTemplat
 
 export default function ViagensClient({ initialTemplates }: { initialTemplates: PublicTemplate[] }) {
   const [templates, setTemplates] = useState<PublicTemplate[]>(initialTemplates);
-  const [filtered, setFiltered] = useState<PublicTemplate[]>(initialTemplates);
+  // Inicializa já ordenado para evitar flash de ordem errada no primeiro render
+  const [filtered, setFiltered] = useState<PublicTemplate[]>(() => sortTemplates(initialTemplates, "date_asc"));
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("date_asc");
