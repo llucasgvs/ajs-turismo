@@ -13,6 +13,11 @@
   --gold-dark: #D4900B;
   --sky: #87CEEB;
   --sky-light: #B8E4F9;
+
+  /* Curvas de easing (mais fortes que as nativas) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * {
@@ -35,23 +40,23 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-gold-500 hover:bg-gold-400 text-navy-700 font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-gold hover:shadow-gold-hover hover:-translate-y-0.5 active:translate-y-0 text-sm md:text-base;
+    @apply bg-gold-500 hover:bg-gold-400 text-navy-700 font-bold py-3 px-6 rounded-xl transition-[transform,box-shadow,background-color] duration-200 ease-[var(--ease-out)] shadow-gold hover:shadow-gold-hover hover:-translate-y-0.5 active:scale-[0.98] text-sm md:text-base;
   }
 
   .btn-secondary {
-    @apply bg-transparent border-2 border-white text-white hover:bg-white hover:text-navy-600 font-semibold py-3 px-6 rounded-xl transition-all duration-300 text-sm md:text-base;
+    @apply bg-transparent border-2 border-white text-white hover:bg-white hover:text-navy-600 font-semibold py-3 px-6 rounded-xl transition-[transform,color,background-color,border-color] duration-200 ease-[var(--ease-out)] active:scale-[0.98] text-sm md:text-base;
   }
 
   .btn-navy {
-    @apply bg-navy-600 hover:bg-navy-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 text-sm md:text-base;
+    @apply bg-navy-600 hover:bg-navy-700 text-white font-bold py-3 px-6 rounded-xl transition-[transform,box-shadow,background-color] duration-200 ease-[var(--ease-out)] shadow-card hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] text-sm md:text-base;
   }
 
   .btn-outline-gold {
-    @apply bg-transparent border-2 border-gold-500 text-gold-500 hover:bg-gold-500 hover:text-navy-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300 text-sm md:text-base;
+    @apply bg-transparent border-2 border-gold-500 text-gold-500 hover:bg-gold-500 hover:text-navy-700 font-semibold py-3 px-6 rounded-xl transition-[transform,color,background-color] duration-200 ease-[var(--ease-out)] active:scale-[0.98] text-sm md:text-base;
   }
 
   .card {
-    @apply bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-300 overflow-hidden;
+    @apply bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-[transform,box-shadow] duration-200 ease-[var(--ease-out)] overflow-hidden;
   }
 
   .section-title {
@@ -161,4 +166,48 @@ body {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-4px); }
   40%, 80% { transform: translateX(4px); }
+}
+
+/* ── Entradas (modais, popovers, listas) ───────────────────────────────── */
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-overlay { animation: overlay-in 180ms var(--ease-out); }
+.animate-modal   { animation: modal-in 240ms var(--ease-out); }
+/* popover anima a partir do gatilho (topo por padrão) */
+.animate-pop     { animation: pop-in 180ms var(--ease-out); transform-origin: top; }
+
+/* Stagger em cascata para grades de cards */
+.stagger-in > * {
+  opacity: 0;
+  animation: fade-up 360ms var(--ease-out) forwards;
+}
+.stagger-in > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-in > *:nth-child(2)  { animation-delay: 50ms; }
+.stagger-in > *:nth-child(3)  { animation-delay: 100ms; }
+.stagger-in > *:nth-child(4)  { animation-delay: 150ms; }
+.stagger-in > *:nth-child(5)  { animation-delay: 200ms; }
+.stagger-in > *:nth-child(6)  { animation-delay: 250ms; }
+.stagger-in > *:nth-child(n+7) { animation-delay: 300ms; }
+
+/* ── Acessibilidade: respeita quem prefere menos movimento ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .stagger-in > * { opacity: 1; }
 }

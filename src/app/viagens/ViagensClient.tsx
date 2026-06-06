@@ -422,7 +422,7 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
         ) : filtered.length === 0 ? (
           <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div key={`${search}|${selectedDate}|${selectedMonth}|${sort}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-in">
             {filtered.map((tmpl) => (
               <TemplateCard key={tmpl.id} tmpl={tmpl} highlightDate={selectedDate} highlightMonth={selectedMonth} />
             ))}

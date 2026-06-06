@@ -707,9 +707,9 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] flex flex-col animate-modal">
         <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display font-black text-navy-800 text-lg">Reservar viagem</h3>
@@ -2044,7 +2044,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
                           <div
-                            className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-y-auto date-scroll"
+                            className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-y-auto date-scroll animate-pop"
                             style={{
                               top: dropdownPos.top,
                               left: dropdownPos.left,
