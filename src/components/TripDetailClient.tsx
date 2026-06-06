@@ -558,6 +558,8 @@ function ageFromBirth(birth: string): number | null {
 function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals, initialPeople = 1, initialTiers }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[]; initialPeople?: number; initialTiers?: Record<string, number> }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Identifica o campo com erro p/ destacar em vermelho ("titular-birth" | "comp-<i>-birth")
+  const [errorField, setErrorField] = useState("");
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>(initialOptionals);
   const [fullName, setFullName] = useState(user.full_name || "");
   const [phone, setPhone] = useState(user.phone || "");
@@ -637,14 +639,14 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError(""); setErrorField("");
     if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); return; }
-    if (!birthDate) { setError("Informe sua data de nascimento."); return; }
+    if (!birthDate) { setError("Informe sua data de nascimento."); setErrorField("titular-birth"); return; }
     if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); return; }
     for (const [i, c] of companions.entries()) {
       if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); return; }
       if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
-      if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); return; }
+      if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); setErrorField(`comp-${i}-birth`); return; }
     }
 
     // Valida data de nascimento contra a faixa de idade da categoria escolhida
@@ -662,10 +664,10 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         return null;
       };
       const titularErr = check(travelerCats[0] ?? ADULT, birthDate, "Titular");
-      if (titularErr) { setError(titularErr); return; }
+      if (titularErr) { setError(titularErr); setErrorField("titular-birth"); return; }
       for (const [i, c] of companions.entries()) {
         const err = check(travelerCats[i + 1] ?? ADULT, c.birth_date, `Acompanhante ${i + 1}`);
-        if (err) { setError(err); return; }
+        if (err) { setError(err); setErrorField(`comp-${i}-birth`); return; }
       }
     }
 
@@ -800,8 +802,12 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 <div className="relative">
                   <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type={type} required placeholder={placeholder} value={value}
-                    onChange={e => onChange(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                    onChange={e => { onChange(e.target.value); setErrorField(""); }}
+                    className={`w-full pl-8 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                      type === "date" && errorField === "titular-birth"
+                        ? "border-red-400 ring-2 ring-red-200 focus:ring-red-300"
+                        : "border-gray-200 focus:ring-navy-400"
+                    }`} />
                 </div>
               </div>
             ))}
@@ -839,8 +845,12 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Nascimento *</label>
                   <input type="date" required value={c.birth_date}
-                    onChange={e => updateCompanion(i, "birth_date", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                    onChange={e => { updateCompanion(i, "birth_date", e.target.value); setErrorField(""); }}
+                    className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                      errorField === `comp-${i}-birth`
+                        ? "border-red-400 ring-2 ring-red-200 focus:ring-red-300"
+                        : "border-gray-200 focus:ring-navy-400"
+                    }`} />
                 </div>
               </div>
               {hasTiers && (
