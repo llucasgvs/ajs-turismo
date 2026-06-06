@@ -163,7 +163,7 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
       <div className="relative h-28 sm:h-40 bg-gray-200 flex-shrink-0">
         {tmpl.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={tmpl.image_url} alt={tmpl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+          <img loading="lazy" decoding="async" src={tmpl.image_url} alt={tmpl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
             <MapPin size={32} />

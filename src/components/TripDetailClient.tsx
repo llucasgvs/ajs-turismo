@@ -194,7 +194,7 @@ function GalleryModal({ images, startIndex, onClose }: { images: string[]; start
       {/* Main image */}
       <div className="flex-1 flex items-center justify-center relative px-14 min-h-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[idx]} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+        <img loading="lazy" decoding="async" src={images[idx]} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
         {images.length > 1 && (
           <>
             <button onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
@@ -216,7 +216,7 @@ function GalleryModal({ images, startIndex, onClose }: { images: string[]; start
             <button key={i} onClick={() => setIdx(i)}
               className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${i === idx ? "border-gold-400" : "border-white/20 opacity-60 hover:opacity-100"}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -236,7 +236,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
       {/* Mobile: single large image */}
       <div className="sm:hidden relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={images[0]} alt="" className="w-full h-full object-cover" />
+        <img loading="lazy" decoding="async" src={images[0]} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         {images.length > 1 && (
           <button
@@ -253,7 +253,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
         {/* Large left */}
         <div className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpen(0)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={images[0]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+          <img loading="lazy" decoding="async" src={images[0]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         </div>
         {/* 4 small right — fill with placeholders if < 5 images */}
         {[1, 2, 3, 4].map((pos) => {
@@ -262,7 +262,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
           return img ? (
             <div key={pos} className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(pos)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
               {isLast && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white font-bold text-xl">+{images.length - 5}</span>
@@ -371,7 +371,7 @@ function RelatedCard({ trip }: { trip: Trip }) {
     >
       <div className="relative h-40 overflow-hidden flex-shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy" decoding="async"
           src={trip.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80"}
           alt={trip.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -1521,7 +1521,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon_ajs.png" alt="AJS Turismo" className="w-9 h-9 object-contain" />
+            <img loading="lazy" decoding="async" src="/icon_ajs.png" alt="AJS Turismo" className="w-9 h-9 object-contain" />
             <div className="flex flex-col leading-tight">
               <span className="font-display font-black text-navy-900 text-base tracking-tight">AJS</span>
               <span className="text-gold-500 text-[10px] font-semibold tracking-[0.2em] uppercase leading-none">Turismo</span>

@@ -121,7 +121,7 @@ export default function CadastroPage() {
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy" decoding="async"
           src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80&fit=crop"
           alt="AJS Turismo"
           className="w-full h-full object-cover"

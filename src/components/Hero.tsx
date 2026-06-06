@@ -52,6 +52,8 @@ export default function Hero() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            decoding="async"
+            fetchPriority="high"
             src={slide.image}
             alt={slide.title}
             className="w-full h-full object-cover"

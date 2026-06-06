@@ -190,7 +190,7 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
       <section className="relative pt-20 overflow-hidden pb-20">
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <img loading="lazy" decoding="async"
             src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80&fit=crop"
             alt="destinos"
             className="w-full h-full object-cover opacity-20"
@@ -485,7 +485,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
       {/* Image */}
       <div className="relative h-44 flex-shrink-0 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy" decoding="async"
           src={tmpl.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80"}
           alt={tmpl.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"

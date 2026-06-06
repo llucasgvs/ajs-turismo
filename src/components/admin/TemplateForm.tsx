@@ -629,7 +629,7 @@ export default function TemplateForm({
           {form.image_url && (
             <Section title="Preview do Card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.image_url} alt={form.title} className="w-full h-36 object-cover rounded-xl mb-3" />
+              <img loading="lazy" decoding="async" src={form.image_url} alt={form.title} className="w-full h-36 object-cover rounded-xl mb-3" />
               <p className="font-bold text-navy-800 text-sm leading-tight">{form.title || "Nome do roteiro"}</p>
               <p className="text-gray-500 text-xs mt-1">{form.destination || "Destino"}</p>
               {form.is_featured && (
@@ -822,7 +822,7 @@ function UnifiedGallery({ images, onChange }: {
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img} alt="" className="w-full h-28 object-cover" />
+            <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-28 object-cover" />
 
             {/* Principal badge */}
             {i === 0 && (

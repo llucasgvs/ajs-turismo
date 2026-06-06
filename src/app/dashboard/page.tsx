@@ -88,7 +88,7 @@ function BookingCard({ b }: { b: Booking }) {
           <div className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-navy-100">
             {b.trip_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={b.trip_image_url} alt={b.trip_title ?? ""} className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={b.trip_image_url} alt={b.trip_title ?? ""} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Plane size={22} className="text-navy-300" />

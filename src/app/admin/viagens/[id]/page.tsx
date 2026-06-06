@@ -722,7 +722,7 @@ function TemplateDrawer({ template, onClose }: { template: TripTemplate; onClose
           {/* Imagem */}
           {template.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={template.image_url} alt={template.title} className="w-full h-44 object-cover" />
+            <img loading="lazy" decoding="async" src={template.image_url} alt={template.title} className="w-full h-44 object-cover" />
           )}
 
           <div className="p-5 space-y-5">
@@ -820,7 +820,7 @@ function TemplateDrawer({ template, onClose }: { template: TripTemplate; onClose
                 <div className="grid grid-cols-3 gap-1.5">
                   {template.gallery.map((url, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={i} src={url} alt="" className="w-full h-20 object-cover rounded-xl" />
+                    <img loading="lazy" decoding="async" key={i} src={url} alt="" className="w-full h-20 object-cover rounded-xl" />
                   ))}
                 </div>
               </div>
@@ -1044,7 +1044,7 @@ export default function TemplateDetailPage() {
         <div className="sm:flex">
           {template.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={template.image_url} alt={template.title}
+            <img loading="lazy" decoding="async" src={template.image_url} alt={template.title}
               className="w-full sm:w-40 h-32 sm:h-auto object-cover flex-shrink-0" />
           )}
           <div className="p-4 flex-1 min-w-0">

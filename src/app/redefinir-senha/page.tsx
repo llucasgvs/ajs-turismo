@@ -61,7 +61,7 @@ export default function RedefinirSenhaPage() {
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy" decoding="async"
           src="https://images.unsplash.com/photo-1502920514313-52581002a659?w=1200&q=80&fit=crop"
           alt="Viagem AJS"
           className="w-full h-full object-cover"

@@ -56,7 +56,7 @@ export default function LoginPage() {
       {/* Left panel - image */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy" decoding="async"
           src="https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200&q=80&fit=crop"
           alt="Viagem AJS"
           className="w-full h-full object-cover"
