@@ -13,7 +13,7 @@ export interface Trip {
   price_per_person: number;
   original_price: number | null;
   max_installments: number;
-  price_tiers: { label: string; price: number }[];
+  price_tiers: { name?: string; age_range?: string; price: number; label?: string }[];
   total_spots: number;
   available_spots: number;
   min_group_size: number;

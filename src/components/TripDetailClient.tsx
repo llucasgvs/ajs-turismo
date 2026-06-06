@@ -12,6 +12,7 @@ import {
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -543,14 +544,14 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const tiers = trip.price_tiers ?? [];
   const hasTiers = tiers.length > 0;
   const priceForLabel = (label: string) =>
-    label === ADULT ? trip.price_per_person : (tiers.find(t => t.label === label)?.price ?? trip.price_per_person);
+    label === ADULT ? trip.price_per_person : (tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person);
 
   // Sem faixas: contador único. Com faixas: quantidade por categoria.
   const [peopleState, setPeopleState] = useState(initialPeople);
   const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
     // Herda os contadores da lateral, se vierem; senão começa com Adulto = initialPeople
     const base: Record<string, number> = { [ADULT]: initialPeople };
-    (trip.price_tiers ?? []).forEach(t => { base[t.label] = 0; });
+    (trip.price_tiers ?? []).forEach(t => { base[tierLabel(t)] = 0; });
     if (initialTiers && Object.values(initialTiers).reduce((a, b) => a + b, 0) > 0) {
       return { ...base, ...initialTiers };
     }
@@ -681,7 +682,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-2">Pessoas por categoria *</label>
               <div className="space-y-2">
-                {[ADULT, ...tiers.map(t => t.label)].map((label) => (
+                {[ADULT, ...tiers.map(t => tierLabel(t))].map((label) => (
                   <div key={label} className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-navy-800 truncate">{label}</p>
@@ -1321,13 +1322,13 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const activeTiers = activeTrip.price_tiers ?? [];
   const activeHasTiers = activeTiers.length > 0;
   const priceForLabel = (label: string) =>
-    label === ADULT ? activeTrip.price_per_person : (activeTiers.find(t => t.label === label)?.price ?? activeTrip.price_per_person);
+    label === ADULT ? activeTrip.price_per_person : (activeTiers.find(t => tierLabel(t) === label)?.price ?? activeTrip.price_per_person);
 
   // Reinicia os contadores por categoria quando a data ativa muda
   useEffect(() => {
     if (!activeHasTiers) return;
     const init: Record<string, number> = { [ADULT]: 1 };
-    activeTiers.forEach(t => { init[t.label] = 0; });
+    activeTiers.forEach(t => { init[tierLabel(t)] = 0; });
     setSidebarTiers(init);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTrip.id]);
@@ -2001,7 +2002,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         <>
                           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas por categoria</p>
                           <div className="space-y-2">
-                            {[ADULT, ...activeTiers.map(t => t.label)].map((label) => (
+                            {[ADULT, ...activeTiers.map(t => tierLabel(t))].map((label) => (
                               <div key={label} className="flex items-center gap-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{label}</p>
