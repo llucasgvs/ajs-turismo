@@ -9,6 +9,11 @@ import { fmtBRL } from "@/lib/format";
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const PAGE_SIZE = 25;
 
+// Cache da lista de viagens (dados de referência p/ dropdown + venda externa).
+// Reservas em si NÃO são cacheadas — sempre refrescadas a cada visita.
+const _tripsCache: { data: Trip[] | null; ts: number } = { data: null, ts: 0 };
+const TRIPS_TTL = 60_000;
+
 /* ─── Types ─── */
 type Booking = {
   id: number;
@@ -980,7 +985,7 @@ export default function AdminReservasPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ interesse: 0, confirmed: 0, cancelled: 0, all: 0 });
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<Trip[]>(_tripsCache.data ?? []);
   const [tab, setTab] = useState<"interesse" | "confirmed" | "cancelled" | "all">("interesse");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1048,8 +1053,20 @@ export default function AdminReservasPage() {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   useEffect(() => {
+    // Usa cache fresco se houver; caso contrário busca e grava no cache
+    if (_tripsCache.data && (Date.now() - _tripsCache.ts) < TRIPS_TTL) {
+      setTrips(_tripsCache.data);
+      return;
+    }
     fetch(`${API}/trips/admin-list?limit=100`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.json()).then((d) => { if (d?.items) setTrips(d.items); else if (Array.isArray(d)) setTrips(d); }).catch(() => {});
+      .then((r) => r.json())
+      .then((d) => {
+        const list = d?.items ?? (Array.isArray(d) ? d : []);
+        setTrips(list);
+        _tripsCache.data = list;
+        _tripsCache.ts = Date.now();
+      })
+      .catch(() => {});
   }, []);
 
   const confirm = async (code: string) => {
