@@ -535,33 +535,43 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const [phone, setPhone] = useState(user.phone || "");
   const [cpf, setCpf] = useState(user.cpf || "");
   const [birthDate, setBirthDate] = useState(user.birth_date || "");
-  const [people, setPeople] = useState(initialPeople);
   const [companions, setCompanions] = useState<CompanionForm[]>([]);
   const [note, setNote] = useState("");
 
   // Faixas de preço por idade (ex: criança). Vazio = só o preço padrão (Adulto).
+  const ADULT = "Adulto";
   const tiers = trip.price_tiers ?? [];
   const hasTiers = tiers.length > 0;
-  const tierPrice = (label: string) => label
-    ? (tiers.find(t => t.label === label)?.price ?? trip.price_per_person)
-    : trip.price_per_person;
-  // 1 entrada por viajante (índice 0 = titular). "" = Adulto/padrão.
-  const [travelerTiers, setTravelerTiers] = useState<string[]>([""]);
+  const priceForLabel = (label: string) =>
+    label === ADULT ? trip.price_per_person : (tiers.find(t => t.label === label)?.price ?? trip.price_per_person);
 
-  useEffect(() => {
-    setTravelerTiers(prev => {
-      if (prev.length === people) return prev;
-      return prev.length < people
-        ? [...prev, ...Array(people - prev.length).fill("")]
-        : prev.slice(0, people);
+  // Sem faixas: contador único. Com faixas: quantidade por categoria.
+  const [peopleState, setPeopleState] = useState(initialPeople);
+  const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = { [ADULT]: initialPeople };
+    (trip.price_tiers ?? []).forEach(t => { init[t.label] = 0; });
+    return init;
+  });
+
+  const people = hasTiers
+    ? Object.values(tierCounts).reduce((a, b) => a + b, 0)
+    : peopleState;
+  const maxSpots = trip.available_spots || 50;
+
+  const changeTier = (label: string, delta: number) => {
+    setTierCounts(prev => {
+      const total = Object.values(prev).reduce((a, b) => a + b, 0);
+      if (delta > 0 && total >= maxSpots) return prev;
+      const next = Math.max(0, (prev[label] || 0) + delta);
+      const updated = { ...prev, [label]: next };
+      // Garante pelo menos 1 pessoa no total
+      if (Object.values(updated).reduce((a, b) => a + b, 0) < 1) return prev;
+      return updated;
     });
-  }, [people]);
-
-  const setTier = (idx: number, label: string) =>
-    setTravelerTiers(prev => prev.map((t, i) => i === idx ? label : t));
+  };
 
   const baseTotal = hasTiers
-    ? travelerTiers.reduce((s, lbl) => s + tierPrice(lbl), 0)
+    ? Object.entries(tierCounts).reduce((s, [label, qty]) => s + qty * priceForLabel(label), 0)
     : people * trip.price_per_person;
   const optionalsTotal = selectedOptionals.reduce((s, o) => s + o.price * people, 0);
   const grandTotal = baseTotal + optionalsTotal;
@@ -603,11 +613,9 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
       });
-      const tierBreakdown = hasTiers ? (() => {
-        const counts: Record<string, number> = {};
-        travelerTiers.forEach(lbl => { const k = lbl || "Adulto"; counts[k] = (counts[k] || 0) + 1; });
-        return Object.entries(counts).map(([label, qty]) => ({ label, qty }));
-      })() : [];
+      const tierBreakdown = hasTiers
+        ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+        : [];
       const bookingRes = await fetch(`${API}/bookings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -621,11 +629,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
       const tierSummary = hasTiers
-        ? Object.entries(
-            travelerTiers.reduce<Record<string, number>>((acc, lbl) => {
-              const k = lbl || "Adulto"; acc[k] = (acc[k] || 0) + 1; return acc;
-            }, {})
-          ).map(([label, qty]) => ({ label, qty, price: tierPrice(label === "Adulto" ? "" : label) }))
+        ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty, price: priceForLabel(label) }))
         : undefined;
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals, hasTiers ? baseTotal : undefined, tierSummary);
       const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
@@ -669,16 +673,38 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
-            <div className="flex items-center gap-4">
-              <button type="button" onClick={() => setPeople(p => Math.max(1, p - 1))}
-                className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">−</button>
-              <span className="flex-1 text-center font-bold text-navy-800 text-xl">{people}</span>
-              <button type="button" onClick={() => setPeople(p => Math.min(trip.available_spots || 50, p + 1))}
-                className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
+          {hasTiers ? (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Pessoas por categoria *</label>
+              <div className="space-y-2">
+                {[ADULT, ...tiers.map(t => t.label)].map((label) => (
+                  <div key={label} className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-navy-800 truncate">{label}</p>
+                      <p className="text-xs text-gray-400">R$ {fmtBRL(priceForLabel(label))}</p>
+                    </div>
+                    <button type="button" onClick={() => changeTier(label, -1)}
+                      className="w-9 h-9 flex items-center justify-center border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-bold text-lg flex-shrink-0">−</button>
+                    <span className="w-7 text-center font-bold text-navy-800">{tierCounts[label] || 0}</span>
+                    <button type="button" onClick={() => changeTier(label, 1)}
+                      className="w-9 h-9 flex items-center justify-center border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-bold text-lg flex-shrink-0">+</button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">Total: {people} pessoa{people !== 1 ? "s" : ""}</p>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
+              <div className="flex items-center gap-4">
+                <button type="button" onClick={() => setPeopleState(p => Math.max(1, p - 1))}
+                  className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">−</button>
+                <span className="flex-1 text-center font-bold text-navy-800 text-xl">{people}</span>
+                <button type="button" onClick={() => setPeopleState(p => Math.min(trip.available_spots || 50, p + 1))}
+                  className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
+              </div>
+            </div>
+          )}
 
           {trip.optionals?.length > 0 && (
             <div>
@@ -734,18 +760,6 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 </div>
               </div>
             ))}
-            {hasTiers && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria</label>
-                <select value={travelerTiers[0] ?? ""} onChange={e => setTier(0, e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
-                  <option value="">{`Adulto — R$ ${fmtBRL(trip.price_per_person)}`}</option>
-                  {tiers.map(t => (
-                    <option key={t.label} value={t.label}>{`${t.label} — R$ ${fmtBRL(t.price)}`}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           {companions.map((c, i) => (
@@ -773,18 +787,6 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
-              {hasTiers && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria</label>
-                  <select value={travelerTiers[i + 1] ?? ""} onChange={e => setTier(i + 1, e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
-                    <option value="">{`Adulto — R$ ${fmtBRL(trip.price_per_person)}`}</option>
-                    {tiers.map(t => (
-                      <option key={t.label} value={t.label}>{`${t.label} — R$ ${fmtBRL(t.price)}`}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
           ))}
 
@@ -800,14 +802,10 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
           <div className="bg-navy-50 rounded-xl p-3 space-y-1.5">
             {hasTiers ? (
               // Resumo por categoria
-              Object.entries(
-                travelerTiers.reduce<Record<string, number>>((acc, lbl) => {
-                  const k = lbl || "Adulto"; acc[k] = (acc[k] || 0) + 1; return acc;
-                }, {})
-              ).map(([label, qty]) => (
+              Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => (
                 <div key={label} className="flex items-center justify-between">
-                  <span className="text-sm text-navy-600 font-medium">{qty} × {label} (R$ {fmtBRL(tierPrice(label === "Adulto" ? "" : label))})</span>
-                  <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(qty * tierPrice(label === "Adulto" ? "" : label))}</span>
+                  <span className="text-sm text-navy-600 font-medium">{qty} × {label} (R$ {fmtBRL(priceForLabel(label))})</span>
+                  <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(qty * priceForLabel(label))}</span>
                 </div>
               ))
             ) : (
@@ -1328,7 +1326,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   // Load all dates for same template
   useEffect(() => {
     if (!trip.template_id) return;
-    fetch(`${API}/trips/?template_id=${trip.template_id}&limit=500&future_only=true`)
+    fetch(`${API}/trips/?template_id=${trip.template_id}&limit=500&future_only=true`, { cache: "no-store" })
       .then(r => r.json())
       .then((data: Trip[]) => {
         if (!Array.isArray(data) || data.length === 0) return;
