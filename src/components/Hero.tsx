@@ -68,7 +68,7 @@ export default function Hero() {
       }} />
 
       {/* Content */}
-      <div className="relative z-10 container-custom pt-24 pb-16 md:pt-32 md:pb-20">
+      <div className="relative z-10 container-custom pt-24 pb-28 md:pt-32 md:pb-20">
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
           <div
@@ -152,7 +152,7 @@ export default function Hero() {
       </div>
 
       {/* Slide indicators */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+      <div className="absolute bottom-6 md:bottom-20 left-1/2 -translate-x-1/2 flex gap-2 z-10">
         {heroSlides.map((_, i) => (
           <button
             key={i}
@@ -164,8 +164,8 @@ export default function Hero() {
         ))}
       </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+      {/* Scroll indicator — só desktop (no mobile sobrepunha as estatísticas) */}
+      <div className="hidden md:block absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => document.querySelector("#destinos")?.scrollIntoView({ behavior: "smooth" })}
           className="flex flex-col items-center gap-1 text-white/50 hover:text-gold-400 transition-colors animate-bounce-slow"

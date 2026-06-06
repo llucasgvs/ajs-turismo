@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   MapPin, Search, ArrowRight,
-  X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check,
+  X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -96,8 +96,17 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
     const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() };
   });
   const [showWhenPicker, setShowWhenPicker] = useState(false);
+  const [showTop, setShowTop] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const whenRef = useRef<HTMLDivElement>(null);
+
+  // Botão "voltar ao topo" aparece após rolar
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 800);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -449,6 +458,18 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
       </section>
 
       <Footer />
+
+      {/* Voltar ao topo */}
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Voltar ao topo"
+        className={`fixed bottom-6 right-6 z-40 w-11 h-11 rounded-full bg-navy-800 text-white shadow-lg flex items-center justify-center transition-[transform,opacity] duration-200 ease-[var(--ease-out)] hover:bg-navy-700 active:scale-95 ${
+          showTop ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-3 pointer-events-none"
+        }`}
+      >
+        <ArrowUp size={20} />
+      </button>
     </div>
   );
 }
