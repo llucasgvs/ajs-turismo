@@ -44,6 +44,7 @@ interface TripDate {
   price_per_person: number;
   original_price: number | null;
   max_installments: number;
+  price_tiers: { label: string; price: number }[] | null;
   total_spots: number;
   available_spots: number;
   status: string;
@@ -51,6 +52,13 @@ interface TripDate {
   created_at: string;
   hidden_at: string | null;
 }
+
+const TIER_SUGGESTIONS = [
+  "Criança (até 5 anos)",
+  "Criança (5 a 12 anos)",
+  "Idoso (60+ anos)",
+  "Meia-entrada",
+];
 
 interface Counts {
   all: number; active: number; sold_out: number; hidden: number; completed: number;
@@ -145,8 +153,17 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   const [availSpots, setAvailSpots] = useState(date.available_spots);
   const [depTime, setDepTime] = useState(dep.time);
   const [retTime, setRetTime] = useState(ret.time);
+  const [tiers, setTiers] = useState<{ label: string; price: string }[]>(
+    (date.price_tiers ?? []).map((t) => ({ label: t.label, price: String(t.price) }))
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const addTier = (label = "") => setTiers(prev =>
+    prev.some(t => t.label.trim().toLowerCase() === label.trim().toLowerCase() && label) ? prev : [...prev, { label, price: "" }]);
+  const removeTier = (i: number) => setTiers(prev => prev.filter((_, idx) => idx !== i));
+  const updateTier = (i: number, key: "label" | "price", value: string) =>
+    setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [key]: value } : t));
 
   const sold = totalSpots - availSpots;
   const pct = totalSpots > 0 ? Math.min(100, Math.round((sold / totalSpots) * 100)) : 0;
@@ -158,6 +175,17 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
     if (!price || isNaN(priceVal) || priceVal <= 0) { setError("Informe um preço válido."); return; }
     if (totalSpots <= 0) { setError("Total de vagas deve ser maior que zero."); return; }
     if (availSpots > totalSpots) { setError("Vagas disponíveis não podem exceder o total."); return; }
+    // Faixas: nome e preço obrigatórios, sem duplicatas
+    const seen = new Set<string>();
+    for (const t of tiers) {
+      const label = t.label.trim();
+      if (!label) { setError("Dê um nome com a idade para cada faixa (ex: Criança 5 a 12 anos)."); return; }
+      const p = parseFloat(t.price);
+      if (t.price === "" || isNaN(p) || p < 0) { setError(`Informe um preço válido para a faixa "${label}".`); return; }
+      const k = label.toLowerCase();
+      if (seen.has(k)) { setError(`Faixa repetida: "${label}".`); return; }
+      seen.add(k);
+    }
     setLoading(true);
     try {
       const res = await apiFetch(`/templates/${templateId}/trips/${date.id}`, {
@@ -170,6 +198,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           max_installments: maxInst,
           total_spots: totalSpots,
           available_spots: availSpots,
+          price_tiers: tiers.map((t) => ({ label: t.label.trim(), price: parseFloat(t.price) })),
         }),
       });
       if (!res.ok) {
@@ -278,6 +307,42 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Valores por idade (faixas) */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Valores por idade</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {TIER_SUGGESTIONS.filter(s => !tiers.some(t => t.label.trim().toLowerCase() === s.toLowerCase())).map(s => (
+                <button key={s} type="button" onClick={() => addTier(s)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
+                  <Plus size={10} /> {s}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {tiers.map((tier, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400"
+                    placeholder="Ex: Criança (5 a 12 anos)" value={tier.label}
+                    onChange={(e) => updateTier(i, "label", e.target.value)} />
+                  <div className="relative w-24 flex-shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">R$</span>
+                    <input type="number" min="0" step="0.01" placeholder="0,00" value={tier.price}
+                      onChange={(e) => updateTier(i, "price", e.target.value)}
+                      className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                  </div>
+                  <button type="button" onClick={() => removeTier(i)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => addTier()}
+              className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-navy-600 hover:text-navy-800 transition-colors">
+              <Plus size={14} /> Adicionar faixa
+            </button>
           </div>
 
           {/* Link para edição completa (só faz sentido alterar datas em roteiros não-open_date) */}
