@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle, Calendar, Star, ArrowRight,
   Loader2, BookOpen, Activity,
 } from "lucide-react";
-import { getToken } from "@/lib/api";
+import { getToken, fetchWithTimeout } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -125,11 +125,11 @@ export default function AdminDashboard() {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const [sR, cR, iR, tR, tmR] = await Promise.all([
-        fetch(`${API}/bookings/admin/stats`, { headers: authHeaders() }),
-        fetch(`${API}/bookings/admin/counts`, { headers: authHeaders() }),
-        fetch(`${API}/bookings/admin/all?booking_status=interesse&limit=6&skip=0`, { headers: authHeaders() }),
-        fetch(`${API}/trips/admin-list?limit=100`, { headers: authHeaders() }),
-        fetch(`${API}/templates/admin-list`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/bookings/admin/stats`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/bookings/admin/counts`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/bookings/admin/all?booking_status=interesse&limit=6&skip=0`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/templates/admin-list`, { headers: authHeaders() }),
       ]);
       const [sD, cD, iD, tD, tmD] = await Promise.all([sR.json(), cR.json(), iR.json(), tR.json(), tmR.json()]);
       setStats(sD);

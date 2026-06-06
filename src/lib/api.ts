@@ -1,5 +1,24 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * fetch com timeout. Sem isso, um backend lento/travado deixa a tela girando
+ * para sempre — o fetch padrão nunca desiste. No timeout, rejeita (AbortError),
+ * o que faz o `finally` das páginas desligar o spinner em vez de pendurar.
+ */
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 30000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface StoredUser {
   id: number;
   full_name: string;
@@ -73,13 +92,13 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  let res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res = await fetchWithTimeout(`${API_URL}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       headers["Authorization"] = `Bearer ${getToken()}`;
-      res = await fetch(`${API_URL}${path}`, { ...options, headers });
+      res = await fetchWithTimeout(`${API_URL}${path}`, { ...options, headers });
     } else {
       logout();
     }

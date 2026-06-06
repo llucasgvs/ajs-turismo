@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
-import { getToken } from "@/lib/api";
+import { getToken, fetchWithTimeout } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 
@@ -675,7 +675,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     if (cpfTimer.current) clearTimeout(cpfTimer.current);
     cpfTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${API}/bookings/admin/lookup-cpf?cpf=${clean}`, {
+        const res = await fetchWithTimeout(`${API}/bookings/admin/lookup-cpf?cpf=${clean}`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
         const d = await res.json();
@@ -732,7 +732,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/bookings/admin/external`, {
+      const res = await fetchWithTimeout(`${API}/bookings/admin/external`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
@@ -1020,7 +1020,7 @@ export default function AdminReservasPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/bookings/admin/counts`, {
+      const res = await fetchWithTimeout(`${API}/bookings/admin/counts`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) setCounts(await res.json());
@@ -1037,7 +1037,7 @@ export default function AdminReservasPage() {
       if (tripFilter) params.set("trip_id", tripFilter);
       if (debouncedSearch) params.set("search", debouncedSearch);
 
-      const res = await fetch(`${API}/bookings/admin/all?${params}`, {
+      const res = await fetchWithTimeout(`${API}/bookings/admin/all?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) {
@@ -1059,7 +1059,7 @@ export default function AdminReservasPage() {
       setTrips(_tripsCache.data);
       return;
     }
-    fetch(`${API}/trips/admin-list?limit=100`, { headers: { Authorization: `Bearer ${getToken()}` } })
+    fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: { Authorization: `Bearer ${getToken()}` } })
       .then((r) => r.json())
       .then((d) => {
         const list = d?.items ?? (Array.isArray(d) ? d : []);
@@ -1074,7 +1074,7 @@ export default function AdminReservasPage() {
     // Used only from BookingDetailModal (no price adjust)
     setActionLoading(code);
     try {
-      await fetch(`${API}/bookings/${code}/confirm`, {
+      await fetchWithTimeout(`${API}/bookings/${code}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({}),
@@ -1095,7 +1095,7 @@ export default function AdminReservasPage() {
     if (!cancelTarget) return;
     setCancelLoading(true);
     try {
-      await fetch(`${API}/bookings/${cancelTarget.booking_code}/cancel`, {
+      await fetchWithTimeout(`${API}/bookings/${cancelTarget.booking_code}/cancel`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
