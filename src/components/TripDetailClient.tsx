@@ -612,6 +612,11 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const optionalsTotal = selectedOptionals.reduce((s, o) => s + o.price * people, 0);
   const grandTotal = baseTotal + optionalsTotal;
 
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error]);
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -730,7 +735,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
-          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
+          {error && <div ref={errorRef} className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
