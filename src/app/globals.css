@@ -148,4 +148,10 @@ body {
 .date-scroll::-webkit-scrollbar { width: 4px; }
 .date-scroll::-webkit-scrollbar-track { background: transparent; }
 .date-scroll::-webkit-scrollbar-thumb { background: #D5DFEF; border-radius: 99px; }
-.date-scroll { scrollbar-width: thin; scrollbar-color: #D5DFEF transparent; }
+.date-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #D5DFEF transparent;
+  /* Impede o scroll interno de "vazar" para a página ao chegar no fim
+     (evitava que o dropdown de datas fechasse e a página rolasse sozinha) */
+  overscroll-behavior: contain;
+}
