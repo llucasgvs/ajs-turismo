@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft, Plus, Pencil, EyeOff, RefreshCw, Calendar, Users,
   MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List, Layers,
-  Clock, ClipboardList, DollarSign, Save,
+  Clock, ClipboardList, DollarSign, Save, Copy,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -362,10 +362,35 @@ function BulkModal({ templateId, onClose, onDone }: {
   const [originalPrice, setOriginalPrice] = useState("");
   const [spots, setSpots] = useState("40");
   const [maxInstallments, setMaxInstallments] = useState("12");
+  const [depTime, setDepTime] = useState("06:00");
+  const [retTime, setRetTime] = useState("23:59");
   const [skipExisting, setSkipExisting] = useState(true);
+  const [inherited, setInherited] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   const [error, setError] = useState("");
+
+  // Herda preço, vagas, parcelas e horários da última data criada
+  useEffect(() => {
+    apiFetch(`/templates/${templateId}/trips?limit=100`)
+      .then((r) => r.json())
+      .then((data) => {
+        const items = data?.items ?? [];
+        if (items.length === 0) return;
+        const last = items.reduce((a: { created_at: string }, b: { created_at: string }) =>
+          new Date(b.created_at).getTime() > new Date(a.created_at).getTime() ? b : a
+        );
+        setPrice(String(last.price_per_person));
+        if (last.original_price != null) setOriginalPrice(String(last.original_price));
+        setSpots(String(last.total_spots));
+        setMaxInstallments(String(last.max_installments));
+        const sp = (iso: string) => new Date(iso).toLocaleString("sv", { timeZone: "America/Sao_Paulo" }).slice(11, 16);
+        setDepTime(sp(last.departure_date));
+        setRetTime(sp(last.return_date));
+        setInherited(true);
+      })
+      .catch(() => {});
+  }, [templateId]);
 
   // Preview: quantas datas serão criadas
   const previewCount = (() => {
@@ -397,6 +422,10 @@ function BulkModal({ templateId, onClose, onDone }: {
           start_date: startDate,
           end_date: endDate,
           days_of_week: selectedDays,
+          departure_hour: parseInt(depTime.split(":")[0]) || 6,
+          departure_minute: parseInt(depTime.split(":")[1] ?? "0"),
+          return_hour: parseInt(retTime.split(":")[0]) || 23,
+          return_minute: parseInt(retTime.split(":")[1] ?? "59"),
           price_per_person: parseFloat(price),
           original_price: originalPrice ? parseFloat(originalPrice) : null,
           max_installments: parseInt(maxInstallments),
@@ -428,7 +457,7 @@ function BulkModal({ templateId, onClose, onDone }: {
             <h2 className="font-black text-navy-800 text-base flex items-center gap-2">
               <Layers size={16} className="text-navy-600" /> Gerar datas em lote
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Ideal para roteiros com saídas diárias</p>
+            <p className="text-xs text-gray-400 mt-0.5">Para viagens recorrentes (ex: todo sábado num período)</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
             <X size={18} />
@@ -455,6 +484,13 @@ function BulkModal({ templateId, onClose, onDone }: {
             </div>
           ) : (
             <>
+              {inherited && (
+                <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 text-navy-600 text-xs px-4 py-2.5 rounded-xl">
+                  <Layers size={13} className="flex-shrink-0" />
+                  Preço, vagas, parcelas e horários foram herdados da última data criada. Ajuste se precisar.
+                </div>
+              )}
+
               {/* Período */}
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Período</p>
@@ -523,6 +559,23 @@ function BulkModal({ templateId, onClose, onDone }: {
                   <label className="text-xs text-gray-400 mb-1 block">Parcelas (máx)</label>
                   <input type="number" className="input-field text-sm" value={maxInstallments}
                     min="1" max="24" onChange={e => setMaxInstallments(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Horários (aplicados a todas as datas geradas) */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Horários <span className="text-gray-400 font-normal normal-case">(Brasília, iguais para todas)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Saída</label>
+                    <input type="time" className="input-field text-sm" value={depTime}
+                      onChange={e => setDepTime(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Retorno</label>
+                    <input type="time" className="input-field text-sm" value={retTime}
+                      onChange={e => setRetTime(e.target.value)} />
+                  </div>
                 </div>
               </div>
 
@@ -1223,13 +1276,19 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
         </div>
       </div>
 
-      {/* Linha 5: ver reservas */}
-      {sold > 0 && (
-        <Link href={`/admin/reservas?trip_id=${date.id}`}
-          className="mt-3 flex items-center justify-center gap-1.5 w-full border border-navy-100 bg-navy-50/50 text-navy-600 hover:bg-navy-50 font-semibold text-xs py-2 rounded-xl transition-colors">
-          <ClipboardList size={12} /> Ver {sold} reserva{sold !== 1 ? "s" : ""}
+      {/* Linha 5: rodapé de ações (duplicar + ver reservas) */}
+      <div className="mt-3 flex gap-2">
+        <Link href={`/admin/viagens/${templateId}/datas/nova?dup=${date.id}`}
+          className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold text-xs py-2 rounded-xl transition-colors">
+          <Copy size={12} /> Duplicar
         </Link>
-      )}
+        {sold > 0 && (
+          <Link href={`/admin/reservas?trip_id=${date.id}`}
+            className="flex items-center justify-center gap-1.5 flex-1 border border-navy-100 bg-navy-50/50 text-navy-600 hover:bg-navy-50 font-semibold text-xs py-2 rounded-xl transition-colors">
+            <ClipboardList size={12} /> Ver {sold} reserva{sold !== 1 ? "s" : ""}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

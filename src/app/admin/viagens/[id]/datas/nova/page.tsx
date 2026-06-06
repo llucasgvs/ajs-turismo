@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import TripDateForm from "@/components/admin/TripDateForm";
 import { apiFetch } from "@/lib/api";
@@ -23,6 +23,8 @@ function timeOf(iso: string): string {
 
 export default function NovaDatum() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const dupId = searchParams.get("dup");
   const [templateTitle, setTemplateTitle] = useState("");
   const [templateDurationNights, setTemplateDurationNights] = useState<number | undefined>();
   const [defaults, setDefaults] = useState<TripDateDefaults | undefined>();
@@ -36,8 +38,8 @@ export default function NovaDatum() {
       if (tmpl?.title) setTemplateTitle(tmpl.title);
       if (tmpl?.duration_nights != null) setTemplateDurationNights(tmpl.duration_nights);
 
-      // Herda valores da última data CRIADA (maior created_at)
       const items: Array<{
+        id: number;
         created_at: string;
         departure_date: string;
         return_date: string;
@@ -47,22 +49,27 @@ export default function NovaDatum() {
         total_spots: number;
       }> = datesData?.items ?? [];
 
-      if (items.length > 0) {
-        const last = items.reduce((a, b) =>
+      // Com ?dup=<id>, herda daquela data específica; senão, da última criada
+      let source = dupId ? items.find((t) => t.id === parseInt(dupId)) : undefined;
+      if (!source && items.length > 0) {
+        source = items.reduce((a, b) =>
           new Date(b.created_at).getTime() > new Date(a.created_at).getTime() ? b : a
         );
+      }
+
+      if (source) {
         setDefaults({
-          price_per_person: last.price_per_person,
-          original_price: last.original_price,
-          max_installments: last.max_installments,
-          total_spots: last.total_spots,
-          dep_time: timeOf(last.departure_date),
-          ret_time: timeOf(last.return_date),
+          price_per_person: source.price_per_person,
+          original_price: source.original_price,
+          max_installments: source.max_installments,
+          total_spots: source.total_spots,
+          dep_time: timeOf(source.departure_date),
+          ret_time: timeOf(source.return_date),
         });
       }
       setLoading(false);
     });
-  }, [id]);
+  }, [id, dupId]);
 
   if (loading) {
     return (
