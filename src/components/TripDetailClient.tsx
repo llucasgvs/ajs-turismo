@@ -525,6 +525,33 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
   );
 }
 
+/** Tenta extrair {min,max} de uma faixa de idade livre ("5 a 12 anos", "até 12", "60+"). */
+function parseAgeRange(s?: string): { min: number; max: number } | null {
+  if (!s) return null;
+  const txt = s.toLowerCase().replace(/anos?/g, "").trim();
+  let m = txt.match(/(\d+)\s*(?:a|à|-|–|até|ate)\s*(\d+)/);
+  if (m) return { min: +m[1], max: +m[2] };
+  m = txt.match(/(?:até|ate|menor que|abaixo de|<=?)\s*(\d+)/);
+  if (m) return { min: 0, max: +m[1] };
+  m = txt.match(/(?:acima de|maior que|mais de|>=?)\s*(\d+)/) || txt.match(/(\d+)\s*\+/) || txt.match(/(\d+)\s*ou\s*mais/);
+  if (m) return { min: +m[1], max: Infinity };
+  m = txt.match(/^(\d+)$/);
+  if (m) return { min: 0, max: +m[1] };
+  return null;
+}
+
+/** Idade em anos completos a partir de "YYYY-MM-DD". */
+function ageFromBirth(birth: string): number | null {
+  if (!birth) return null;
+  const b = new Date(birth + "T12:00:00");
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  const md = now.getMonth() - b.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < b.getDate())) a--;
+  return a;
+}
+
 /* ═══════════════════════════════════════════
    10. Booking Modal
 ═══════════════════════════════════════════ */
@@ -546,37 +573,41 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const priceForLabel = (label: string) =>
     label === ADULT ? trip.price_per_person : (tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person);
 
-  // Sem faixas: contador único. Com faixas: quantidade por categoria.
-  const [peopleState, setPeopleState] = useState(initialPeople);
-  const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
-    // Herda os contadores da lateral, se vierem; senão começa com Adulto = initialPeople
-    const base: Record<string, number> = { [ADULT]: initialPeople };
-    (trip.price_tiers ?? []).forEach(t => { base[tierLabel(t)] = 0; });
-    if (initialTiers && Object.values(initialTiers).reduce((a, b) => a + b, 0) > 0) {
-      return { ...base, ...initialTiers };
-    }
-    return base;
-  });
-
-  const people = hasTiers
-    ? Object.values(tierCounts).reduce((a, b) => a + b, 0)
-    : peopleState;
   const maxSpots = trip.available_spots || 50;
 
-  const changeTier = (label: string, delta: number) => {
-    setTierCounts(prev => {
-      const total = Object.values(prev).reduce((a, b) => a + b, 0);
-      if (delta > 0 && total >= maxSpots) return prev;
-      const next = Math.max(0, (prev[label] || 0) + delta);
-      const updated = { ...prev, [label]: next };
-      // Garante pelo menos 1 pessoa no total
-      if (Object.values(updated).reduce((a, b) => a + b, 0) < 1) return prev;
-      return updated;
-    });
+  // Sem faixas: contador único. Com faixas: 1 categoria por viajante (índice 0 = titular).
+  const [peopleState, setPeopleState] = useState(initialPeople);
+  const [travelerCats, setTravelerCats] = useState<string[]>(() => {
+    if (!hasTiers) return [];
+    // Expande as quantidades escolhidas na lateral para uma lista, na ordem (Adulto primeiro)
+    const order = [ADULT, ...tiers.map(t => tierLabel(t))];
+    const counts = initialTiers && Object.values(initialTiers).reduce((a, b) => a + b, 0) > 0
+      ? initialTiers : { [ADULT]: initialPeople };
+    const list: string[] = [];
+    order.forEach(label => { for (let i = 0; i < (counts[label] || 0); i++) list.push(label); });
+    return list.length > 0 ? list : [ADULT];
+  });
+
+  const people = hasTiers ? travelerCats.length : peopleState;
+
+  const changePeople = (delta: number) => {
+    if (hasTiers) {
+      setTravelerCats(prev => {
+        if (delta > 0) return prev.length >= maxSpots ? prev : [...prev, ADULT];
+        return prev.length <= 1 ? prev : prev.slice(0, -1);
+      });
+    } else {
+      setPeopleState(p => Math.max(1, Math.min(maxSpots, p + delta)));
+    }
   };
+  const setTravelerCat = (idx: number, label: string) =>
+    setTravelerCats(prev => prev.map((c, i) => i === idx ? label : c));
+
+  // Distribuição por categoria derivada das escolhas por viajante
+  const tierCounts = travelerCats.reduce<Record<string, number>>((acc, l) => { acc[l] = (acc[l] || 0) + 1; return acc; }, {});
 
   const baseTotal = hasTiers
-    ? Object.entries(tierCounts).reduce((s, [label, qty]) => s + qty * priceForLabel(label), 0)
+    ? travelerCats.reduce((s, label) => s + priceForLabel(label), 0)
     : people * trip.price_per_person;
   const optionalsTotal = selectedOptionals.reduce((s, o) => s + o.price * people, 0);
   const grandTotal = baseTotal + optionalsTotal;
@@ -610,6 +641,29 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
       if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); return; }
     }
+
+    // Valida data de nascimento contra a faixa de idade da categoria escolhida
+    if (hasTiers) {
+      const check = (label: string, birth: string, who: string): string | null => {
+        if (!label || label === ADULT) return null;
+        const tier = tiers.find(t => tierLabel(t) === label);
+        const range = parseAgeRange(tier?.age_range);
+        if (!range) return null; // faixa sem idade interpretável → não bloqueia
+        const age = ageFromBirth(birth);
+        if (age == null) return null;
+        if (age < range.min || age > range.max) {
+          return `${who}: a data de nascimento (${age} anos) não corresponde à categoria "${label}".`;
+        }
+        return null;
+      };
+      const titularErr = check(travelerCats[0] ?? ADULT, birthDate, "Titular");
+      if (titularErr) { setError(titularErr); return; }
+      for (const [i, c] of companions.entries()) {
+        const err = check(travelerCats[i + 1] ?? ADULT, c.birth_date, `Acompanhante ${i + 1}`);
+        if (err) { setError(err); return; }
+      }
+    }
+
     setLoading(true);
     try {
       const token = getToken();
@@ -678,38 +732,19 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-          {hasTiers ? (
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Pessoas por categoria *</label>
-              <div className="space-y-2">
-                {[ADULT, ...tiers.map(t => tierLabel(t))].map((label) => (
-                  <div key={label} className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-navy-800 truncate">{label}</p>
-                      <p className="text-xs text-gray-400">R$ {fmtBRL(priceForLabel(label))}</p>
-                    </div>
-                    <button type="button" onClick={() => changeTier(label, -1)}
-                      className="w-9 h-9 flex items-center justify-center border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-bold text-lg flex-shrink-0">−</button>
-                    <span className="w-7 text-center font-bold text-navy-800">{tierCounts[label] || 0}</span>
-                    <button type="button" onClick={() => changeTier(label, 1)}
-                      className="w-9 h-9 flex items-center justify-center border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-bold text-lg flex-shrink-0">+</button>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">Total: {people} pessoa{people !== 1 ? "s" : ""}</p>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={() => changePeople(-1)}
+                className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">−</button>
+              <span className="flex-1 text-center font-bold text-navy-800 text-xl">{people}</span>
+              <button type="button" onClick={() => changePeople(1)}
+                className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
             </div>
-          ) : (
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>
-              <div className="flex items-center gap-4">
-                <button type="button" onClick={() => setPeopleState(p => Math.max(1, p - 1))}
-                  className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">−</button>
-                <span className="flex-1 text-center font-bold text-navy-800 text-xl">{people}</span>
-                <button type="button" onClick={() => setPeopleState(p => Math.min(trip.available_spots || 50, p + 1))}
-                  className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
-              </div>
-            </div>
-          )}
+            {hasTiers && (
+              <p className="text-xs text-gray-400 mt-1.5">Escolha a categoria de cada viajante abaixo — a idade será conferida pela data de nascimento.</p>
+            )}
+          </div>
 
           {trip.optionals?.length > 0 && (
             <div>
@@ -765,6 +800,17 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 </div>
               </div>
             ))}
+            {hasTiers && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria *</label>
+                <select value={travelerCats[0] ?? ADULT} onChange={e => setTravelerCat(0, e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
+                  {[ADULT, ...tiers.map(t => tierLabel(t))].map(l => (
+                    <option key={l} value={l}>{`${l} — R$ ${fmtBRL(priceForLabel(l))}`}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {companions.map((c, i) => (
@@ -792,6 +838,17 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
+              {hasTiers && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria *</label>
+                  <select value={travelerCats[i + 1] ?? ADULT} onChange={e => setTravelerCat(i + 1, e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
+                    {[ADULT, ...tiers.map(t => tierLabel(t))].map(l => (
+                      <option key={l} value={l}>{`${l} — R$ ${fmtBRL(priceForLabel(l))}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           ))}
 
