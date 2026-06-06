@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api";
+import { invalidateAdminCache } from "@/lib/adminCache";
 
 interface ItinerarySection {
   title: string;
@@ -231,6 +232,7 @@ export default function TemplateForm({
         }
         return;
       }
+      invalidateAdminCache();
       setSuccess(templateId ? "Roteiro atualizado!" : "Roteiro criado!");
       if (!templateId) setTimeout(() => router.push(`/admin/viagens/${data.id}`), 1200);
     } catch {

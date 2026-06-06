@@ -1,10 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
+// Rota legada: "nova viagem" virou "novo roteiro" após a separação template/data.
+// Redirect server-side (sem flash de tela) para bookmarks antigos.
 export default function NovaViagemRedirect() {
-  const router = useRouter();
-  useEffect(() => { router.replace("/admin/viagens/novo-roteiro"); }, [router]);
-  return null;
+  redirect("/admin/viagens/novo-roteiro");
 }

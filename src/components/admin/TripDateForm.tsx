@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { invalidateAdminCache } from "@/lib/adminCache";
 
 /* ── types ── */
 interface TripDateFormData {
@@ -419,6 +420,7 @@ export default function TripDateForm({
         }
         return;
       }
+      invalidateAdminCache();
       setSuccess(tripId ? "Data atualizada!" : "Data criada!");
       setTimeout(() => router.push(`/admin/viagens/${templateId}`), 1200);
     } catch {

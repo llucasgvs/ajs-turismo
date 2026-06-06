@@ -27,6 +27,8 @@ export function saveSession(accessToken: string, refreshToken: string, user: Sto
   if (user.is_admin) {
     const secure = location.protocol === "https:" ? "; Secure" : "";
     document.cookie = `ajs_admin=1; path=/; SameSite=Lax; max-age=86400${secure}`;
+    // Token real em cookie: o middleware exige sua presença, não só o flag
+    document.cookie = `ajs_token=${accessToken}; path=/; SameSite=Lax; max-age=86400${secure}`;
   }
 }
 
@@ -35,6 +37,7 @@ export function logout() {
   localStorage.removeItem("ajs_refresh_token");
   localStorage.removeItem("ajs_user");
   document.cookie = "ajs_admin=; path=/; max-age=0";
+  document.cookie = "ajs_token=; path=/; max-age=0";
   window.location.href = "/login";
 }
 
@@ -51,6 +54,11 @@ async function tryRefresh(): Promise<boolean> {
     const data = await res.json();
     localStorage.setItem("ajs_token", data.access_token);
     localStorage.setItem("ajs_refresh_token", data.refresh_token);
+    // Mantém o cookie do token sincronizado (se admin) para o middleware
+    if (document.cookie.includes("ajs_admin=1")) {
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `ajs_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400${secure}`;
+    }
     return true;
   } catch {
     return false;

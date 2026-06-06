@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
 import { getToken } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
+import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const PAGE_SIZE = 25;
@@ -1053,8 +1054,8 @@ export default function AdminReservasPage() {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   useEffect(() => {
-    // Usa cache fresco se houver; caso contrário busca e grava no cache
-    if (_tripsCache.data && (Date.now() - _tripsCache.ts) < TRIPS_TTL) {
+    // Usa cache fresco se houver (dentro do TTL e após a última mutação)
+    if (_tripsCache.data && (Date.now() - _tripsCache.ts) < TRIPS_TTL && _tripsCache.ts >= adminDirtyTs()) {
       setTrips(_tripsCache.data);
       return;
     }
@@ -1078,6 +1079,7 @@ export default function AdminReservasPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({}),
       });
+      invalidateAdminCache();
       fetchBookings();
       fetchCounts();
     } finally {
@@ -1097,6 +1099,7 @@ export default function AdminReservasPage() {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
+      invalidateAdminCache();
       setCancelTarget(null);
       fetchBookings();
       fetchCounts();
@@ -1143,7 +1146,7 @@ export default function AdminReservasPage() {
         <EditBookingModal
           booking={editTarget}
           onClose={() => setEditTarget(null)}
-          onSaved={fetchBookings}
+          onSaved={() => { invalidateAdminCache(); fetchBookings(); fetchCounts(); }}
         />
       )}
 
@@ -1151,7 +1154,7 @@ export default function AdminReservasPage() {
         <ExternalSaleModal
           trips={trips.filter((t) => t.is_active !== false && t.available_spots > 0 && t.status !== "cancelled" && t.status !== "completed")}
           onClose={() => setShowExternal(false)}
-          onSaved={fetchBookings}
+          onSaved={() => { invalidateAdminCache(); fetchBookings(); fetchCounts(); }}
         />
       )}
 

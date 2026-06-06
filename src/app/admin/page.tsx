@@ -8,6 +8,7 @@ import {
   Loader2, BookOpen, Activity,
 } from "lucide-react";
 import { getToken } from "@/lib/api";
+import { adminDirtyTs } from "@/lib/adminCache";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -111,7 +112,7 @@ const DASH_TTL = 60_000; // 60 segundos
 
 /* ─── Main ─── */
 export default function AdminDashboard() {
-  const hasFreshCache = !!_dashCache.stats && (Date.now() - _dashCache.ts) < DASH_TTL;
+  const hasFreshCache = !!_dashCache.stats && (Date.now() - _dashCache.ts) < DASH_TTL && _dashCache.ts >= adminDirtyTs();
   const [stats, setStats] = useState<Stats | null>(_dashCache.stats);
   const [counts, setCounts] = useState<Counts | null>(_dashCache.counts);
   const [interests, setInterests] = useState<Booking[]>(_dashCache.interests);

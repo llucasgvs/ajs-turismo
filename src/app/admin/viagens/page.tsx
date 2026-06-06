@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { adminDirtyTs } from "@/lib/adminCache";
 
 // Cache em nível de módulo — sobrevive a navegações dentro da SPA, reset no F5
 const _cache: { data: TemplateSummary[] | null; ts: number } = { data: null, ts: 0 };
@@ -60,7 +61,10 @@ export default function ViagensPage() {
     if (debouncedSearch) params.set("search", debouncedSearch);
 
     // Com busca ativa: sempre mostra spinner. Sem busca: usa cache se fresco
-    const cached = !debouncedSearch && _cache.data && (Date.now() - _cache.ts) < CACHE_TTL;
+    // (dentro do TTL E criado depois da última mutação do admin)
+    const cached = !debouncedSearch && _cache.data
+      && (Date.now() - _cache.ts) < CACHE_TTL
+      && _cache.ts >= adminDirtyTs();
     if (cached && !isSearch) {
       setTemplates(_cache.data!);
       setLoading(false);

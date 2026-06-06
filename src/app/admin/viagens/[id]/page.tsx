@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
+import { invalidateAdminCache } from "@/lib/adminCache";
 
 interface TripTemplate {
   id: number;
@@ -773,7 +774,7 @@ export default function TemplateDetailPage() {
           open_date_spots_per_day: parseInt(odSpots) || 0,
         }),
       });
-      if (res.ok) { setOdSuccess(true); setTimeout(() => setOdSuccess(false), 3000); fetchCounts(); fetchDates(); }
+      if (res.ok) { invalidateAdminCache(); setOdSuccess(true); setTimeout(() => setOdSuccess(false), 3000); fetchCounts(); fetchDates(); }
     } finally {
       setOdSaving(false);
     }
@@ -818,6 +819,7 @@ export default function TemplateDetailPage() {
     setHideLoading(true);
     try {
       await apiFetch(`/templates/${templateId}/trips/${hideTarget.id}`, { method: "DELETE" });
+      invalidateAdminCache();
       setHideTarget(null);
       fetchCounts();
       fetchDates();
@@ -833,6 +835,7 @@ export default function TemplateDetailPage() {
         method: "PUT",
         body: JSON.stringify({ is_active: true, status: "active" }),
       });
+      invalidateAdminCache();
       fetchCounts();
       fetchDates();
     } finally {
@@ -1080,7 +1083,7 @@ export default function TemplateDetailPage() {
           templateId={templateId}
           isOpenDate={template.is_open_date}
           onClose={() => setQuickEditTarget(null)}
-          onSaved={() => { fetchCounts(); fetchDates(); }}
+          onSaved={() => { invalidateAdminCache(); fetchCounts(); fetchDates(); }}
         />
       )}
 
@@ -1101,7 +1104,7 @@ export default function TemplateDetailPage() {
         <BulkModal
           templateId={templateId}
           onClose={() => setBulkOpen(false)}
-          onDone={() => { fetchCounts(); fetchDates(); }}
+          onDone={() => { invalidateAdminCache(); fetchCounts(); fetchDates(); }}
         />
       )}
     </div>
