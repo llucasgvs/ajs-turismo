@@ -366,11 +366,12 @@ function BulkModal({ templateId, onClose, onDone }: {
   const [retTime, setRetTime] = useState("23:59");
   const [skipExisting, setSkipExisting] = useState(true);
   const [inherited, setInherited] = useState(false);
+  const [tiersInherited, setTiersInherited] = useState<{ label: string; price: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   const [error, setError] = useState("");
 
-  // Herda preço, vagas, parcelas e horários da última data criada
+  // Herda preço, vagas, parcelas, horários e faixas de preço da última data criada
   useEffect(() => {
     apiFetch(`/templates/${templateId}/trips?limit=100`)
       .then((r) => r.json())
@@ -387,6 +388,7 @@ function BulkModal({ templateId, onClose, onDone }: {
         const sp = (iso: string) => new Date(iso).toLocaleString("sv", { timeZone: "America/Sao_Paulo" }).slice(11, 16);
         setDepTime(sp(last.departure_date));
         setRetTime(sp(last.return_date));
+        if (Array.isArray(last.price_tiers) && last.price_tiers.length > 0) setTiersInherited(last.price_tiers);
         setInherited(true);
       })
       .catch(() => {});
@@ -431,6 +433,7 @@ function BulkModal({ templateId, onClose, onDone }: {
           max_installments: parseInt(maxInstallments),
           total_spots: parseInt(spots),
           available_spots: parseInt(spots),
+          price_tiers: tiersInherited,
           skip_existing: skipExisting,
         }),
       });
@@ -485,9 +488,14 @@ function BulkModal({ templateId, onClose, onDone }: {
           ) : (
             <>
               {inherited && (
-                <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 text-navy-600 text-xs px-4 py-2.5 rounded-xl">
-                  <Layers size={13} className="flex-shrink-0" />
-                  Preço, vagas, parcelas e horários foram herdados da última data criada. Ajuste se precisar.
+                <div className="flex items-start gap-2 bg-navy-50 border border-navy-100 text-navy-600 text-xs px-4 py-2.5 rounded-xl">
+                  <Layers size={13} className="flex-shrink-0 mt-0.5" />
+                  <span>
+                    Preço, vagas, parcelas e horários foram herdados da última data criada. Ajuste se precisar.
+                    {tiersInherited.length > 0 && (
+                      <> As faixas de preço também serão aplicadas: <strong>{tiersInherited.map(t => t.label).join(", ")}</strong>.</>
+                    )}
+                  </span>
                 </div>
               )}
 

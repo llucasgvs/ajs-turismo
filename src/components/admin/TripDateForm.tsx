@@ -10,6 +10,14 @@ import { invalidateAdminCache } from "@/lib/adminCache";
 /* ── types ── */
 interface PriceTierInput { label: string; price: string }
 
+// Sugestões rápidas de faixas (clique adiciona já com o nome)
+const TIER_SUGGESTIONS = [
+  "Criança (até 5 anos)",
+  "Criança (5 a 12 anos)",
+  "Idoso (60+ anos)",
+  "Meia-entrada",
+];
+
 interface TripDateFormData {
   dep_date: string;   // "YYYY-MM-DD"
   dep_time: string;   // "HH:MM"
@@ -404,7 +412,10 @@ export default function TripDateForm({
     setForm(f => ({ ...f, [key]: value }));
 
   // Faixas de preço (ex: criança)
-  const addTier = () => setForm(f => ({ ...f, price_tiers: [...f.price_tiers, { label: "", price: "" }] }));
+  const addTier = (label = "") => setForm(f =>
+    f.price_tiers.some(t => t.label.trim().toLowerCase() === label.trim().toLowerCase() && label)
+      ? f
+      : { ...f, price_tiers: [...f.price_tiers, { label, price: "" }] });
   const removeTier = (i: number) => setForm(f => ({ ...f, price_tiers: f.price_tiers.filter((_, idx) => idx !== i) }));
   const updateTier = (i: number, key: keyof PriceTierInput, value: string) =>
     setForm(f => ({ ...f, price_tiers: f.price_tiers.map((t, idx) => idx === i ? { ...t, [key]: value } : t) }));
@@ -430,6 +441,18 @@ export default function TripDateForm({
     }
     if (form.total_spots <= 0) { setError("Total de vagas deve ser maior que zero."); return; }
 
+    // Faixas de preço: nome e preço obrigatórios; sem duplicatas
+    const seenLabels = new Set<string>();
+    for (const t of form.price_tiers) {
+      const label = t.label.trim();
+      if (!label) { setError("Dê um nome com a idade para cada faixa (ex: Criança 5 a 12 anos)."); return; }
+      const p = parseFloat(t.price);
+      if (t.price === "" || isNaN(p) || p < 0) { setError(`Informe um preço válido para a faixa "${label}".`); return; }
+      const key = label.toLowerCase();
+      if (seenLabels.has(key)) { setError(`Faixa repetida: "${label}". Remova a duplicada.`); return; }
+      seenLabels.add(key);
+    }
+
     setLoading(true);
     const body = {
       departure_date: toISO(form.dep_date, form.dep_time),
@@ -439,9 +462,7 @@ export default function TripDateForm({
       max_installments: form.max_installments,
       total_spots: form.total_spots,
       available_spots: form.available_spots,
-      price_tiers: form.price_tiers
-        .filter((t) => t.label.trim() && parseFloat(t.price) >= 0 && t.price !== "")
-        .map((t) => ({ label: t.label.trim(), price: parseFloat(t.price) })),
+      price_tiers: form.price_tiers.map((t) => ({ label: t.label.trim(), price: parseFloat(t.price) })),
     };
     try {
       const url = tripId
@@ -591,15 +612,26 @@ export default function TripDateForm({
               <label className="block text-sm font-medium text-navy-700">Valores por idade <span className="text-gray-400 font-normal">(opcional)</span></label>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              O preço acima é o padrão (Adulto). Adicione faixas como &ldquo;Criança (3 a 10 anos)&rdquo; com preço próprio.
-              Sem faixas, a viagem usa só o preço padrão.
+              O preço acima é o padrão (Adulto). Adicione faixas com a idade no nome — ex: &ldquo;Criança (5 a 12 anos)&rdquo;,
+              &ldquo;Criança (até 12)&rdquo;, &ldquo;Idoso (60+)&rdquo;. Sem faixas, a viagem usa só o preço padrão.
             </p>
+
+            {/* Sugestões rápidas */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {TIER_SUGGESTIONS.filter(s => !form.price_tiers.some(t => t.label.trim().toLowerCase() === s.toLowerCase())).map(s => (
+                <button key={s} type="button" onClick={() => addTier(s)}
+                  className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
+                  <Plus size={11} /> {s}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-2">
               {form.price_tiers.map((tier, i) => (
                 <div key={i} className="flex gap-2 items-center">
                   <input
                     className="input-field flex-1 text-sm"
-                    placeholder="Ex: Criança (3 a 10 anos)"
+                    placeholder="Nome com a idade — ex: Criança (5 a 12 anos)"
                     value={tier.label}
                     onChange={(e) => updateTier(i, "label", e.target.value)}
                   />
@@ -619,7 +651,7 @@ export default function TripDateForm({
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addTier}
+            <button type="button" onClick={() => addTier()}
               className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-navy-600 hover:text-navy-800 transition-colors">
               <Plus size={15} /> Adicionar faixa de preço
             </button>
