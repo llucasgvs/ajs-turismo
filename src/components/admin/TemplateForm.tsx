@@ -462,7 +462,7 @@ export default function TemplateForm({
                     key={loc}
                     type="button"
                     onClick={() => toggleDepartureLocation(loc)}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm border transition-all text-left ${
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm border transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left ${
                       selected
                         ? "bg-navy-700 text-white border-navy-700 shadow-sm"
                         : "bg-white text-gray-500 border-gray-200 hover:border-navy-300 hover:text-gray-700"

@@ -59,9 +59,9 @@ export default function HowItWorks() {
               <div key={step} className="flex flex-col items-center text-center group">
                 {/* Icon circle */}
                 <div
-                  className={`relative w-28 h-28 md:w-32 md:h-32 ${color} rounded-full flex items-center justify-center mb-6 shadow-card group-hover:shadow-card-hover transition-all duration-300 group-hover:-translate-y-2`}
+                  className={`relative w-28 h-28 md:w-32 md:h-32 ${color} rounded-full flex items-center justify-center mb-6 shadow-card group-hover:shadow-card-hover transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 group-hover:-translate-y-2`}
                 >
-                  <Icon size={40} className={`${accent} transition-transform duration-300 group-hover:scale-110`} />
+                  <Icon size={40} className={`${accent} transition-transform duration-200 group-hover:scale-110`} />
 
                   {/* Step number badge */}
                   <div className="absolute -top-2 -right-2 bg-white border-2 border-gray-100 text-navy-700 font-display font-black text-sm w-9 h-9 rounded-full flex items-center justify-center shadow-sm">

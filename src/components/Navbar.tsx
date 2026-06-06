@@ -42,7 +42,7 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
           scrolled
             ? "bg-navy-900 shadow-lg py-2"
             : "bg-gradient-to-b from-black/50 to-transparent py-4"
@@ -85,7 +85,7 @@ export default function Navbar() {
                   <button
                     key={link.href}
                     onClick={() => handleNavClick(link.href)}
-                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
+                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 text-sm"
                   >
                     {link.label}
                   </button>
@@ -93,7 +93,7 @@ export default function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-sm"
+                    className="text-white/90 hover:text-gold-400 font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 text-sm"
                   >
                     {link.label}
                   </Link>
@@ -148,7 +148,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         <div
-          className={`lg:hidden transition-all duration-300 overflow-hidden ${
+          className={`lg:hidden transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 overflow-hidden ${
             isOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
           }`}
         >
@@ -159,7 +159,7 @@ export default function Navbar() {
                   <button
                     key={link.href}
                     onClick={() => handleNavClick(link.href)}
-                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
+                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left text-base"
                   >
                     {link.label}
                   </button>
@@ -168,7 +168,7 @@ export default function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsOpen(false)}
-                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all text-left text-base"
+                    className="text-white/90 hover:text-gold-400 font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left text-base"
                   >
                     {link.label}
                   </Link>

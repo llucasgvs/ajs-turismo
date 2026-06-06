@@ -157,13 +157,13 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
   return (
     <Link
       href={`/admin/viagens/${tmpl.id}`}
-      className={`group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all overflow-hidden flex flex-col border border-gray-100 ${!tmpl.is_active ? "opacity-50" : ""}`}
+      className={`group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-[color,background-color,border-color,box-shadow,transform,opacity] overflow-hidden flex flex-col border border-gray-100 ${!tmpl.is_active ? "opacity-50" : ""}`}
     >
       {/* Imagem — menor no mobile (h-28), maior no desktop (h-40) */}
       <div className="relative h-28 sm:h-40 bg-gray-200 flex-shrink-0">
         {tmpl.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={tmpl.image_url} alt={tmpl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={tmpl.image_url} alt={tmpl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
             <MapPin size={32} />

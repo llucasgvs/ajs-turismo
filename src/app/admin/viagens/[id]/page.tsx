@@ -301,7 +301,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                   <span>{availSpots} disponíveis</span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] ${barCls}`} style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )}
@@ -1280,7 +1280,7 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
     : "bg-gray-100 text-gray-500";
 
   return (
-    <div className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${borderCls} shadow-sm p-4 transition-all ${isHidden ? "opacity-60" : ""}`}>
+    <div className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${borderCls} shadow-sm p-4 transition-[color,background-color,border-color,box-shadow,transform,opacity] ${isHidden ? "opacity-60" : ""}`}>
 
       {/* Linha 1: datas + badge + botões */}
       <div className="flex items-start justify-between gap-2">
@@ -1350,7 +1350,7 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
           <span className={availCls}>{date.available_spots} disponíveis</span>
         </div>
         <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
+          <div className={`h-full rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] ${barCls}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
 

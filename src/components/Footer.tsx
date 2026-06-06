@@ -33,7 +33,7 @@ export default function Footer() {
                   key={label}
                   href={href}
                   aria-label={label}
-                  className="w-9 h-9 bg-white/10 hover:bg-gold-500 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+                  className="w-9 h-9 bg-white/10 hover:bg-gold-500 rounded-lg flex items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
                 >
                   <Icon size={16} />
                 </a>

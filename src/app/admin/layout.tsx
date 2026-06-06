@@ -114,7 +114,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* ── Mobile Sidebar (drawer) ── */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 h-screen w-64 bg-navy-900 flex flex-col z-50 transition-transform duration-300 ${
+        className={`lg:hidden fixed top-0 left-0 h-screen w-64 bg-navy-900 flex flex-col z-50 transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

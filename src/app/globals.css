@@ -201,6 +201,62 @@ body {
 .stagger-in > *:nth-child(6)  { animation-delay: 250ms; }
 .stagger-in > *:nth-child(n+7) { animation-delay: 300ms; }
 
+/* ── Foco visível por teclado (acessibilidade) ─────────────────────────── */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Remove o outline só quando o foco veio do mouse/toque (mantém no teclado) */
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Feedback de press para qualquer elemento pressionável ─────────────── */
+.press {
+  transition: transform 140ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .press:hover { /* hover effects ficam por conta de cada componente */ }
+}
+.press:active { transform: scale(0.97); }
+
+/* ── Hover só em dispositivos com mouse (evita "grudar" no toque) ───────── */
+@media (hover: none) {
+  .hover-safe:hover { transform: none !important; }
+}
+
+/* ── Spinner mais rápido = percepção de app mais ágil ──────────────────── */
+.animate-spin { animation-duration: 0.7s; }
+
+/* ── Skeleton com shimmer ──────────────────────────────────────────────── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #eef1f6;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* ── Fade-in de imagens ao carregar ────────────────────────────────────── */
+.img-fade {
+  opacity: 0;
+  transition: opacity 400ms var(--ease-out);
+}
+.img-fade.is-loaded { opacity: 1; }
+
 /* ── Acessibilidade: respeita quem prefere menos movimento ─────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -210,4 +266,5 @@ body {
     scroll-behavior: auto !important;
   }
   .stagger-in > * { opacity: 1; }
+  .img-fade { opacity: 1; }
 }

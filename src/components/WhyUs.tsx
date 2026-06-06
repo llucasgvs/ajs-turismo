@@ -92,9 +92,9 @@ export default function WhyUs() {
             {reasons.map(({ icon: Icon, title, description, color, bg }) => (
               <div
                 key={title}
-                className="group p-5 rounded-2xl border border-gray-100 hover:border-navy-200 hover:shadow-card transition-all duration-300 hover:-translate-y-1"
+                className="group p-5 rounded-2xl border border-gray-100 hover:border-navy-200 hover:shadow-card transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:-translate-y-1"
               >
-                <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300`}>
+                <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200`}>
                   <Icon size={20} className={color} />
                 </div>
                 <h3 className="font-bold text-navy-700 text-sm mb-1.5">{title}</h3>

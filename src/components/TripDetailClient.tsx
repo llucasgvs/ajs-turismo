@@ -279,7 +279,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
       {images.length > 1 && (
         <button
           onClick={() => onOpen(0)}
-          className="hidden sm:flex absolute bottom-3 right-3 items-center gap-2 bg-white text-navy-800 text-sm font-semibold px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200"
+          className="hidden sm:flex absolute bottom-3 right-3 items-center gap-2 bg-white text-navy-800 text-sm font-semibold px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-gray-200"
         >
           <Camera size={14} /> Ver todas as fotos
         </button>
@@ -367,7 +367,7 @@ function RelatedCard({ trip }: { trip: Trip }) {
   const depDate = new Date(trip.departure_date);
   return (
     <Link href={`/viagens/${trip.id}`}
-      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-gold-300 hover:-translate-y-0.5 flex flex-col"
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 border border-gray-100 hover:border-gold-300 hover:-translate-y-0.5 flex flex-col"
     >
       <div className="relative h-40 overflow-hidden flex-shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -503,7 +503,7 @@ function StickyMobileCTA({
         </a>
       ) : (
         <button onClick={onBook}
-          className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-all">
+          className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-[color,background-color,border-color,box-shadow,transform,opacity]">
           Reservar agora
         </button>
       )}
@@ -778,7 +778,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                       onClick={() => setSelectedOptionals(prev =>
                         isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
                       )}
-                      className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 py-3 transition-all text-left active:scale-[0.98] ${
+                      className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 py-3 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left active:scale-[0.98] ${
                         isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300"
                       }`}
                     >
@@ -1022,7 +1022,7 @@ function DateSelector({
               key={t.id}
               disabled={isSold}
               onClick={() => !isSold && onSelect(t)}
-              className={`relative text-left rounded-xl border-2 p-4 transition-all duration-150 w-full ${
+              className={`relative text-left rounded-xl border-2 p-4 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150 w-full ${
                 isSelected
                   ? "border-navy-700 bg-navy-50 shadow-md"
                   : isSold
@@ -1171,7 +1171,7 @@ function CompactDateSelector({
                     key={t.id}
                     disabled={isSold}
                     onClick={() => !isSold && onSelect(t)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-all text-left ${
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left ${
                       isSelected
                         ? "border-navy-700 bg-navy-50"
                         : isSold
@@ -1325,7 +1325,7 @@ function OpenDateCalendar({
             <button key={day} type="button"
               disabled={isUnavailable}
               onClick={() => trip && !isUnavailable && onSelect(trip)}
-              className={`aspect-square flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+              className={`aspect-square flex items-center justify-center rounded-xl text-sm font-semibold transition-[color,background-color,border-color,box-shadow,transform,opacity] ${
                 isSelected
                   ? "bg-navy-700 text-white shadow-md"
                   : isUnavailable
@@ -1819,11 +1819,11 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                           onClick={() => setSelectedOptionals(prev =>
                             isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
                           )}
-                          className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 sm:px-4 py-3.5 transition-all text-left active:scale-[0.99] ${
+                          className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 sm:px-4 py-3.5 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left active:scale-[0.99] ${
                             isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
                           }`}
                         >
-                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-[color,background-color,border-color,box-shadow,transform,opacity] ${
                             isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
                           }`}>
                             {isSelected && <Check size={11} className="text-white" />}
@@ -2159,7 +2159,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       </div>
                     ) : (
                       <button onClick={handleOpenBooking}
-                        className={`w-full font-bold py-4 rounded-xl text-center transition-all text-lg ${
+                        className={`w-full font-bold py-4 rounded-xl text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg ${
                           selectedTrip
                             ? "bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20"
                             : "bg-gray-200 text-gray-500 cursor-pointer"
@@ -2204,7 +2204,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             </a>
           ) : (
             <button onClick={handleOpenBooking}
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-all text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
               Quero reservar agora
             </button>
           )}

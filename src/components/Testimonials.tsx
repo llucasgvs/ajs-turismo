@@ -137,7 +137,7 @@ export default function Testimonials() {
           <div className="flex items-center justify-center gap-4 mt-8">
             <button
               onClick={prev}
-              className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-all duration-200 hover:scale-110"
+              className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
             >
               <ChevronLeft size={20} />
             </button>
@@ -147,7 +147,7 @@ export default function Testimonials() {
                 <button
                   key={i}
                   onClick={() => setCurrent(i)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
+                  className={`h-2 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
                     i === current ? "w-8 bg-gold-400" : "w-2 bg-white/30"
                   }`}
                 />
@@ -156,7 +156,7 @@ export default function Testimonials() {
 
             <button
               onClick={next}
-              className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-all duration-200 hover:scale-110"
+              className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
             >
               <ChevronRight size={20} />
             </button>
@@ -169,7 +169,7 @@ export default function Testimonials() {
             <button
               key={t.id}
               onClick={() => setCurrent(i)}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs transition-all duration-200 ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
                 i === current
                   ? `${t.avatarColor} scale-125 ring-2 ring-gold-400 ring-offset-2 ring-offset-navy-700`
                   : `${t.avatarColor} opacity-40 hover:opacity-70`

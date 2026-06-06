@@ -56,7 +56,7 @@ export default function WhatsAppFloat({ bottomOffset = 0 }: { bottomOffset?: num
         href="https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20preciso%20de%20ajuda."
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center w-14 h-14 bg-[#25D366] hover:bg-[#20BA5A] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+        className="flex items-center justify-center w-14 h-14 bg-[#25D366] hover:bg-[#20BA5A] rounded-full shadow-lg hover:shadow-xl transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
         aria-label="Falar no WhatsApp"
       >
         <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">

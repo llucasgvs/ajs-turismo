@@ -172,7 +172,7 @@ function DateRangePicker({
                   onMouseLeave={() => setHovered(null)}
                   title={isDep ? "Saída" : isRet ? "Volta" : undefined}
                   className={[
-                    "relative w-10 h-10 text-sm rounded-full flex flex-col items-center justify-center transition-all leading-none",
+                    "relative w-10 h-10 text-sm rounded-full flex flex-col items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] leading-none",
                     isPast ? "text-gray-300 cursor-not-allowed" : "cursor-pointer",
                     isDep ? "bg-navy-700 text-white font-black shadow-md" : "",
                     isRet ? "bg-gold-500 text-navy-900 font-black shadow-md" : "",
@@ -207,7 +207,7 @@ function DateRangePicker({
           type="button"
           onClick={() => { onChange("", ""); setPhase("dep"); }}
           className={[
-            "text-left rounded-xl border-2 px-4 py-3 transition-all",
+            "text-left rounded-xl border-2 px-4 py-3 transition-[color,background-color,border-color,box-shadow,transform,opacity]",
             phase === "dep"
               ? "border-navy-600 bg-navy-50 shadow-sm"
               : depCard
@@ -240,7 +240,7 @@ function DateRangePicker({
           onClick={() => depDate && setPhase("ret")}
           disabled={!depDate}
           className={[
-            "text-left rounded-xl border-2 px-4 py-3 transition-all",
+            "text-left rounded-xl border-2 px-4 py-3 transition-[color,background-color,border-color,box-shadow,transform,opacity]",
             phase === "ret"
               ? "border-gold-500 bg-amber-50 shadow-sm"
               : retCard
@@ -680,7 +680,7 @@ export default function TripDateForm({
                 <span>{form.available_spots} disponíveis</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-400 rounded-full transition-all"
+                <div className="h-full bg-green-400 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity]"
                   style={{ width: `${Math.min(100, Math.round(((form.total_spots - form.available_spots) / form.total_spots) * 100))}%` }} />
               </div>
             </div>

@@ -1186,7 +1186,7 @@ export default function AdminReservasPage() {
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           {tabs.map(({ key, label, count }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
                 tab === key
                   ? "bg-navy-800 text-white shadow-sm"
                   : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
@@ -1241,7 +1241,7 @@ export default function AdminReservasPage() {
               const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
               return (
                 <div key={b.id} onClick={() => setSelectedBooking(b)}
-                  className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-all duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
+                  className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
                   {/* Info + badge */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-1">

@@ -77,7 +77,7 @@ function BookingCard({ b }: { b: Booking }) {
   );
 
   return (
-    <div className={`rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md ${cfg.bg}`}>
+    <div className={`rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:shadow-md ${cfg.bg}`}>
       {/* Status bar top */}
       <div className={`h-1 w-full ${cfg.bar}`} />
 
@@ -388,14 +388,14 @@ export default function Dashboard() {
         {/* ── Quick actions ── */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/viagens"
-            className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-navy-200 transition-all group">
+            className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-navy-200 transition-[color,background-color,border-color,box-shadow,transform,opacity] group">
             <div className="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center group-hover:bg-navy-100 transition-colors">
               <Search size={18} className="text-navy-600" />
             </div>
             <span className="text-xs font-bold text-navy-700">Explorar viagens</span>
           </Link>
           <a href={WA_HELP} target="_blank" rel="noopener noreferrer"
-            className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group">
+            className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-emerald-200 transition-[color,background-color,border-color,box-shadow,transform,opacity] group">
             <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
               <MessageCircle size={18} className="text-emerald-600" />
             </div>
