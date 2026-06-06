@@ -18,14 +18,18 @@ async function getTrip(id: string): Promise<Trip | null> {
   }
 }
 
-// Pré-renderiza as viagens ativas no build (ISR). O clique passa a servir HTML
-// em cache na hora; ids novos/desconhecidos caem no render sob demanda (dynamicParams).
+// Pré-renderiza no build apenas as viagens que os cards realmente linkam
+// (first_trip_id de cada roteiro — ~1 por roteiro), evitando gerar centenas de
+// páginas para datas diárias (ex: Beto Carrero). As demais datas caem em render
+// sob demanda (dynamicParams), o que é raro.
 export async function generateStaticParams() {
   try {
-    const r = await fetch(`${API}/trips/?limit=500`, { next: { revalidate: 300 } });
+    const r = await fetch(`${API}/templates/public`, { next: { revalidate: 300 } });
     if (!r.ok) return [];
-    const trips: Array<{ id: number }> = await r.json();
-    return trips.map((t) => ({ id: String(t.id) }));
+    const templates: Array<{ first_trip_id: number }> = await r.json();
+    return templates
+      .filter((t) => t.first_trip_id)
+      .map((t) => ({ id: String(t.first_trip_id) }));
   } catch {
     return [];
   }
