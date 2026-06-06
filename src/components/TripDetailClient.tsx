@@ -737,7 +737,18 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 p-5 space-y-5">
-          {error && <div ref={errorRef} className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
+          {error && (
+            <div ref={errorRef} role="alert"
+              className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 shadow-sm animate-[shake_0.3s_ease-in-out]">
+              <span className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertTriangle size={15} className="text-red-500" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-red-700 leading-tight">Não foi possível continuar</p>
+                <p className="text-sm text-red-600 leading-snug mt-0.5">{error}</p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-2">Número de pessoas *</label>

@@ -155,3 +155,10 @@ body {
      (evitava que o dropdown de datas fechasse e a página rolasse sozinha) */
   overscroll-behavior: contain;
 }
+
+/* Balança o aviso de erro para chamar atenção */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
