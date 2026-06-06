@@ -527,7 +527,7 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
 /* ═══════════════════════════════════════════
    10. Booking Modal
 ═══════════════════════════════════════════ */
-function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals, initialPeople = 1 }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[]; initialPeople?: number }) {
+function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals, initialPeople = 1, initialTiers }: { trip: Trip; user: StoredUser; onClose: () => void; selectedOptionals: { name: string; price: number }[]; initialPeople?: number; initialTiers?: Record<string, number> }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>(initialOptionals);
@@ -548,9 +548,13 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   // Sem faixas: contador único. Com faixas: quantidade por categoria.
   const [peopleState, setPeopleState] = useState(initialPeople);
   const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = { [ADULT]: initialPeople };
-    (trip.price_tiers ?? []).forEach(t => { init[t.label] = 0; });
-    return init;
+    // Herda os contadores da lateral, se vierem; senão começa com Adulto = initialPeople
+    const base: Record<string, number> = { [ADULT]: initialPeople };
+    (trip.price_tiers ?? []).forEach(t => { base[t.label] = 0; });
+    if (initialTiers && Object.values(initialTiers).reduce((a, b) => a + b, 0) > 0) {
+      return { ...base, ...initialTiers };
+    }
+    return base;
   });
 
   const people = hasTiers
@@ -1283,6 +1287,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   const [dateError, setDateError] = useState(false);
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>([]);
   const [sidebarPeople, setSidebarPeople] = useState(1);
+  // Quantidade por categoria na lateral (quando a data tem faixas de preço)
+  const [sidebarTiers, setSidebarTiers] = useState<Record<string, number>>({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const dateRowRef = useRef<HTMLDivElement>(null);
@@ -1309,6 +1315,40 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
   // activeTrip: the trip whose price/availability drives the UI
   const activeTrip = selectedTrip || trip;
+
+  // Faixas de preço por idade da data ativa
+  const ADULT = "Adulto";
+  const activeTiers = activeTrip.price_tiers ?? [];
+  const activeHasTiers = activeTiers.length > 0;
+  const priceForLabel = (label: string) =>
+    label === ADULT ? activeTrip.price_per_person : (activeTiers.find(t => t.label === label)?.price ?? activeTrip.price_per_person);
+
+  // Reinicia os contadores por categoria quando a data ativa muda
+  useEffect(() => {
+    if (!activeHasTiers) return;
+    const init: Record<string, number> = { [ADULT]: 1 };
+    activeTiers.forEach(t => { init[t.label] = 0; });
+    setSidebarTiers(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTrip.id]);
+
+  const changeSidebarTier = (label: string, delta: number) => {
+    setSidebarTiers(prev => {
+      const total = Object.values(prev).reduce((a, b) => a + b, 0);
+      if (delta > 0 && total >= (activeTrip.available_spots || 50)) return prev;
+      const next = Math.max(0, (prev[label] || 0) + delta);
+      const updated = { ...prev, [label]: next };
+      if (Object.values(updated).reduce((a, b) => a + b, 0) < 1) return prev;
+      return updated;
+    });
+  };
+
+  const sidebarTotalPeople = activeHasTiers
+    ? Object.values(sidebarTiers).reduce((a, b) => a + b, 0)
+    : sidebarPeople;
+  const sidebarBaseTotal = activeHasTiers
+    ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * priceForLabel(label), 0)
+    : sidebarPeople * activeTrip.price_per_person;
 
   const sold = activeTrip.available_spots === 0 || activeTrip.status === "sold_out";
   const lowStock = !sold && activeTrip.available_spots > 0 && activeTrip.available_spots <= 5;
@@ -1438,7 +1478,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
       {/* Booking Modal */}
       {bookingUser && selectedTrip && (
-        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} initialPeople={sidebarPeople} />
+        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} initialPeople={sidebarPeople} initialTiers={sidebarTiers} />
       )}
 
       {/* Sticky Mobile CTA */}
@@ -1957,22 +1997,58 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
                     {/* People selector row */}
                     <div className="px-5 py-3.5">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
-                      <div className="flex items-center gap-3">
-                        <button type="button"
-                          onClick={() => setSidebarPeople(p => Math.max(1, p - 1))}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">−</button>
-                        <span className="flex-1 text-center font-bold text-navy-800 text-base">{sidebarPeople} pessoa{sidebarPeople > 1 ? "s" : ""}</span>
-                        <button type="button"
-                          onClick={() => setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1))}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">+</button>
-                      </div>
+                      {activeHasTiers ? (
+                        <>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas por categoria</p>
+                          <div className="space-y-2">
+                            {[ADULT, ...activeTiers.map(t => t.label)].map((label) => (
+                              <div key={label} className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{label}</p>
+                                  <p className="text-[11px] text-gray-400 leading-tight">R$ {fmtBRL(priceForLabel(label))}</p>
+                                </div>
+                                <button type="button" onClick={() => changeSidebarTier(label, -1)}
+                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
+                                <span className="w-6 text-center font-bold text-navy-800">{sidebarTiers[label] || 0}</span>
+                                <button type="button" onClick={() => changeSidebarTier(label, 1)}
+                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">+</button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
+                          <div className="flex items-center gap-3">
+                            <button type="button"
+                              onClick={() => setSidebarPeople(p => Math.max(1, p - 1))}
+                              className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">−</button>
+                            <span className="flex-1 text-center font-bold text-navy-800 text-base">{sidebarPeople} pessoa{sidebarPeople > 1 ? "s" : ""}</span>
+                            <button type="button"
+                              onClick={() => setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1))}
+                              className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">+</button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Total + CTA */}
                   <div className="p-5 pt-4">
-                    {sidebarPeople > 1 && (
+                    {activeHasTiers ? (
+                      <div className="space-y-1 mb-3 text-sm">
+                        {Object.entries(sidebarTiers).filter(([, q]) => q > 0).map(([label, qty]) => (
+                          <div key={label} className="flex items-center justify-between">
+                            <span className="text-gray-500">{qty} × {label}</span>
+                            <span className="font-semibold text-navy-700">R$ {fmtBRL(qty * priceForLabel(label))}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                          <span className="text-gray-600 font-semibold">Total ({sidebarTotalPeople})</span>
+                          <span className="font-black text-navy-700">R$ {fmtBRL(sidebarBaseTotal)}</span>
+                        </div>
+                      </div>
+                    ) : sidebarPeople > 1 && (
                       <div className="flex items-center justify-between mb-3 text-sm">
                         <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
                         <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
