@@ -18,6 +18,19 @@ async function getTrip(id: string): Promise<Trip | null> {
   }
 }
 
+// Pré-renderiza as viagens ativas no build (ISR). O clique passa a servir HTML
+// em cache na hora; ids novos/desconhecidos caem no render sob demanda (dynamicParams).
+export async function generateStaticParams() {
+  try {
+    const r = await fetch(`${API}/trips/?limit=500`, { next: { revalidate: 300 } });
+    if (!r.ok) return [];
+    const trips: Array<{ id: number }> = await r.json();
+    return trips.map((t) => ({ id: String(t.id) }));
+  } catch {
+    return [];
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
