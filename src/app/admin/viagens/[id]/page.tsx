@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft, Plus, Pencil, EyeOff, RefreshCw, Calendar, Users,
   MapPin, Star, Loader2, AlertTriangle, X, ChevronRight, CheckCircle2, XCircle, List, Layers,
+  Clock, ClipboardList, DollarSign, Save,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -56,6 +57,10 @@ interface Counts {
 
 const PAGE_SIZE = 10;
 
+// Cache em nível de módulo por templateId — evita spinner ao reentrar no roteiro.
+// Sempre revalida em background no mount, então os dados ficam frescos.
+const _tmplCache: Record<number, { template: TripTemplate; counts: Counts; ts: number }> = {};
+
 type Tab = "all" | "active" | "sold_out" | "hidden" | "completed";
 
 const TABS: { key: Tab; label: string }[] = [
@@ -68,6 +73,32 @@ const TABS: { key: Tab; label: string }[] = [
 
 function fmt(d: string) {
   return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR");
+}
+
+/** Horário em SP (HH:MM) a partir de um ISO */
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
+  });
+}
+
+/** ISO → { date: "YYYY-MM-DD", time: "HH:MM" } em SP */
+function splitISO(iso: string): { date: string; time: string } {
+  const sp = new Date(iso).toLocaleString("sv", { timeZone: "America/Sao_Paulo" });
+  return { date: sp.slice(0, 10), time: sp.slice(11, 16) };
+}
+
+/** "YYYY-MM-DD" + "HH:MM" → ISO com offset -03:00 */
+function toISO(date: string, time: string): string {
+  return `${date}T${time}:00-03:00`;
+}
+
+/** Dias até a partida (negativo = passado) */
+function daysUntil(iso: string): number {
+  const dep = new Date(iso.slice(0, 10) + "T12:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((dep.getTime() - today.getTime()) / 86_400_000);
 }
 
 function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
@@ -92,6 +123,182 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
       )}
       <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
         className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 text-sm">›</button>
+    </div>
+  );
+}
+
+/* ── Modal de edição rápida (preço, vagas, horário) ─────────────────────── */
+function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
+  date: TripDate;
+  templateId: number;
+  isOpenDate: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const dep = splitISO(date.departure_date);
+  const ret = splitISO(date.return_date);
+  const [price, setPrice] = useState(String(date.price_per_person));
+  const [originalPrice, setOriginalPrice] = useState(date.original_price != null ? String(date.original_price) : "");
+  const [maxInst, setMaxInst] = useState(date.max_installments);
+  const [totalSpots, setTotalSpots] = useState(date.total_spots);
+  const [availSpots, setAvailSpots] = useState(date.available_spots);
+  const [depTime, setDepTime] = useState(dep.time);
+  const [retTime, setRetTime] = useState(ret.time);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const sold = totalSpots - availSpots;
+  const pct = totalSpots > 0 ? Math.min(100, Math.round((sold / totalSpots) * 100)) : 0;
+  const barCls = pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-amber-400" : "bg-green-400";
+
+  const save = async () => {
+    setError("");
+    const priceVal = parseFloat(price);
+    if (!price || isNaN(priceVal) || priceVal <= 0) { setError("Informe um preço válido."); return; }
+    if (totalSpots <= 0) { setError("Total de vagas deve ser maior que zero."); return; }
+    if (availSpots > totalSpots) { setError("Vagas disponíveis não podem exceder o total."); return; }
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/templates/${templateId}/trips/${date.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          departure_date: toISO(dep.date, depTime),
+          return_date: toISO(ret.date, retTime),
+          price_per_person: priceVal,
+          original_price: originalPrice ? parseFloat(originalPrice) : null,
+          max_installments: maxInst,
+          total_spots: totalSpots,
+          available_spots: availSpots,
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        setError(typeof e.detail === "string" ? e.detail : "Erro ao salvar.");
+        return;
+      }
+      onSaved();
+      onClose();
+    } catch {
+      setError("Erro de conexão.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h3 className="font-bold text-navy-800 text-base flex items-center gap-2">
+              <Pencil size={15} /> Edição rápida
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">{fmt(date.departure_date)} → {fmt(date.return_date)}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
+
+          {/* Horários */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><Clock size={11} /> Horários (Brasília)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Saída</p>
+                <input type="time" value={depTime} onChange={(e) => setDepTime(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-navy-800 focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Retorno</p>
+                <input type="time" value={retTime} onChange={(e) => setRetTime(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-navy-800 focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* Preço */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Preço</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Por pessoa</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                  <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Original (De:)</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                  <input type="number" min="0" step="0.01" placeholder="—" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-[11px] text-gray-400 mb-1">Parcelamento máximo</p>
+              <select value={maxInst} onChange={(e) => setMaxInst(parseInt(e.target.value))}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map((n) => <option key={n} value={n}>{n}x</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Vagas */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><Users size={11} /> Vagas</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Total</p>
+                <input type="number" min="1" value={totalSpots} onChange={(e) => setTotalSpots(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400 mb-1">Disponíveis</p>
+                <input type="number" min="0" value={availSpots} onChange={(e) => setAvailSpots(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+              </div>
+            </div>
+            {totalSpots > 0 && (
+              <div className="mt-2.5">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>{sold}/{totalSpots} vendidas</span>
+                  <span>{availSpots} disponíveis</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Link para edição completa (só faz sentido alterar datas em roteiros não-open_date) */}
+          {!isOpenDate && (
+            <Link href={`/admin/viagens/${templateId}/datas/${date.id}/editar`}
+              className="block text-center text-xs text-navy-500 hover:text-navy-700 underline underline-offset-2 transition-colors">
+              Precisa alterar as datas? Abrir edição completa →
+            </Link>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-500 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+            Cancelar
+          </button>
+          <button onClick={save} disabled={loading}
+            className="flex-1 bg-navy-800 hover:bg-navy-700 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Salvando...</> : <><Save size={15} /> Salvar</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -506,17 +713,20 @@ export default function TemplateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const templateId = parseInt(id);
 
-  const [template, setTemplate] = useState<TripTemplate | null>(null);
+  const cached = _tmplCache[templateId];
+
+  const [template, setTemplate] = useState<TripTemplate | null>(cached?.template ?? null);
   const [dates, setDates] = useState<TripDate[]>([]);
   const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState<Counts>({ all: 0, active: 0, sold_out: 0, hidden: 0, completed: 0 });
+  const [counts, setCounts] = useState<Counts>(cached?.counts ?? { all: 0, active: 0, sold_out: 0, hidden: 0, completed: 0 });
   const [tab, setTab] = useState<Tab>("all");
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const [loadingDates, setLoadingDates] = useState(false);
   const [hideTarget, setHideTarget] = useState<TripDate | null>(null);
   const [hideLoading, setHideLoading] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
+  const [quickEditTarget, setQuickEditTarget] = useState<TripDate | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [odDeparture, setOdDeparture] = useState("06:00");
@@ -526,12 +736,14 @@ export default function TemplateDetailPage() {
   const [odSaving, setOdSaving] = useState(false);
   const [odSuccess, setOdSuccess] = useState(false);
 
-  // Carregar template
+  // Carregar template (usa cache se houver; sempre revalida em background)
   useEffect(() => {
     apiFetch(`/templates/${templateId}`)
       .then((r) => r.json())
       .then((data) => {
         setTemplate(data);
+        if (_tmplCache[templateId]) _tmplCache[templateId].template = data;
+        else _tmplCache[templateId] = { template: data, counts: { all: 0, active: 0, sold_out: 0, hidden: 0, completed: 0 }, ts: Date.now() };
         if (data.is_open_date) {
           const dh = data.open_date_departure_hour ?? 6;
           const dm = data.open_date_departure_minute ?? 0;
@@ -567,10 +779,14 @@ export default function TemplateDetailPage() {
     }
   };
 
-  // Carregar contagens
+  // Carregar contagens (também grava no cache para reentrada instantânea)
   const fetchCounts = useCallback(async () => {
     const res = await apiFetch(`/templates/${templateId}/counts`);
-    if (res.ok) setCounts(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setCounts(data);
+      if (_tmplCache[templateId]) { _tmplCache[templateId].counts = data; _tmplCache[templateId].ts = Date.now(); }
+    }
   }, [templateId]);
 
   // Carregar datas
@@ -844,6 +1060,7 @@ export default function TemplateDetailPage() {
                 templateId={templateId}
                 onHide={() => setHideTarget(date)}
                 onReactivate={() => handleReactivate(date.id)}
+                onQuickEdit={() => setQuickEditTarget(date)}
                 reactivating={reactivatingId === date.id}
               />
             ))}
@@ -856,6 +1073,16 @@ export default function TemplateDetailPage() {
           </div>
         )}
       </div>
+
+      {quickEditTarget && (
+        <QuickEditModal
+          date={quickEditTarget}
+          templateId={templateId}
+          isOpenDate={template.is_open_date}
+          onClose={() => setQuickEditTarget(null)}
+          onSaved={() => { fetchCounts(); fetchDates(); }}
+        />
+      )}
 
       {hideTarget && (
         <HideModal
@@ -881,11 +1108,12 @@ export default function TemplateDetailPage() {
   );
 }
 
-function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
+function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactivating }: {
   date: TripDate;
   templateId: number;
   onHide: () => void;
   onReactivate: () => void;
+  onQuickEdit: () => void;
   reactivating: boolean;
 }) {
   const sold = date.total_spots - date.available_spots;
@@ -909,6 +1137,14 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
   const barCls = pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-amber-400" : "bg-green-400";
   const availCls = pct >= 90 ? "text-red-500 font-semibold" : pct >= 60 ? "text-amber-500 font-semibold" : "text-green-600 font-semibold";
 
+  // Badge "em X dias" — só para datas futuras ativas/esgotadas
+  const dDays = daysUntil(date.departure_date);
+  const showCountdown = !isHidden && !isCompleted && dDays >= 0;
+  const countdownLabel = dDays === 0 ? "Hoje" : dDays === 1 ? "Amanhã" : `em ${dDays} dias`;
+  const countdownCls = dDays <= 1 ? "bg-red-100 text-red-700"
+    : dDays <= 3 ? "bg-amber-100 text-amber-700"
+    : "bg-gray-100 text-gray-500";
+
   return (
     <div className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${borderCls} shadow-sm p-4 transition-all ${isHidden ? "opacity-60" : ""}`}>
 
@@ -921,6 +1157,11 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${statusBadge.cls}`}>
             {statusBadge.label}
           </span>
+          {showCountdown && (
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${countdownCls}`}>
+              {countdownLabel}
+            </span>
+          )}
         </div>
 
         <div className="flex gap-1.5 flex-shrink-0">
@@ -932,10 +1173,10 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
             </button>
           ) : !isCompleted && (
             <>
-              <Link href={`/admin/viagens/${templateId}/datas/${date.id}/editar`}
+              <button onClick={onQuickEdit}
                 className="flex items-center gap-1 border border-gray-200 text-gray-600 font-semibold text-xs px-2.5 py-1.5 rounded-xl hover:bg-gray-50 transition-colors">
                 <Pencil size={11} /> Editar
-              </Link>
+              </button>
               <button onClick={onHide}
                 className="flex items-center gap-1 border border-zinc-200 text-zinc-500 font-semibold text-xs px-2.5 py-1.5 rounded-xl hover:bg-zinc-50 transition-colors">
                 <EyeOff size={11} /> Ocultar
@@ -945,7 +1186,15 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
         </div>
       </div>
 
-      {/* Linha 2: preço */}
+      {/* Linha 2: horário */}
+      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500">
+        <Clock size={11} className="text-gray-400" />
+        <span className="font-medium text-navy-600">{fmtTime(date.departure_date)}</span>
+        <span className="text-gray-300">→</span>
+        <span className="font-medium text-navy-600">{fmtTime(date.return_date)}</span>
+      </div>
+
+      {/* Linha 3: preço */}
       <div className="mt-2 flex items-baseline gap-2">
         <span className="text-gold-600 font-bold text-lg leading-none">
           R$ {fmtBRL(date.price_per_person)}
@@ -958,7 +1207,7 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
         <span className="text-gray-400 text-xs">/ pessoa · até {date.max_installments}x</span>
       </div>
 
-      {/* Linha 3: barra de vagas full-width */}
+      {/* Linha 4: barra de vagas full-width */}
       <div className="mt-3 space-y-1">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500 flex items-center gap-1">
@@ -970,6 +1219,14 @@ function DateCard({ date, templateId, onHide, onReactivate, reactivating }: {
           <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {/* Linha 5: ver reservas */}
+      {sold > 0 && (
+        <Link href={`/admin/reservas?trip_id=${date.id}`}
+          className="mt-3 flex items-center justify-center gap-1.5 w-full border border-navy-100 bg-navy-50/50 text-navy-600 hover:bg-navy-50 font-semibold text-xs py-2 rounded-xl transition-colors">
+          <ClipboardList size={12} /> Ver {sold} reserva{sold !== 1 ? "s" : ""}
+        </Link>
+      )}
     </div>
   );
 }
