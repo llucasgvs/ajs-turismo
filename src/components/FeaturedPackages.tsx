@@ -51,7 +51,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 stagger-in">
           {packages.map((pkg) => {
             const discount = pkg.original_price_from
               ? Math.round((1 - pkg.price_from / pkg.original_price_from) * 100)

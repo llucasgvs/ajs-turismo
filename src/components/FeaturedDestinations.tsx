@@ -35,7 +35,7 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 stagger-in">
           {templates.map((tmpl) => (
             <Link
               key={tmpl.id}
