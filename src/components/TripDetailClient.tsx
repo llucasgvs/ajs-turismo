@@ -640,12 +640,12 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setErrorField("");
-    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); return; }
+    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); setErrorField("titular-cpf"); return; }
     if (!birthDate) { setError("Informe sua data de nascimento."); setErrorField("titular-birth"); return; }
-    if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); return; }
+    if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); setErrorField("titular-phone"); return; }
     for (const [i, c] of companions.entries()) {
-      if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); return; }
-      if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); return; }
+      if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-name`); return; }
+      if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-cpf`); return; }
       if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); setErrorField(`comp-${i}-birth`); return; }
     }
 
@@ -792,11 +792,11 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
           <div className="bg-navy-50 rounded-xl p-4 space-y-3">
             <p className="text-xs font-bold text-navy-700 uppercase tracking-wide">Seus dados (titular)</p>
             {[
-              { label: "Nome completo *", icon: User, type: "text", placeholder: "Nome completo", value: fullName, onChange: (v: string) => setFullName(v), fmt: (v: string) => v },
-              { label: "Telefone / WhatsApp *", icon: Phone, type: "tel", placeholder: "(41) 99999-9999", value: phone, onChange: (v: string) => setPhone(formatPhone(v)), fmt: (v: string) => v },
-              { label: "CPF *", icon: CreditCard, type: "text", placeholder: "000.000.000-00", value: cpf, onChange: (v: string) => setCpf(formatCPF(v)), fmt: (v: string) => v },
-              { label: "Data de nascimento *", icon: Cake, type: "date", placeholder: "", value: birthDate, onChange: (v: string) => setBirthDate(v), fmt: (v: string) => v },
-            ].map(({ label, icon: Icon, type, placeholder, value, onChange }) => (
+              { id: "name", label: "Nome completo *", icon: User, type: "text", placeholder: "Nome completo", value: fullName, onChange: (v: string) => setFullName(v) },
+              { id: "phone", label: "Telefone / WhatsApp *", icon: Phone, type: "tel", placeholder: "(41) 99999-9999", value: phone, onChange: (v: string) => setPhone(formatPhone(v)) },
+              { id: "cpf", label: "CPF *", icon: CreditCard, type: "text", placeholder: "000.000.000-00", value: cpf, onChange: (v: string) => setCpf(formatCPF(v)) },
+              { id: "birth", label: "Data de nascimento *", icon: Cake, type: "date", placeholder: "", value: birthDate, onChange: (v: string) => setBirthDate(v) },
+            ].map(({ id, label, icon: Icon, type, placeholder, value, onChange }) => (
               <div key={label}>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
                 <div className="relative">
@@ -804,7 +804,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                   <input type={type} required placeholder={placeholder} value={value}
                     onChange={e => { onChange(e.target.value); setErrorField(""); }}
                     className={`w-full pl-8 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
-                      type === "date" && errorField === "titular-birth"
+                      errorField === `titular-${id}`
                         ? "border-red-400 ring-2 ring-red-200 focus:ring-red-300"
                         : "border-gray-200 focus:ring-navy-400"
                     }`} />
@@ -832,15 +832,19 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Nome completo *</label>
                 <input type="text" required placeholder="Nome completo" value={c.full_name}
-                  onChange={e => updateCompanion(i, "full_name", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                  onChange={e => { updateCompanion(i, "full_name", e.target.value); setErrorField(""); }}
+                  className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                    errorField === `comp-${i}-name` ? "border-red-400 ring-2 ring-red-200 focus:ring-red-300" : "border-gray-200 focus:ring-navy-400"
+                  }`} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">CPF *</label>
                   <input type="text" required placeholder="000.000.000-00" value={c.cpf}
-                    onChange={e => updateCompanion(i, "cpf", formatCPF(e.target.value))}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                    onChange={e => { updateCompanion(i, "cpf", formatCPF(e.target.value)); setErrorField(""); }}
+                    className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
+                      errorField === `comp-${i}-cpf` ? "border-red-400 ring-2 ring-red-200 focus:ring-red-300" : "border-gray-200 focus:ring-navy-400"
+                    }`} />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Nascimento *</label>
