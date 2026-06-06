@@ -216,13 +216,17 @@ textarea:focus-visible,
 :focus:not(:focus-visible) { outline: none; }
 
 /* ── Feedback de press para qualquer elemento pressionável ─────────────── */
-.press {
+.press { transition: transform 140ms var(--ease-out); }
+.press:active { transform: scale(0.97); }
+
+/* Press sutil global em botões (exceto os que pedem para sair com .no-press).
+   Botões com hover de transform próprio mantêm o comportamento deles (mais específico). */
+button:not(:disabled):not(.no-press) {
   transition: transform 140ms var(--ease-out);
 }
-@media (hover: hover) and (pointer: fine) {
-  .press:hover { /* hover effects ficam por conta de cada componente */ }
+button:not(:disabled):not(.no-press):active {
+  transform: scale(0.97);
 }
-.press:active { transform: scale(0.97); }
 
 /* ── Hover só em dispositivos com mouse (evita "grudar" no toque) ───────── */
 @media (hover: none) {
