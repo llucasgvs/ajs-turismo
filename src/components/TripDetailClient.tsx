@@ -83,8 +83,11 @@ function buildWhatsAppMessage(
   birthDate: string, people: number, companions: CompanionForm[],
   note: string, bookingCode: string,
   optionals: { name: string; price: number }[],
+  baseTotal?: number, tierSummary?: { label: string; qty: number; price: number }[],
 ) {
   const fmt = (d: string) => { if (!d) return "-"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; };
+  // Total da passagem: por faixa (se houver) ou preço único
+  const passagem = baseTotal != null ? baseTotal : people * trip.price_per_person;
   let msg =
     `*Interesse em reserva -- ${trip.title}*\n` +
     `Destino: ${trip.destination}\n` +
@@ -101,12 +104,17 @@ function buildWhatsAppMessage(
     msg += `\n*Acompanhante ${i + 1}:*\n   Nome: ${c.full_name}\n   CPF: ${c.cpf}\n   Nascimento: ${fmt(c.birth_date)}\n`;
   });
   msg += `\n*Total:* ${people} pessoa${people > 1 ? "s" : ""}\n`;
+  if (tierSummary && tierSummary.length > 0) {
+    msg += `*Valores por categoria:*`;
+    tierSummary.forEach(t => { msg += `\n   - ${t.qty}x ${t.label}: R$ ${fmtBRL(t.qty * t.price)}`; });
+    msg += `\n`;
+  }
   const optsTotal = optionals.reduce((s, o) => s + o.price, 0);
-  msg += `*Passagem:* R$ ${fmtBRL(people * trip.price_per_person)}`;
+  msg += `*Passagem:* R$ ${fmtBRL(passagem)}`;
   if (optionals.length > 0) {
     msg += `\n*Opcionais selecionados:*`;
     optionals.forEach(o => { msg += `\n   - ${o.name}: R$ ${fmtBRL(o.price * people)} (${people}x R$ ${fmtBRL(o.price)})`; });
-    msg += `\n*Total com opcionais:* R$ ${fmtBRL(people * trip.price_per_person + optsTotal * people)}`;
+    msg += `\n*Total com opcionais:* R$ ${fmtBRL(passagem + optsTotal * people)}`;
   }
   if (note) msg += `\n\nObservacao: ${note}`;
   return msg;
@@ -531,6 +539,33 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const [companions, setCompanions] = useState<CompanionForm[]>([]);
   const [note, setNote] = useState("");
 
+  // Faixas de preço por idade (ex: criança). Vazio = só o preço padrão (Adulto).
+  const tiers = trip.price_tiers ?? [];
+  const hasTiers = tiers.length > 0;
+  const tierPrice = (label: string) => label
+    ? (tiers.find(t => t.label === label)?.price ?? trip.price_per_person)
+    : trip.price_per_person;
+  // 1 entrada por viajante (índice 0 = titular). "" = Adulto/padrão.
+  const [travelerTiers, setTravelerTiers] = useState<string[]>([""]);
+
+  useEffect(() => {
+    setTravelerTiers(prev => {
+      if (prev.length === people) return prev;
+      return prev.length < people
+        ? [...prev, ...Array(people - prev.length).fill("")]
+        : prev.slice(0, people);
+    });
+  }, [people]);
+
+  const setTier = (idx: number, label: string) =>
+    setTravelerTiers(prev => prev.map((t, i) => i === idx ? label : t));
+
+  const baseTotal = hasTiers
+    ? travelerTiers.reduce((s, lbl) => s + tierPrice(lbl), 0)
+    : people * trip.price_per_person;
+  const optionalsTotal = selectedOptionals.reduce((s, o) => s + o.price * people, 0);
+  const grandTotal = baseTotal + optionalsTotal;
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -568,10 +603,15 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
       });
+      const tierBreakdown = hasTiers ? (() => {
+        const counts: Record<string, number> = {};
+        travelerTiers.forEach(lbl => { const k = lbl || "Adulto"; counts[k] = (counts[k] || 0) + 1; });
+        return Object.entries(counts).map(([label, qty]) => ({ label, qty }));
+      })() : [];
       const bookingRes = await fetch(`${API}/bookings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined, selected_optionals: selectedOptionals }),
+        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined, selected_optionals: selectedOptionals, tier_breakdown: tierBreakdown }),
       });
       if (!bookingRes.ok) {
         const err = await bookingRes.json();
@@ -580,7 +620,14 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       }
       const booking = await bookingRes.json();
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
-      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals);
+      const tierSummary = hasTiers
+        ? Object.entries(
+            travelerTiers.reduce<Record<string, number>>((acc, lbl) => {
+              const k = lbl || "Adulto"; acc[k] = (acc[k] || 0) + 1; return acc;
+            }, {})
+          ).map(([label, qty]) => ({ label, qty, price: tierPrice(label === "Adulto" ? "" : label) }))
+        : undefined;
+      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals, hasTiers ? baseTotal : undefined, tierSummary);
       const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
       onClose();
       // Redireciona para o WhatsApp direto na mesma aba — evita bloqueio de popup após async
@@ -687,6 +734,18 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 </div>
               </div>
             ))}
+            {hasTiers && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria</label>
+                <select value={travelerTiers[0] ?? ""} onChange={e => setTier(0, e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
+                  <option value="">{`Adulto — R$ ${fmtBRL(trip.price_per_person)}`}</option>
+                  {tiers.map(t => (
+                    <option key={t.label} value={t.label}>{`${t.label} — R$ ${fmtBRL(t.price)}`}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {companions.map((c, i) => (
@@ -714,6 +773,18 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
+              {hasTiers && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria</label>
+                  <select value={travelerTiers[i + 1] ?? ""} onChange={e => setTier(i + 1, e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
+                    <option value="">{`Adulto — R$ ${fmtBRL(trip.price_per_person)}`}</option>
+                    {tiers.map(t => (
+                      <option key={t.label} value={t.label}>{`${t.label} — R$ ${fmtBRL(t.price)}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           ))}
 
@@ -727,10 +798,24 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
           </div>
 
           <div className="bg-navy-50 rounded-xl p-3 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-navy-600 font-medium">{people} × R$ {fmtBRL(trip.price_per_person)}</span>
-              <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(people * trip.price_per_person)}</span>
-            </div>
+            {hasTiers ? (
+              // Resumo por categoria
+              Object.entries(
+                travelerTiers.reduce<Record<string, number>>((acc, lbl) => {
+                  const k = lbl || "Adulto"; acc[k] = (acc[k] || 0) + 1; return acc;
+                }, {})
+              ).map(([label, qty]) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-sm text-navy-600 font-medium">{qty} × {label} (R$ {fmtBRL(tierPrice(label === "Adulto" ? "" : label))})</span>
+                  <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(qty * tierPrice(label === "Adulto" ? "" : label))}</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-navy-600 font-medium">{people} × R$ {fmtBRL(trip.price_per_person)}</span>
+                <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(people * trip.price_per_person)}</span>
+              </div>
+            )}
             {selectedOptionals.map((opt) => (
               <div key={opt.name} className="flex items-center justify-between text-amber-700">
                 <span className="text-xs font-medium">{people} × {opt.name}</span>
@@ -739,7 +824,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
             ))}
             <div className="flex items-center justify-between pt-1 border-t border-navy-200">
               <span className="text-sm text-navy-700 font-semibold">Total</span>
-              <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(people * trip.price_per_person + selectedOptionals.reduce((s, o) => s + o.price * people, 0))}</span>
+              <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(grandTotal)}</span>
             </div>
           </div>
 

@@ -40,6 +40,7 @@ type Booking = {
   discount_amount: number;
   installments: number;
   is_external: boolean;
+  tier_breakdown?: { label: string; price: number; qty: number }[];
   trip_title: string | null;
   trip_destination: string | null;
   trip_departure_date: string | null;
@@ -235,10 +236,19 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
           <section>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><DollarSign size={11} /> Financeiro</p>
             <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-600">
-                <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {fmtBRL(booking.price_per_person)}</span>
-                <span>R$ {fmtBRL(booking.total_amount)}</span>
-              </div>
+              {booking.tier_breakdown && booking.tier_breakdown.length > 0 ? (
+                booking.tier_breakdown.map((t, i) => (
+                  <div key={i} className="flex justify-between text-gray-600">
+                    <span>{t.qty} × {t.label} (R$ {fmtBRL(t.price)})</span>
+                    <span>R$ {fmtBRL(t.qty * t.price)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex justify-between text-gray-600">
+                  <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {fmtBRL(booking.price_per_person)}</span>
+                  <span>R$ {fmtBRL(booking.total_amount)}</span>
+                </div>
+              )}
               {booking.discount_amount > 0 && (
                 <div className="flex justify-between text-red-500">
                   <span>Desconto</span>

@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign } from "lucide-react";
+import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 
 /* ── types ── */
+interface PriceTierInput { label: string; price: string }
+
 interface TripDateFormData {
   dep_date: string;   // "YYYY-MM-DD"
   dep_time: string;   // "HH:MM"
@@ -18,6 +20,7 @@ interface TripDateFormData {
   max_installments: number;
   total_spots: number;
   available_spots: number;
+  price_tiers: PriceTierInput[];
 }
 
 const EMPTY: TripDateFormData = {
@@ -25,6 +28,7 @@ const EMPTY: TripDateFormData = {
   ret_date: "", ret_time: "22:00",
   price_per_person: "", original_price: "",
   max_installments: 12, total_spots: 30, available_spots: 30,
+  price_tiers: [],
 };
 
 interface TripDateInitialData {
@@ -35,6 +39,7 @@ interface TripDateInitialData {
   max_installments?: number;
   total_spots?: number;
   available_spots?: number;
+  price_tiers?: { label: string; price: number }[];
 }
 
 /** ISO UTC → { date: "YYYY-MM-DD", time: "HH:MM" } em SP */
@@ -314,6 +319,7 @@ interface TripDateDefaults {
   total_spots?: number;
   dep_time?: string; // "HH:MM"
   ret_time?: string; // "HH:MM"
+  price_tiers?: { label: string; price: number }[];
 }
 
 /* ── Main form ── */
@@ -355,6 +361,9 @@ export default function TripDateForm({
     original_price: initialData?.original_price != null
       ? String(initialData.original_price)
       : (d?.original_price != null ? String(d.original_price) : ""),
+    price_tiers: (initialData?.price_tiers ?? d?.price_tiers ?? []).map((t) => ({
+      label: t.label, price: String(t.price),
+    })),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -394,6 +403,12 @@ export default function TripDateForm({
   const set = <K extends keyof TripDateFormData>(key: K, value: TripDateFormData[K]) =>
     setForm(f => ({ ...f, [key]: value }));
 
+  // Faixas de preço (ex: criança)
+  const addTier = () => setForm(f => ({ ...f, price_tiers: [...f.price_tiers, { label: "", price: "" }] }));
+  const removeTier = (i: number) => setForm(f => ({ ...f, price_tiers: f.price_tiers.filter((_, idx) => idx !== i) }));
+  const updateTier = (i: number, key: keyof PriceTierInput, value: string) =>
+    setForm(f => ({ ...f, price_tiers: f.price_tiers.map((t, idx) => idx === i ? { ...t, [key]: value } : t) }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setSuccess("");
@@ -424,6 +439,9 @@ export default function TripDateForm({
       max_installments: form.max_installments,
       total_spots: form.total_spots,
       available_spots: form.available_spots,
+      price_tiers: form.price_tiers
+        .filter((t) => t.label.trim() && parseFloat(t.price) >= 0 && t.price !== "")
+        .map((t) => ({ label: t.label.trim(), price: parseFloat(t.price) })),
     };
     try {
       const url = tripId
@@ -565,6 +583,46 @@ export default function TripDateForm({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Valores por idade (faixas) */}
+          <div className="mt-5 pt-5 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-navy-700">Valores por idade <span className="text-gray-400 font-normal">(opcional)</span></label>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              O preço acima é o padrão (Adulto). Adicione faixas como &ldquo;Criança (3 a 10 anos)&rdquo; com preço próprio.
+              Sem faixas, a viagem usa só o preço padrão.
+            </p>
+            <div className="space-y-2">
+              {form.price_tiers.map((tier, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    className="input-field flex-1 text-sm"
+                    placeholder="Ex: Criança (3 a 10 anos)"
+                    value={tier.label}
+                    onChange={(e) => updateTier(i, "label", e.target.value)}
+                  />
+                  <div className="relative w-32 flex-shrink-0">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                    <input
+                      className="input-field text-sm pl-9"
+                      type="number" min="0" step="0.01" placeholder="0,00"
+                      value={tier.price}
+                      onChange={(e) => updateTier(i, "price", e.target.value)}
+                    />
+                  </div>
+                  <button type="button" onClick={() => removeTier(i)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={addTier}
+              className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-navy-600 hover:text-navy-800 transition-colors">
+              <Plus size={15} /> Adicionar faixa de preço
+            </button>
           </div>
         </div>
 

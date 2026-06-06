@@ -13,6 +13,7 @@ interface TripDateDefaults {
   total_spots?: number;
   dep_time?: string;
   ret_time?: string;
+  price_tiers?: { label: string; price: number }[];
 }
 
 /** ISO → "HH:MM" no horário de São Paulo */
@@ -47,6 +48,7 @@ export default function NovaDatum() {
         original_price: number | null;
         max_installments: number;
         total_spots: number;
+        price_tiers?: { label: string; price: number }[];
       }> = datesData?.items ?? [];
 
       // Com ?dup=<id>, herda daquela data específica; senão, da última criada
@@ -65,6 +67,7 @@ export default function NovaDatum() {
           total_spots: source.total_spots,
           dep_time: timeOf(source.departure_date),
           ret_time: timeOf(source.return_date),
+          price_tiers: source.price_tiers ?? [],
         });
       }
       setLoading(false);
