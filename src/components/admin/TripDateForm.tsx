@@ -306,6 +306,16 @@ function DateRangePicker({
   );
 }
 
+/** Valores herdados da última data criada (preço/horários/vagas), só ao criar. */
+interface TripDateDefaults {
+  price_per_person?: number;
+  original_price?: number | null;
+  max_installments?: number;
+  total_spots?: number;
+  dep_time?: string; // "HH:MM"
+  ret_time?: string; // "HH:MM"
+}
+
 /* ── Main form ── */
 export default function TripDateForm({
   templateId,
@@ -313,29 +323,38 @@ export default function TripDateForm({
   initialData,
   templateTitle,
   templateDurationNights,
+  defaults,
 }: {
   templateId: number;
   tripId?: number;
   initialData?: TripDateInitialData;
   templateTitle?: string;
   templateDurationNights?: number;
+  defaults?: TripDateDefaults;
 }) {
   const router = useRouter();
 
   const initDep = splitISO(initialData?.departure_date);
   const initRet = splitISO(initialData?.return_date);
 
+  // Defaults só se aplicam ao CRIAR (sem initialData); ao editar, manda o initialData
+  const d = initialData ? undefined : defaults;
+
   const [form, setForm] = useState<TripDateFormData>({
     ...EMPTY,
     dep_date: initDep.date,
-    dep_time: initDep.date ? initDep.time : "22:00",
+    dep_time: initDep.date ? initDep.time : (d?.dep_time ?? "22:00"),
     ret_date: initRet.date,
-    ret_time: initRet.date ? initRet.time : "22:00",
-    max_installments: initialData?.max_installments ?? EMPTY.max_installments,
-    total_spots: initialData?.total_spots ?? EMPTY.total_spots,
-    available_spots: initialData?.available_spots ?? EMPTY.available_spots,
-    price_per_person: initialData?.price_per_person != null ? String(initialData.price_per_person) : "",
-    original_price: initialData?.original_price != null ? String(initialData.original_price) : "",
+    ret_time: initRet.date ? initRet.time : (d?.ret_time ?? "22:00"),
+    max_installments: initialData?.max_installments ?? d?.max_installments ?? EMPTY.max_installments,
+    total_spots: initialData?.total_spots ?? d?.total_spots ?? EMPTY.total_spots,
+    available_spots: initialData?.available_spots ?? d?.total_spots ?? EMPTY.available_spots,
+    price_per_person: initialData?.price_per_person != null
+      ? String(initialData.price_per_person)
+      : (d?.price_per_person != null ? String(d.price_per_person) : ""),
+    original_price: initialData?.original_price != null
+      ? String(initialData.original_price)
+      : (d?.original_price != null ? String(d.original_price) : ""),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -458,6 +477,14 @@ export default function TripDateForm({
       </div>
 
       <div className="max-w-2xl space-y-6">
+
+        {/* Aviso: valores herdados da última data */}
+        {d && (
+          <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 text-navy-600 text-xs px-4 py-2.5 rounded-xl">
+            <Calendar size={13} className="flex-shrink-0" />
+            Preço, horários e vagas foram preenchidos com base na última data criada. Ajuste se precisar.
+          </div>
+        )}
 
         {/* Calendário */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
