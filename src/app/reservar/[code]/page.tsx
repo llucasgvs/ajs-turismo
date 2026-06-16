@@ -223,6 +223,9 @@ function fmtDateRange(dep?: string, ret?: string) {
   const mon = (x: Date) => x.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   if (!ret) return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   const d2 = new Date(ret.slice(0, 10) + "T12:00:00");
+  // Bate-e-volta (mesmo dia): mostra só a data, sem intervalo "5 – 5".
+  if (dep.slice(0, 10) === ret.slice(0, 10))
+    return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
     return `${d1.getDate()} – ${d2.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   return `${d1.getDate()} ${mon(d1)} – ${d2.getDate()} ${mon(d2)} ${d2.getFullYear()}`;
@@ -234,6 +237,9 @@ function fmtDateRangeFull(dep?: string, ret?: string) {
   const mon = (x: Date) => x.toLocaleDateString("pt-BR", { month: "long" });
   if (!ret) return `${d1.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;
   const d2 = new Date(ret.slice(0, 10) + "T12:00:00");
+  // Bate-e-volta (mesmo dia): data única.
+  if (dep.slice(0, 10) === ret.slice(0, 10))
+    return `${d1.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;
   if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
     return `${d1.getDate()} a ${d2.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;
   return `${d1.getDate()} de ${mon(d1)} a ${d2.getDate()} de ${mon(d2)} de ${d2.getFullYear()}`;
@@ -403,14 +409,33 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   const push = useCallback(async (num: number, tiers: Record<string, number>, optNames: Set<string>) => {
     if (!trip) return;
     const my = ++seq.current; setBusy(true);
+    const priceOf = (label: string) =>
+      label === ADULT ? (trip.price_per_person ?? 0) : (trip.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person ?? 0);
     const tier_breakdown = hasTiers ? Object.entries(tiers).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty })) : [];
     const selected_optionals = trip.optionals.filter(o => optNames.has(o.name));
     const total = hasTiers ? Object.values(tiers).reduce((a, b) => a + b, 0) : num;
+
+    // Atualização otimista: o resumo (valor, opcionais, total) muda na hora,
+    // sem esperar o round-trip do PATCH. O servidor reconcilia ao responder.
+    const base = hasTiers
+      ? tier_breakdown.reduce((s, t) => s + t.qty * priceOf(t.label), 0)
+      : total * (trip.price_per_person || 0);
+    const optionals_amount = selected_optionals.reduce((s, o) => s + o.price, 0) * total;
+    onUpdate({
+      ...booking,
+      num_travelers: total,
+      total_amount: base,
+      optionals_amount,
+      final_amount: base + optionals_amount,
+      selected_optionals,
+      tier_breakdown: tier_breakdown.map(t => ({ label: t.label, qty: t.qty, price: priceOf(t.label) })),
+    });
+
     try {
       const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown }) });
       if (r.ok && my === seq.current) onUpdate(await r.json());
     } catch { /* mantém */ } finally { if (my === seq.current) setBusy(false); }
-  }, [code, hasTiers, trip, onUpdate]);
+  }, [code, hasTiers, trip, onUpdate, booking]);
 
   const changePeople = (d: number) => { const v = Math.max(1, Math.min(trip?.available_spots || 50, people + d)); setPeople(v); push(v, tierCounts, opts); onTravelersChange?.(); };
   const changeTier = (label: string, d: number) => setTierCounts(prev => {

@@ -38,9 +38,11 @@ type Booking = {
   cancelled_at: string | null;
   updated_at: string | null;
   discount_amount: number;
+  optionals_amount: number;
   installments: number;
   is_external: boolean;
   tier_breakdown?: { label: string; price: number; qty: number }[];
+  selected_optionals?: { name: string; price: number }[];
   trip_title: string | null;
   trip_destination: string | null;
   trip_departure_date: string | null;
@@ -260,6 +262,16 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 <div className="flex justify-between text-gray-600">
                   <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {fmtBRL(booking.price_per_person)}</span>
                   <span>R$ {fmtBRL(booking.total_amount)}</span>
+                </div>
+              )}
+              {booking.selected_optionals && booking.selected_optionals.length > 0 && (
+                <div className="space-y-1 border-t border-gray-100 pt-2">
+                  {booking.selected_optionals.map((o, i) => (
+                    <div key={i} className="flex justify-between text-gold-700">
+                      <span>+ {o.name} <span className="text-gray-400 text-xs">({booking.num_travelers}×)</span></span>
+                      <span>R$ {fmtBRL(o.price * booking.num_travelers)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
               {booking.discount_amount > 0 && (
