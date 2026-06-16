@@ -322,13 +322,23 @@ function BookingCheckout({ code }: { code: string }) {
   }, [code]);
 
   useEffect(() => {
+    // Viagem entregue pelo PreCheckout (evita um GET /trips no caminho crítico).
+    let haveTrip = false;
+    try {
+      const cached = sessionStorage.getItem(`reservar_trip_${code}`);
+      if (cached) { setTrip(JSON.parse(cached)); haveTrip = true; }
+    } catch { /* ignore */ }
+
     (async () => {
       const r = await apiFetch(`/payments/${code}/status`);
       if (r.ok) {
         const d: Booking = await r.json();
         setBooking(d);
         if (d.status === "confirmed") setConfirmed(true);
-        try { const t = await fetch(`${API}/trips/${d.trip_id}`); if (t.ok) setTrip(await t.json()); } catch { /* ignore */ }
+        // Busca a viagem em paralelo (não bloqueia o render) só se não veio do handoff.
+        if (!haveTrip) {
+          fetch(`${API}/trips/${d.trip_id}`).then(t => t.ok ? t.json() : null).then(j => { if (j) setTrip(j); }).catch(() => {});
+        }
       }
       setLoading(false);
     })();
@@ -1033,6 +1043,9 @@ function PreCheckout() {
       });
       if (!res.ok) { const e = await res.json(); setError(typeof e.detail === "string" ? e.detail : "Não foi possível iniciar a reserva."); setCreating(false); return; }
       const d = await res.json();
+      // Passa a viagem (já buscada aqui) adiante pra a tela [code] renderizar o
+      // resumo na hora, sem refazer GET /trips no carregamento.
+      try { if (trip) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
       router.replace(`/reservar/${d.booking_code}`);
     } catch { setError("Erro de conexão. Tente novamente."); setCreating(false); }
   }, [tripId, people, selOptionals, selTiers, router]);
