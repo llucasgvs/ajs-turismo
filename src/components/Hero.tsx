@@ -22,16 +22,15 @@ const heroSlides = [
   },
 ];
 
-export default function Hero({ roteirosCount = 0 }: { roteirosCount?: number }) {
+const stats = [
+  { icon: Users, value: "16.000+", label: "Clientes felizes" },
+  { icon: MapPin, value: "80+", label: "Destinos disponíveis" },
+  { icon: Star, value: "4.9", label: "Avaliação média" },
+];
+
+export default function Hero() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-
-  // "Destinos disponíveis" reflete o nº real de roteiros cadastrados (mesmo sem datas).
-  const stats = [
-    { icon: Users, value: "16.000+", label: "Clientes felizes" },
-    { icon: MapPin, value: roteirosCount > 0 ? String(roteirosCount) : "—", label: "Destinos disponíveis" },
-    { icon: Star, value: "4.9", label: "Avaliação média" },
-  ];
 
   useEffect(() => {
     setIsLoaded(true);

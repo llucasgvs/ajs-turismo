@@ -233,7 +233,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <p className="text-gray-500 text-xs flex items-center gap-1.5"><Phone size={11} className="text-gray-400" />{booking.traveler_phone}</p>
                   <a href={buildWaUrl(booking)}
                     target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#1ebe5d] px-2.5 py-1.5 rounded-lg transition-colors shadow-sm">
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#25D366] hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors">
                     <WhatsAppGlyph size={13} /> WhatsApp
                   </a>
                 </div>
@@ -1295,7 +1295,7 @@ export default function AdminReservasPage() {
         {b.traveler_phone && (
           <a href={buildWaUrl(b)} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()} title="Falar no WhatsApp"
-            className={`flex items-center justify-center gap-1.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold rounded-lg transition-colors shrink-0 shadow-sm ${compact ? "w-[30px] h-[30px]" : "px-2.5 py-1.5 text-xs"}`}>
+            className={`flex items-center justify-center gap-1.5 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-semibold rounded-lg transition-colors shrink-0 ${compact ? "w-[30px] h-[30px]" : "px-2.5 py-1.5 text-xs"}`}>
             <WhatsAppGlyph size={compact ? 14 : 13} />{!compact && " WhatsApp"}
           </a>
         )}

@@ -23,24 +23,13 @@ async function getPublicTemplates() {
   }
 }
 
-async function getRoteirosCount(): Promise<number> {
-  try {
-    const res = await fetch(`${API}/templates/public-count`, { next: { revalidate: 300 } });
-    if (!res.ok) return 0;
-    const d = await res.json();
-    return Number(d?.count) || 0;
-  } catch {
-    return 0;
-  }
-}
-
 export default async function Home() {
-  const [templates, roteirosCount] = await Promise.all([getPublicTemplates(), getRoteirosCount()]);
+  const templates = await getPublicTemplates();
 
   return (
     <main className="min-h-screen">
       <Navbar />
-      <Hero roteirosCount={roteirosCount} />
+      <Hero />
       <FeaturedDestinations templates={templates} />
       <HowItWorks />
       <FeaturedPackages templates={templates} />

@@ -67,7 +67,7 @@ export default function WhyUs() {
             <div className="grid grid-cols-3 gap-4 mb-8 max-w-sm mx-auto lg:mx-0">
               {[
                 { value: "10+", label: "Anos de mercado" },
-                { value: "5k+", label: "Viajantes" },
+                { value: "16k+", label: "Viajantes" },
                 { value: "4.9★", label: "Avaliação" },
               ].map(({ value, label }) => (
                 <div key={label} className="text-center lg:text-left">
