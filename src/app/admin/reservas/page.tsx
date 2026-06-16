@@ -282,7 +282,11 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 <p className="text-gray-400">Editado em {fmt(booking.updated_at)}</p>
               )}
               {booking.confirmed_at && <p className="text-emerald-600">Confirmado em {fmt(booking.confirmed_at)}</p>}
-              {booking.cancelled_at && <p className="text-red-500">Cancelado em {fmt(booking.cancelled_at)}</p>}
+              {booking.cancelled_at && (
+                booking.status === "refunded"
+                  ? <p className="text-orange-600">Estornado em {fmt(booking.cancelled_at)}</p>
+                  : <p className="text-red-500">Cancelado em {fmt(booking.cancelled_at)}</p>
+              )}
             </div>
           </section>
         </div>
@@ -1160,6 +1164,17 @@ export default function AdminReservasPage() {
 
   return (
     <div className="space-y-6">
+      {/* Overlay de processamento: o estorno chama o Asaas e leva alguns segundos.
+          Sem isto a tela parecia travada (o modal de detalhe fecha antes da resposta). */}
+      {actionLoading && (
+        <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl px-6 py-5 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+            <span className="text-navy-800 font-semibold text-sm">Processando…</span>
+          </div>
+        </div>
+      )}
+
       {cancelTarget && (
         <CancelConfirmModal
           booking={cancelTarget}
