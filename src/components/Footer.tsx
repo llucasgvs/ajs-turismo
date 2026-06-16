@@ -125,6 +125,8 @@ export default function Footer() {
           <p className="text-white/30 text-xs text-center md:text-left">
             © {new Date().getFullYear()} AJS Turismo. Todos os direitos reservados.
             CNPJ: 28.702.277/0001-85
+            <br className="hidden md:block" />
+            Fotos, textos e roteiros são conteúdo exclusivo da AJS Turismo — reprodução proibida.
           </p>
           <div className="flex items-center gap-4 text-white/30 text-xs">
             <span>Cadastur: 28.702.277/0001-85</span>
