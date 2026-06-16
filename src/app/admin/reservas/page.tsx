@@ -49,6 +49,12 @@ type Booking = {
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
 
+type Counts = {
+  interesse: number; pending: number; confirmed: number; completed: number;
+  cancelled: number; refunded: number; all: number;
+  stats: { confirmed_revenue: number; pending_value: number; month_count: number; month_value: number };
+};
+
 const STATUS_LABEL: Record<string, { label: string; color: string; border: string }> = {
   interesse:  { label: "Interesse",  color: "bg-amber-100 text-amber-700",     border: "border-l-amber-400" },
   pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700",       border: "border-l-blue-400" },
@@ -57,6 +63,18 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
   refunded:   { label: "Estornado",  color: "bg-orange-100 text-orange-700",   border: "border-l-orange-400" },
   completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600",       border: "border-l-gray-300" },
 };
+
+const PAYMENT_LABEL: Record<string, string> = {
+  whatsapp: "Presencial / WhatsApp",
+  pix: "PIX",
+  transfer: "Transferência",
+  credit_card: "Cartão de crédito",
+};
+
+function paymentLabel(method: string | null, installments?: number): string {
+  const base = PAYMENT_LABEL[method ?? ""] ?? method ?? "—";
+  return installments && installments > 1 ? `${base} · ${installments}x` : base;
+}
 
 function fmt(d: string) {
   if (!d) return "—";
@@ -128,7 +146,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   onConfirm: (code: string) => void;
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
-  onRefund: (code: string) => void;
+  onRefund: (booking: Booking) => void;
   actionLoading: string | null;
 }) {
   const st = STATUS_LABEL[booking.status] ?? { label: booking.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
@@ -146,13 +164,6 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   })();
   const isLoading = actionLoading === booking.booking_code;
   const canAct = ["interesse", "confirmed", "pending"].includes(booking.status);
-
-  const PAYMENT_LABEL: Record<string, string> = {
-    whatsapp: "WhatsApp / Presencial",
-    pix: "PIX",
-    transfer: "Transferência",
-    credit_card: "Cartão de crédito",
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-overlay p-0 sm:p-4"
@@ -305,7 +316,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               <Pencil size={14} /> Editar
             </button>
             {booking.status === "confirmed" && ["pix", "credit_card"].includes(booking.payment_method ?? "") ? (
-              <button onClick={() => { onRefund(booking.booking_code); onClose(); }} disabled={isLoading}
+              <button onClick={() => { onRefund(booking); onClose(); }} disabled={isLoading}
                 className="flex items-center justify-center gap-1.5 border border-amber-300 text-amber-600 hover:bg-amber-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
                 <Undo2 size={14} />
                 <span className="hidden sm:inline">Estornar</span>
@@ -595,6 +606,56 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
               className="flex-1 bg-red-500 hover:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
               {loading ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
               Cancelar reserva
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Refund Confirm Modal ─── */
+function RefundConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
+  booking: Booking;
+  trip: Trip | undefined;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl animate-modal">
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
+              <Undo2 size={24} className="text-amber-500" />
+            </div>
+            <div>
+              <h3 className="font-bold text-navy-800 text-lg">Estornar reserva?</h3>
+              <p className="text-gray-400 text-sm mt-1">O valor pago será devolvido ao cliente ({paymentLabel(booking.payment_method)}) e a vaga liberada.</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
+            <p className="font-mono text-xs text-gray-400">{booking.booking_code}</p>
+            <p className="font-bold text-navy-800">{travelerName}</p>
+            {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
+            <p className="text-xs text-gray-400">
+              R$ {fmtBRL(booking.final_amount)} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+              Voltar
+            </button>
+            <button onClick={onConfirm} disabled={loading}
+              className="flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <Undo2 size={15} />}
+              Estornar
             </button>
           </div>
         </div>
@@ -1009,9 +1070,12 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 export default function AdminReservasPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState({ interesse: 0, confirmed: 0, cancelled: 0, all: 0 });
+  const [counts, setCounts] = useState<Counts>({
+    interesse: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, refunded: 0, all: 0,
+    stats: { confirmed_revenue: 0, pending_value: 0, month_count: 0, month_value: 0 },
+  });
   const [trips, setTrips] = useState<Trip[]>(_tripsCache.data ?? []);
-  const [tab, setTab] = useState<"interesse" | "confirmed" | "cancelled" | "all">("interesse");
+  const [tab, setTab] = useState<string>("interesse");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -1022,6 +1086,8 @@ export default function AdminReservasPage() {
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
+  const [refundLoading, setRefundLoading] = useState(false);
   const searchParams = useSearchParams();
   const [tripFilter, setTripFilter] = useState<string>(searchParams.get("trip_id") ?? "");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -1111,23 +1177,23 @@ export default function AdminReservasPage() {
     }
   };
 
-  const refund = async (code: string) => {
-    if (!window.confirm("Estornar esta reserva? O valor pago será devolvido ao cliente no cartão/PIX e a vaga liberada.")) return;
-    setActionLoading(code);
+  const executeRefund = async () => {
+    if (!refundTarget) return;
+    setRefundLoading(true);
     try {
-      const res = await fetchWithTimeout(`${API}/payments/${code}/refund`, {
+      const res = await fetchWithTimeout(`${API}/payments/${refundTarget.booking_code}/refund`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.detail || "Não foi possível estornar."); return; }
       invalidateAdminCache();
+      setRefundTarget(null);
       fetchBookings();
       fetchCounts();
-      alert("Reserva estornada. O valor será devolvido ao cliente.");
     } catch {
       alert("Erro de conexão ao estornar. Tente novamente.");
     } finally {
-      setActionLoading(null);
+      setRefundLoading(false);
     }
   };
 
@@ -1155,12 +1221,63 @@ export default function AdminReservasPage() {
   const tripMap = Object.fromEntries(trips.map((t) => [t.id, t]));
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const tabs: { key: typeof tab; label: string; count: number }[] = [
-    { key: "all",        label: "Todas",       count: counts.all },
-    { key: "interesse",  label: "Interesses",  count: counts.interesse },
-    { key: "confirmed",  label: "Confirmadas", count: counts.confirmed },
-    { key: "cancelled",  label: "Canceladas",  count: counts.cancelled },
+  const tabs: { key: string; label: string; count: number }[] = [
+    { key: "interesse",          label: "Interesses",        count: counts.interesse },
+    { key: "pending",            label: "Aguardando pgto",   count: counts.pending },
+    { key: "confirmed",          label: "Confirmadas",       count: counts.confirmed },
+    { key: "completed",          label: "Concluídas",        count: counts.completed },
+    { key: "cancelled,refunded", label: "Encerradas",        count: counts.cancelled + counts.refunded },
+    { key: "all",                label: "Todas",             count: counts.all },
   ];
+
+  const summary = [
+    { label: "Receita confirmada", value: `R$ ${fmtBRL(counts.stats.confirmed_revenue)}`, sub: `${counts.confirmed} reserva${counts.confirmed !== 1 ? "s" : ""}`, accent: "text-emerald-600", icon: DollarSign },
+    { label: "Aguardando pagamento", value: `R$ ${fmtBRL(counts.stats.pending_value)}`, sub: `${counts.pending} reserva${counts.pending !== 1 ? "s" : ""}`, accent: "text-blue-600", icon: Clock },
+    { label: "Interesses a seguir", value: String(counts.interesse), sub: "contatos a fechar", accent: "text-amber-600", icon: MessageSquare },
+    { label: "Vendas do mês", value: `R$ ${fmtBRL(counts.stats.month_value)}`, sub: `${counts.stats.month_count} confirmada${counts.stats.month_count !== 1 ? "s" : ""}`, accent: "text-navy-700", icon: CheckCheck },
+  ];
+
+  const RowActions = ({ b, compact }: { b: Booking; compact?: boolean }) => {
+    const isLoading = actionLoading === b.booking_code;
+    const canRefund = b.status === "confirmed" && ["pix", "credit_card"].includes(b.payment_method ?? "");
+    const actionable = ["interesse", "confirmed", "pending"].includes(b.status);
+    const name = b.traveler_name || `Usuário #${b.user_id}`;
+    return (
+      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {b.status === "interesse" && (
+          <button onClick={() => confirm(b.booking_code)} disabled={isLoading} title="Confirmar"
+            className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <Check size={11} />{!compact && " Confirmar"}
+          </button>
+        )}
+        {actionable && (
+          <button onClick={() => setEditTarget(b)} disabled={isLoading} title="Editar"
+            className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <Pencil size={11} />{!compact && " Editar"}
+          </button>
+        )}
+        {actionable && (canRefund ? (
+          <button onClick={() => setRefundTarget(b)} disabled={isLoading} title="Estornar"
+            className="flex items-center gap-1 border border-amber-300 text-amber-600 hover:bg-amber-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <Undo2 size={11} />{!compact && " Estornar"}
+          </button>
+        ) : (
+          <button onClick={() => promptCancel(b)} disabled={isLoading} title="Cancelar"
+            className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <X size={11} />{!compact && " Cancelar"}
+          </button>
+        ))}
+        {b.traveler_phone && (
+          <a href={buildWaUrl(b.traveler_phone, name, b.booking_code)} target="_blank" rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()} title="WhatsApp"
+            className="flex items-center justify-center border border-emerald-200 text-emerald-600 hover:bg-emerald-50 w-[30px] h-[30px] rounded-lg transition-colors shrink-0">
+            <MessageSquare size={12} />
+          </a>
+        )}
+        {!actionable && !b.traveler_phone && <span className="text-xs text-gray-300">—</span>}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1185,6 +1302,16 @@ export default function AdminReservasPage() {
         />
       )}
 
+      {refundTarget && (
+        <RefundConfirmModal
+          booking={refundTarget}
+          trip={tripMap[refundTarget.trip_id]}
+          onClose={() => setRefundTarget(null)}
+          onConfirm={executeRefund}
+          loading={refundLoading}
+        />
+      )}
+
       {selectedBooking && (
         <BookingDetailModal
           booking={selectedBooking}
@@ -1193,7 +1320,7 @@ export default function AdminReservasPage() {
           onConfirm={(code) => { confirm(code); setSelectedBooking(null); }}
           onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
           onCancel={(b) => { setSelectedBooking(null); promptCancel(b); }}
-          onRefund={(code) => { setSelectedBooking(null); refund(code); }}
+          onRefund={(b) => { setSelectedBooking(null); setRefundTarget(b); }}
           actionLoading={actionLoading}
         />
       )}
@@ -1224,6 +1351,23 @@ export default function AdminReservasPage() {
           className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm">
           <Plus size={16} /> Nova Venda Externa
         </button>
+      </div>
+
+      {/* Resumo */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summary.map((s) => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
+                <Icon size={15} className={s.accent} />
+              </div>
+              <p className={`mt-2 text-lg sm:text-xl font-black leading-tight ${s.accent}`}>{s.value}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Tabs + filters */}
@@ -1279,76 +1423,112 @@ export default function AdminReservasPage() {
             <p className="font-medium">Nenhuma reserva encontrada</p>
           </div>
         ) : (
-          <div className="p-4 flex flex-col gap-3">
-            {bookings.map((b) => {
-              const trip = tripMap[b.trip_id];
-              const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
-              const isLoading = actionLoading === b.booking_code;
-              const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
-              return (
-                <div key={b.id} onClick={() => setSelectedBooking(b)}
-                  className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
-                  {/* Info + badge */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <button onClick={(e) => { e.stopPropagation(); copyCode(b.booking_code); }}
-                          className="flex items-center gap-1 font-mono text-xs text-navy-500 font-semibold hover:text-gold-600 transition-colors group">
-                          {b.booking_code}
-                          {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
-                        </button>
-                        {b.is_external
-                          ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
-                          : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>
-                        }
-                        <span className="w-full sm:w-auto font-bold text-navy-800 text-sm sm:truncate leading-snug">
-                          <span className="hidden sm:inline text-gray-300 mr-1">·</span>
-                          {b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}
-                          {(b.trip_destination ?? trip?.destination) && <span className="hidden sm:inline text-xs text-gray-400 font-normal ml-1.5">{b.trip_destination ?? trip?.destination}</span>}
-                        </span>
+          <>
+            {/* Desktop: tabela densa */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    <th className="px-4 py-3 font-semibold">Código</th>
+                    <th className="px-4 py-3 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 font-semibold">Viagem</th>
+                    <th className="px-4 py-3 font-semibold text-center">Pess.</th>
+                    <th className="px-4 py-3 font-semibold text-right">Valor</th>
+                    <th className="px-4 py-3 font-semibold">Pagamento</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((b) => {
+                    const trip = tripMap[b.trip_id];
+                    const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+                    const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
+                    return (
+                      <tr key={b.id} onClick={() => setSelectedBooking(b)}
+                        className={`border-b border-gray-50 border-l-4 ${st.border} hover:bg-gray-50 cursor-pointer transition-colors`}>
+                        <td className="px-4 py-3 align-top">
+                          <button onClick={(e) => { e.stopPropagation(); copyCode(b.booking_code); }}
+                            className="flex items-center gap-1 font-mono text-xs text-navy-600 font-semibold hover:text-gold-600 transition-colors group">
+                            {b.booking_code}
+                            {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
+                          </button>
+                          <span className="mt-1 flex items-center gap-0.5 text-[10px] font-semibold">
+                            {b.is_external
+                              ? <span className="text-purple-600 flex items-center gap-0.5"><Store size={9} /> Externo</span>
+                              : <span className="text-blue-500 flex items-center gap-0.5"><Globe size={9} /> Site</span>}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <p className="font-semibold text-navy-800 truncate max-w-[170px]">{travelerName}</p>
+                          {b.traveler_phone && <p className="text-xs text-gray-400">{b.traveler_phone}</p>}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <p className="text-navy-700 truncate max-w-[200px]">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                          {b.trip_departure_date && <p className="text-xs text-gray-400">{fmt(b.trip_departure_date)}</p>}
+                        </td>
+                        <td className="px-4 py-3 align-top text-center text-gray-600">{b.num_travelers}</td>
+                        <td className="px-4 py-3 align-top text-right font-bold text-navy-800 whitespace-nowrap">R$ {fmtBRL(b.final_amount)}</td>
+                        <td className="px-4 py-3 align-top text-xs text-gray-500 whitespace-nowrap">{paymentLabel(b.payment_method, b.installments)}</td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                            {b.status === "interesse" && <WaitingBadge createdAt={b.created_at} />}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex justify-end"><RowActions b={b} compact /></div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: cards */}
+            <div className="md:hidden p-4 flex flex-col gap-3">
+              {bookings.map((b) => {
+                const trip = tripMap[b.trip_id];
+                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+                const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
+                const showActions = ["interesse", "confirmed", "pending"].includes(b.status) || !!b.traveler_phone;
+                return (
+                  <div key={b.id} onClick={() => setSelectedBooking(b)}
+                    className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-colors duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <button onClick={(e) => { e.stopPropagation(); copyCode(b.booking_code); }}
+                            className="flex items-center gap-1 font-mono text-xs text-navy-500 font-semibold hover:text-gold-600 transition-colors group">
+                            {b.booking_code}
+                            {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
+                          </button>
+                          {b.is_external
+                            ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
+                            : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>}
+                        </div>
+                        <p className="font-bold text-navy-800 text-sm leading-snug">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                        <p className="text-xs text-gray-500 truncate">{travelerName}</p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 pt-0.5">
+                          <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
+                          <span>·</span>
+                          <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>
+                          <span>·</span>
+                          <span>{paymentLabel(b.payment_method, b.installments)}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
-                        <span className="font-medium text-gray-600 truncate">{travelerName}</span>
-                        {b.traveler_cpf && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline font-mono">{b.traveler_cpf}</span></>}
-                        {b.traveler_phone && <><span className="hidden sm:inline text-gray-300">·</span><span className="hidden sm:inline">{b.traveler_phone}</span></>}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 pt-0.5">
-                        <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
-                        <span>·</span>
-                        <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>
-                        <span>·</span>
-                        <span>{fmt(b.created_at)}</span>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                        {b.status === "interesse" && <WaitingBadge createdAt={b.created_at} />}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
-                      {b.status === "interesse" && <WaitingBadge createdAt={b.created_at} />}
-                    </div>
+                    {showActions && <RowActions b={b} />}
                   </div>
-                  {/* Actions */}
-                  {["interesse", "confirmed", "pending"].includes(b.status) && (
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      {b.status === "interesse" && (
-                        <button onClick={() => confirm(b.booking_code)} disabled={isLoading}
-                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                          <Check size={11} /> Confirmar
-                        </button>
-                      )}
-                      <button onClick={() => setEditTarget(b)} disabled={isLoading}
-                        className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                        <Pencil size={11} /> Editar
-                      </button>
-                      <button onClick={() => promptCancel(b)} disabled={isLoading}
-                        className="flex items-center justify-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold w-7 h-7 sm:w-auto sm:px-2.5 sm:py-1.5 rounded-lg transition-colors disabled:opacity-50">
-                        <X size={11} />
-                        <span className="hidden sm:inline">Cancelar</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
