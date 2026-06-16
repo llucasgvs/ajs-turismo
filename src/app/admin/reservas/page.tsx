@@ -1268,7 +1268,7 @@ export default function AdminReservasPage() {
     const actionable = ["interesse", "confirmed", "pending"].includes(b.status);
     const name = b.traveler_name || `Usuário #${b.user_id}`;
     return (
-      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         {b.status === "interesse" && (
           <button onClick={() => confirm(b.booking_code)} disabled={isLoading} title="Confirmar"
             className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
@@ -1494,7 +1494,7 @@ export default function AdminReservasPage() {
                         </td>
                         <td className="px-4 py-3 align-top text-center text-gray-600">{b.num_travelers}</td>
                         <td className="px-4 py-3 align-top text-right font-bold text-navy-800 whitespace-nowrap">R$ {fmtBRL(b.final_amount)}</td>
-                        <td className="px-4 py-3 align-top text-xs text-gray-500 whitespace-nowrap">{paymentLabel(b.payment_method, b.installments)}</td>
+                        <td className="px-4 py-3 align-top text-xs text-gray-500 max-w-[130px]">{paymentLabel(b.payment_method, b.installments)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex items-center gap-1.5">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
@@ -1502,7 +1502,7 @@ export default function AdminReservasPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top">
-                          <div className="flex justify-end"><RowActions b={b} compact /></div>
+                          <div className="flex justify-end flex-wrap gap-y-1"><RowActions b={b} compact /></div>
                         </td>
                       </tr>
                     );
