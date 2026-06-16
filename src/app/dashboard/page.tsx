@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
+import { BrandedLoader } from "@/components/BrandedLoader";
 
 interface StoredUser {
   full_name: string;
@@ -243,6 +244,7 @@ export default function Dashboard() {
   }, []);
 
   if (!user) return null;
+  if (loading) return <BrandedLoader label="Carregando seu painel..." />;
 
   const firstName = user.full_name.split(" ")[0];
   const initial = user.full_name[0]?.toUpperCase() ?? "?";

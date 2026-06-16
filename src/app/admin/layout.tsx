@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, Menu, X } from "lucide-react";
 import { getUser, logout } from "@/lib/api";
+import { BrandedLoader } from "@/components/BrandedLoader";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -35,11 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [pathname]);
 
   if (checking) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <BrandedLoader label="Carregando painel..." />;
   }
 
   const SidebarContent = () => (

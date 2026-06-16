@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { BrandedLoader } from "@/components/BrandedLoader";
 
 interface Booking {
   booking_code: string;
@@ -53,11 +54,7 @@ export default function CheckoutPage({ params }: { params: { code: string } }) {
   }, [loadStatus]);
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-navy-500 animate-spin" />
-      </main>
-    );
+    return <BrandedLoader label="Carregando pagamento..." />;
   }
 
   if (confirmed || booking?.status === "confirmed") {
