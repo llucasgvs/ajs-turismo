@@ -48,7 +48,7 @@ type StatusCfg = {
 
 const STATUS: Record<string, StatusCfg> = {
   interesse:  { label: "Aguardando",  bg: "bg-amber-50",   text: "text-amber-700",   icon: Clock,         bar: "bg-amber-400",   desc: "Aguardando confirmação da equipe AJS" },
-  pending:    { label: "Pendente",    bg: "bg-blue-50",    text: "text-blue-700",    icon: RotateCcw,     bar: "bg-blue-400",    desc: "Documentação em análise" },
+  pending:    { label: "Pagamento pendente", bg: "bg-blue-50", text: "text-blue-700", icon: RotateCcw, bar: "bg-blue-400", desc: "Aguardando o pagamento para confirmar sua vaga" },
   confirmed:  { label: "Confirmado",  bg: "bg-emerald-50", text: "text-emerald-700", icon: CheckCircle2,  bar: "bg-emerald-500", desc: "Reserva confirmada — boa viagem!" },
   completed:  { label: "Realizado",   bg: "bg-gray-50",    text: "text-gray-500",    icon: Star,          bar: "bg-gray-300",    desc: "Viagem concluída — esperamos que tenha curtido!" },
 };
@@ -170,6 +170,14 @@ function BookingCard({ b }: { b: Booking }) {
         {/* Status description */}
         {cfg.desc && (
           <p className={`text-xs ${cfg.text} opacity-80 mb-3`}>{cfg.desc}</p>
+        )}
+
+        {/* CTA: retomar pagamento pendente */}
+        {b.status === "pending" && (
+          <Link href={`/reservar/${b.booking_code}`}
+            className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors mb-3">
+            Continuar pagamento <ArrowRight size={14} />
+          </Link>
         )}
 
         {/* Footer */}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2 } from "lucide-react";
 import { getToken, fetchWithTimeout } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
@@ -54,6 +54,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
   pending:    { label: "Pendente",   color: "bg-blue-100 text-blue-700",       border: "border-l-blue-400" },
   confirmed:  { label: "Confirmado", color: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-400" },
   cancelled:  { label: "Cancelado",  color: "bg-red-100 text-red-700",         border: "border-l-red-400" },
+  refunded:   { label: "Estornado",  color: "bg-orange-100 text-orange-700",   border: "border-l-orange-400" },
   completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600",       border: "border-l-gray-300" },
 };
 
@@ -120,13 +121,14 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ─── Booking Detail Modal ─── */
-function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, actionLoading }: {
+function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, onRefund, actionLoading }: {
   booking: Booking;
   trip: Trip | undefined;
   onClose: () => void;
   onConfirm: (code: string) => void;
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
+  onRefund: (code: string) => void;
   actionLoading: string | null;
 }) {
   const st = STATUS_LABEL[booking.status] ?? { label: booking.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
@@ -298,11 +300,19 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               className="flex-1 flex items-center justify-center gap-2 border border-navy-300 text-navy-700 bg-navy-50 hover:bg-navy-100 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
               <Pencil size={14} /> Editar
             </button>
-            <button onClick={() => { onCancel(booking); onClose(); }} disabled={isLoading}
-              className="flex items-center justify-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
-              <X size={14} />
-              <span className="hidden sm:inline">Cancelar</span>
-            </button>
+            {booking.status === "confirmed" && ["pix", "credit_card"].includes(booking.payment_method ?? "") ? (
+              <button onClick={() => { onRefund(booking.booking_code); onClose(); }} disabled={isLoading}
+                className="flex items-center justify-center gap-1.5 border border-amber-300 text-amber-600 hover:bg-amber-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
+                <Undo2 size={14} />
+                <span className="hidden sm:inline">Estornar</span>
+              </button>
+            ) : (
+              <button onClick={() => { onCancel(booking); onClose(); }} disabled={isLoading}
+                className="flex items-center justify-center gap-1.5 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
+                <X size={14} />
+                <span className="hidden sm:inline">Cancelar</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1097,6 +1107,26 @@ export default function AdminReservasPage() {
     }
   };
 
+  const refund = async (code: string) => {
+    if (!window.confirm("Estornar esta reserva? O valor pago será devolvido ao cliente no cartão/PIX e a vaga liberada.")) return;
+    setActionLoading(code);
+    try {
+      const res = await fetchWithTimeout(`${API}/payments/${code}/refund`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.detail || "Não foi possível estornar."); return; }
+      invalidateAdminCache();
+      fetchBookings();
+      fetchCounts();
+      alert("Reserva estornada. O valor será devolvido ao cliente.");
+    } catch {
+      alert("Erro de conexão ao estornar. Tente novamente.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const promptCancel = (booking: Booking) => {
     setCancelTarget(booking);
   };
@@ -1148,6 +1178,7 @@ export default function AdminReservasPage() {
           onConfirm={(code) => { confirm(code); setSelectedBooking(null); }}
           onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
           onCancel={(b) => { setSelectedBooking(null); promptCancel(b); }}
+          onRefund={(code) => { setSelectedBooking(null); refund(code); }}
           actionLoading={actionLoading}
         />
       )}

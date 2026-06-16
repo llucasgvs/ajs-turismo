@@ -637,16 +637,17 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const updateCompanion = (i: number, field: keyof CompanionForm, val: string) =>
     setCompanions(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Validações compartilhadas pelos dois fluxos (WhatsApp e pagamento online).
+  // Retorna true se tudo OK; caso contrário seta o erro/campo e retorna false.
+  const validateForm = (): boolean => {
     setError(""); setErrorField("");
-    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); setErrorField("titular-cpf"); return; }
-    if (!birthDate) { setError("Informe sua data de nascimento."); setErrorField("titular-birth"); return; }
-    if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); setErrorField("titular-phone"); return; }
+    if (!validateCPF(cpf)) { setError("CPF inválido. Verifique os números digitados."); setErrorField("titular-cpf"); return false; }
+    if (!birthDate) { setError("Informe sua data de nascimento."); setErrorField("titular-birth"); return false; }
+    if (!phone || phone.replace(/\D/g, "").length < 10) { setError("Informe um telefone válido com DDD."); setErrorField("titular-phone"); return false; }
     for (const [i, c] of companions.entries()) {
-      if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-name`); return; }
-      if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-cpf`); return; }
-      if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); setErrorField(`comp-${i}-birth`); return; }
+      if (c.full_name.trim().length < 3) { setError(`Nome do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-name`); return false; }
+      if (!validateCPF(c.cpf)) { setError(`CPF do acompanhante ${i + 1} inválido.`); setErrorField(`comp-${i}-cpf`); return false; }
+      if (!c.birth_date) { setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`); setErrorField(`comp-${i}-birth`); return false; }
     }
 
     // Valida data de nascimento contra a faixa de idade da categoria escolhida
@@ -664,21 +665,70 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         return null;
       };
       const titularErr = check(travelerCats[0] ?? ADULT, birthDate, "Titular");
-      if (titularErr) { setError(titularErr); setErrorField("titular-birth"); return; }
+      if (titularErr) { setError(titularErr); setErrorField("titular-birth"); return false; }
       for (const [i, c] of companions.entries()) {
         const err = check(travelerCats[i + 1] ?? ADULT, c.birth_date, `Acompanhante ${i + 1}`);
-        if (err) { setError(err); setErrorField(`comp-${i}-birth`); return; }
+        if (err) { setError(err); setErrorField(`comp-${i}-birth`); return false; }
       }
     }
+    return true;
+  };
+
+  // Payload comum das reservas (interesse e pagamento online).
+  const buildBookingPayload = () => ({
+    trip_id: trip.id,
+    num_travelers: people,
+    companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })),
+    notes: note || undefined,
+    selected_optionals: selectedOptionals,
+    tier_breakdown: hasTiers
+      ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+      : [],
+  });
+
+  const saveProfile = async (token: string | null) => {
+    await fetch(`${API}/auth/me`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
+    });
+    localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
+  };
+
+  // ── Fluxo: pagar agora online (Asaas) ──────────────────────────────────────
+  const [payLoading, setPayLoading] = useState(false);
+  const handlePayOnline = async () => {
+    if (!validateForm()) return;
+    setPayLoading(true);
+    try {
+      const token = getToken();
+      await saveProfile(token);
+      const res = await fetch(`${API}/payments/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(buildBookingPayload()),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setError(Array.isArray(err.detail) ? err.detail.map((d: {msg?: string}) => d.msg ?? String(d)).join(", ") : (err.detail || "Não foi possível iniciar o pagamento."));
+        return;
+      }
+      const data = await res.json();
+      onClose();
+      // Vai para a página de checkout transparente (PIX / cartão) dentro do site
+      window.location.href = `/pagamento/${data.booking_code}`;
+    } catch { setError("Erro de conexão. Tente novamente."); }
+    finally { setPayLoading(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
     setLoading(true);
     try {
       const token = getToken();
-      await fetch(`${API}/auth/me`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ full_name: fullName, phone, cpf, birth_date: birthDate }),
-      });
+      await saveProfile(token);
       const tierBreakdown = hasTiers
         ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
         : [];
@@ -693,7 +743,6 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
         return;
       }
       const booking = await bookingRes.json();
-      localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, phone, cpf, birth_date: birthDate }));
       const tierSummary = hasTiers
         ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty, price: priceForLabel(label) }))
         : undefined;
@@ -918,12 +967,26 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
             </div>
           </div>
 
-          <button type="submit" disabled={loading}
+          <button type="button" onClick={handlePayOnline} disabled={loading || payLoading}
+            className="w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base disabled:opacity-60">
+            {payLoading ? "Abrindo pagamento..." : `Pagar agora — R$ ${fmtBRL(grandTotal)}`}
+          </button>
+          <p className="text-center text-xs text-gray-400 -mt-2">
+            PIX, cartão (parcelado) ou boleto. Sua vaga é confirmada na hora do pagamento.
+          </p>
+
+          <div className="flex items-center gap-3 py-1">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium">ou</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          <button type="submit" disabled={loading || payLoading}
             className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base disabled:opacity-60">
             {loading ? "Salvando..." : "Manifestar interesse pelo WhatsApp"}
           </button>
           <p className="text-center text-xs text-gray-400">
-            Seus dados são salvos e abriremos o WhatsApp com tudo preenchido. Nossa equipe confirmará a reserva.
+            Prefere falar antes? Abriremos o WhatsApp com tudo preenchido e nossa equipe confirma a reserva.
           </p>
         </form>
       </div>
@@ -1357,18 +1420,8 @@ function OpenDateCalendar({
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
 
-  // Capture ?book= at mount time (before any async/replaceState changes the URL)
-  const initialBookId = useRef(
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("book")
-      : null
-  );
-  // Tracks if the ?book= redirect was already handled (prevents Strict Mode double-run)
-  const bookHandled = useRef(false);
-
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
-  const [bookingUser, setBookingUser] = useState<StoredUser | null>(null);
   const [navUser, setNavUser] = useState<StoredUser | null>(null);
   const [siblingTrips, setSiblingTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -1462,12 +1515,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           (a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime()
         );
         setSiblingTrips(sorted);
-        // Only auto-select if no ?book= param (post-login redirect handles its own selection)
-        if (!initialBookId.current) {
-          // Always auto-select the nearest available date
-          const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out") || sorted[0];
-          if (nearest) setSelectedTrip(nearest);
-        }
+        // Auto-seleciona a data mais próxima disponível
+        const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out") || sorted[0];
+        if (nearest) setSelectedTrip(nearest);
       })
       .catch(() => {});
   }, [trip.id, trip.template_id]);
@@ -1477,35 +1527,22 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     setDateError(false);
   }, []);
 
-  // Auto-open booking modal after login redirect (?book=tripId)
-  useEffect(() => {
-    if (siblingTrips.length === 0) return;
-    if (bookHandled.current) return; // already processed (Strict Mode double-run guard)
-    const bookId = initialBookId.current;
-    if (!bookId) return;
-    const target = siblingTrips.find(t => t.id === Number(bookId));
-    if (!target) return;
-    bookHandled.current = true;
-    window.history.replaceState({}, "", window.location.pathname);
-    setSelectedTrip(target);
-    const u = getStoredUser();
-    if (u) setBookingUser(u);
-  }, [siblingTrips]);
-
+  // Vai para o checkout (estilo Airbnb). Login/cadastro acontece lá dentro (modal),
+  // então não checamos login aqui nem criamos a reserva — a seleção vai na URL.
   const handleOpenBooking = useCallback(() => {
     if (!selectedTrip) {
       setDateError(true);
       document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    const u = getStoredUser();
-    if (!u) {
-      const returnUrl = `${window.location.pathname}?book=${selectedTrip.id}`;
-      router.push(`/login?redirect=${encodeURIComponent(returnUrl)}`);
-    } else {
-      setBookingUser(u);
-    }
-  }, [router, selectedTrip]);
+    const hasTiers = (selectedTrip.price_tiers ?? []).length > 0;
+    const tiers = hasTiers
+      ? Object.entries(sidebarTiers).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+      : [];
+    const people = hasTiers ? Object.values(sidebarTiers).reduce((a, b) => a + b, 0) : sidebarPeople;
+    const sel = encodeURIComponent(JSON.stringify({ people, optionals: selectedOptionals, tiers }));
+    router.push(`/reservar/novo?trip=${selectedTrip.id}&sel=${sel}`);
+  }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals]);
 
   const openGallery = useCallback((idx: number) => {
     setGalleryStart(idx);
@@ -1564,10 +1601,6 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         <GalleryModal images={allImages} startIndex={galleryStart} onClose={() => setGalleryOpen(false)} />
       )}
 
-      {/* Booking Modal */}
-      {bookingUser && selectedTrip && (
-        <BookingModal trip={selectedTrip} user={bookingUser} onClose={() => setBookingUser(null)} selectedOptionals={selectedOptionals} initialPeople={sidebarPeople} initialTiers={sidebarTiers} />
-      )}
 
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />

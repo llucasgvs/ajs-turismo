@@ -25,6 +25,9 @@ export interface StoredUser {
   email: string;
   is_admin: boolean;
   is_active: boolean;
+  cpf?: string;
+  phone?: string;
+  birth_date?: string;
 }
 
 export function getToken(): string | null {

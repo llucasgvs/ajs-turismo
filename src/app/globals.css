@@ -187,6 +187,9 @@ body {
 .animate-modal   { animation: modal-in 240ms var(--ease-out); }
 /* popover anima a partir do gatilho (topo por padrão) */
 .animate-pop     { animation: pop-in 180ms var(--ease-out); transform-origin: top; }
+/* Revelação sutil (ex.: endereço resolvido pelo CEP) — só opacidade + 4px */
+@keyframes reveal-soft { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.reveal-soft { animation: reveal-soft 200ms var(--ease-out) both; }
 
 /* Stagger em cascata para grades de cards */
 .stagger-in > * {
