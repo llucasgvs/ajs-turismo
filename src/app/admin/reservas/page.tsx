@@ -1267,36 +1267,39 @@ export default function AdminReservasPage() {
     const canRefund = b.status === "confirmed" && ["pix", "credit_card"].includes(b.payment_method ?? "");
     const actionable = ["interesse", "confirmed", "pending"].includes(b.status);
     const name = b.traveler_name || `Usuário #${b.user_id}`;
+    // Na tabela (compact) os botões são quadradinhos uniformes de 30px e NÃO quebram
+    // linha; no card mobile mostram rótulo e podem quebrar.
+    const sizing = compact ? "w-[30px] h-[30px] justify-center shrink-0" : "px-2.5 py-1.5";
     return (
-      <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
         {b.status === "interesse" && (
           <button onClick={() => confirm(b.booking_code)} disabled={isLoading} title="Confirmar"
-            className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-            <Check size={11} />{!compact && " Confirmar"}
+            className={`flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
+            <Check size={13} />{!compact && " Confirmar"}
           </button>
         )}
         {actionable && (
           <button onClick={() => setEditTarget(b)} disabled={isLoading} title="Editar"
-            className="flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-            <Pencil size={11} />{!compact && " Editar"}
+            className={`flex items-center gap-1 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
+            <Pencil size={13} />{!compact && " Editar"}
           </button>
         )}
         {actionable && (canRefund ? (
           <button onClick={() => setRefundTarget(b)} disabled={isLoading} title="Estornar"
-            className="flex items-center gap-1 border border-amber-300 text-amber-600 hover:bg-amber-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-            <Undo2 size={11} />{!compact && " Estornar"}
+            className={`flex items-center gap-1 border border-amber-300 text-amber-600 hover:bg-amber-50 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
+            <Undo2 size={13} />{!compact && " Estornar"}
           </button>
         ) : (
           <button onClick={() => promptCancel(b)} disabled={isLoading} title="Cancelar"
-            className="flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-            <X size={11} />{!compact && " Cancelar"}
+            className={`flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
+            <X size={13} />{!compact && " Cancelar"}
           </button>
         ))}
         {b.traveler_phone && (
           <a href={buildWaUrl(b)} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()} title="Falar no WhatsApp"
-            className={`flex items-center justify-center gap-1.5 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-semibold rounded-lg transition-colors shrink-0 ${compact ? "w-[30px] h-[30px]" : "px-2.5 py-1.5 text-xs"}`}>
-            <WhatsAppGlyph size={compact ? 14 : 13} />{!compact && " WhatsApp"}
+            className={`flex items-center justify-center gap-1.5 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-semibold text-xs rounded-lg transition-colors ${sizing}`}>
+            <WhatsAppGlyph size={14} />{!compact && " WhatsApp"}
           </a>
         )}
         {!actionable && !b.traveler_phone && <span className="text-xs text-gray-300">—</span>}
@@ -1502,7 +1505,7 @@ export default function AdminReservasPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top">
-                          <div className="flex justify-end flex-wrap gap-y-1"><RowActions b={b} compact /></div>
+                          <div className="flex justify-end"><RowActions b={b} compact /></div>
                         </td>
                       </tr>
                     );
