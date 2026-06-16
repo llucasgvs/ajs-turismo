@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2 } from "lucide-react";
 import { getToken, fetchWithTimeout } from "@/lib/api";
-import { fmtBRL } from "@/lib/format";
+import { fmtBRL, spotsLabel } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -911,7 +911,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                     <option key={t.id} value={t.id}>
                       {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR") : "Data indefinida"}
                       {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR")}` : ""}
-                      {" "}· {t.available_spots} vaga{t.available_spots !== 1 ? "s" : ""} · R$ {fmtBRL(t.price_per_person)}
+                      {" "}· {spotsLabel(t.available_spots)} · R$ {fmtBRL(t.price_per_person)}
                     </option>
                   ))}
                 </select>
@@ -923,7 +923,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                   <span className="mx-1">·</span>
                   <span className="font-semibold text-navy-600">R$ {fmtBRL(selectedTrip.price_per_person)} / pessoa</span>
                   <span className="mx-1">·</span>
-                  {selectedTrip.available_spots} vagas
+                  {spotsLabel(selectedTrip.available_spots)}
                 </p>
               )}
             </div>

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots } from "@/lib/format";
 import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1143,7 +1143,7 @@ function DateSelector({
                       ? "bg-orange-100 text-orange-600"
                       : "bg-gray-100 text-gray-500"
                   }`}>
-                    {isLow ? `⚠ ${t.available_spots} vagas` : `${t.available_spots} vagas`}
+                    {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
                   </span>
                 )}
               </div>
@@ -1256,7 +1256,7 @@ function CompactDateSelector({
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
                         }`}>
-                          {isLow ? `⚠ ${t.available_spots}` : `${t.available_spots}`} vagas
+                          {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
                         </span>
                       </>
                     )}
@@ -1732,7 +1732,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       <InfoStat
                         icon={<Users size={16} className="text-gold-500" />}
                         label="Vagas"
-                        value={sold ? "Esgotado" : `${activeTrip.available_spots} disponíveis`}
+                        value={sold ? "Esgotado" : isUnlimitedSpots(activeTrip.available_spots) ? "Disponível" : `${activeTrip.available_spots} disponíveis`}
                         valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
                       />
                     </div>

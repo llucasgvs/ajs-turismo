@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
-import { fmtBRL } from "@/lib/format";
+import { fmtBRL, spotsLabel } from "@/lib/format";
 import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -462,6 +462,21 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     const tier_breakdown = hasTiers ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty })) : [];
     const selected_optionals = trip.optionals.filter(o => opts.has(o.name));
     const total = hasTiers ? Object.values(tierCounts).reduce((a, b) => a + b, 0) : people;
+
+    // Otimista: a data (e o preço, quando não há faixas) muda na hora — sem isso
+    // a lista fecha e nada parece acontecer por 1-2s até o PATCH responder.
+    const target = dates.find(d => d.id === tid);
+    if (target) {
+      const newPrice = target.price_per_person ?? trip.price_per_person ?? 0;
+      const optionals_amount = selected_optionals.reduce((s, o) => s + o.price, 0) * total;
+      const base = hasTiers ? booking.total_amount : total * newPrice;
+      onUpdate({
+        ...booking,
+        trip_departure_date: target.departure_date,
+        trip_return_date: target.return_date ?? null,
+        ...(hasTiers ? {} : { total_amount: base, optionals_amount, final_amount: base + optionals_amount }),
+      });
+    }
     setBusy(true);
     try {
       const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown, trip_id: tid }) });
@@ -505,7 +520,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                     <button key={d.id} disabled={sold || cur} onClick={() => changeDate(d.id)}
                       className={`w-full flex items-center justify-between px-3.5 py-3 text-sm text-left transition-colors ${cur ? "bg-navy-50/60" : "hover:bg-gray-50"} ${sold && !cur ? "opacity-40" : ""}`}>
                       <span className="font-medium text-navy-800">{fmtDateRange(d.departure_date, d.return_date)}</span>
-                      <span className={`text-xs font-medium ${cur ? "text-navy-600" : sold ? "text-gray-400" : "text-emerald-600"}`}>{cur ? "atual" : sold ? "esgotado" : `${d.available_spots} vagas`}</span>
+                      <span className={`text-xs font-medium ${cur ? "text-navy-600" : sold ? "text-gray-400" : "text-emerald-600"}`}>{cur ? "atual" : sold ? "esgotado" : spotsLabel(d.available_spots)}</span>
                     </button>
                   );
                 })}
