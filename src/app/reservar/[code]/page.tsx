@@ -12,6 +12,7 @@ import {
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { fmtBRL, spotsLabel } from "@/lib/format";
+import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -350,7 +351,7 @@ function BookingCheckout({ code }: { code: string }) {
     })();
   }, [code]);
 
-  if (loading) return <main className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-10 h-10 text-navy-500 animate-spin" /></main>;
+  if (loading) return <BrandedLoader label="Abrindo sua reserva..." />;
   if (confirmed || booking?.status === "confirmed") return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><SuccessScreen code={code} amount={booking?.final_amount} /></div><Footer /></div>;
   if (!booking) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -1097,7 +1098,7 @@ function PreCheckout() {
   }, [trip, createBooking]);
 
   if (loading || (getToken() && !error)) {
-    return <main className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-10 h-10 text-navy-500 animate-spin" /></main>;
+    return <BrandedLoader label="Abrindo sua reserva..." />;
   }
   if (!trip) {
     return <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4"><div className="text-center"><p className="text-gray-600 mb-4">Viagem não encontrada.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div></main>;

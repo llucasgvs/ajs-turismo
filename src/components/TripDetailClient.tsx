@@ -12,6 +12,7 @@ import {
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots } from "@/lib/format";
+import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1419,6 +1420,7 @@ function OpenDateCalendar({
 ═══════════════════════════════════════════ */
 export default function TripDetailClient({ trip }: { trip: Trip }) {
   const router = useRouter();
+  const { show: showLoading } = useLoading();
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
@@ -1541,8 +1543,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
       : [];
     const people = hasTiers ? Object.values(sidebarTiers).reduce((a, b) => a + b, 0) : sidebarPeople;
     const sel = encodeURIComponent(JSON.stringify({ people, optionals: selectedOptionals, tiers }));
+    showLoading();
     router.push(`/reservar/novo?trip=${selectedTrip.id}&sel=${sel}`);
-  }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals]);
+  }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals, showLoading]);
 
   const openGallery = useCallback((idx: number) => {
     setGalleryStart(idx);
