@@ -17,7 +17,7 @@ const steps = [
     icon: CreditCard,
     title: "Reserve com Segurança",
     description:
-      "Faça sua reserva online de forma rápida e segura. Parcelamos em até 12x sem juros no cartão e aceitamos PIX com desconto especial.",
+      "Faça sua reserva online de forma rápida e segura. Parcele no cartão em até 12x ou pague no PIX. Parcelamento sem juros em viagens selecionadas.",
     color: "bg-gold-500",
     accent: "text-navy-700",
   },

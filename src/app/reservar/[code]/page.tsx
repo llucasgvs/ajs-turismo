@@ -1006,10 +1006,9 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
 
 function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
   const [loading, setLoading] = useState(false);
-  const go = async () => {
-    setLoading(true);
-    try { await apiFetch(`/payments/${code}/whatsapp`, { method: "POST" }); } catch { /* segue */ }
+  const [sent, setSent] = useState(false);
 
+  const buildUrl = () => {
     const u = typeof window !== "undefined" ? getUser() : null;
     const L: string[] = [];
     L.push("Olá! Quero reservar pela AJS Turismo.");
@@ -1036,12 +1035,31 @@ function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
     L.push("");
     L.push(`Código da reserva: ${code}`);
 
-    window.location.href = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(L.join("\n"))}`;
+    return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(L.join("\n"))}`;
   };
+
+  const go = async () => {
+    setLoading(true);
+    // Abre o WhatsApp em NOVA aba: a reserva fica em aberto aqui, então o cliente
+    // pode voltar e pagar online se preferir, sem perder o checkout.
+    const url = buildUrl();
+    window.open(url, "_blank", "noopener,noreferrer");
+    try { await apiFetch(`/payments/${code}/whatsapp`, { method: "POST" }); } catch { /* segue */ }
+    setLoading(false);
+    setSent(true);
+  };
+
   return (
     <div className="text-center py-4">
-      <p className="text-gray-500 text-sm mb-4">Vamos abrir o WhatsApp com sua reserva preenchida. Nossa equipe confirma os detalhes e o pagamento com você.</p>
-      <button onClick={go} disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-60 inline-flex items-center gap-2"><MessageCircle size={17} /> {loading ? "Abrindo..." : "Continuar no WhatsApp"}</button>
+      {sent ? (
+        <>
+          <p className="text-emerald-600 text-sm font-semibold mb-2 inline-flex items-center gap-1.5"><Check size={15} /> Abrimos o WhatsApp em uma nova aba.</p>
+          <p className="text-gray-500 text-sm mb-4">Não abriu? <a href={buildUrl()} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-semibold underline">Toque aqui</a> para abrir de novo.</p>
+        </>
+      ) : (
+        <p className="text-gray-500 text-sm mb-4">Abrimos o WhatsApp (em nova aba) com sua reserva preenchida. Nossa equipe confirma os detalhes e o pagamento com você — e a reserva continua aqui caso prefira pagar online.</p>
+      )}
+      <button onClick={go} disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-60 inline-flex items-center gap-2"><MessageCircle size={17} /> {loading ? "Abrindo..." : sent ? "Abrir novamente" : "Continuar no WhatsApp"}</button>
     </div>
   );
 }

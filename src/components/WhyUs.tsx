@@ -18,7 +18,7 @@ const reasons = [
   {
     icon: CreditCard,
     title: "Melhores Preços",
-    description: "Parcelamos em até 12x sem juros. Aceitamos PIX, cartão de crédito e débito. Desconto no boleto.",
+    description: "Parcele no cartão em até 12x ou pague no PIX com desconto. Parcelamento sem juros em viagens selecionadas.",
     color: "text-navy-600",
     bg: "bg-navy-50",
   },
