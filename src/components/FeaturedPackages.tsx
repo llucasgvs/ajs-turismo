@@ -66,7 +66,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                   <img loading="lazy" decoding="async"
                     src={pkg.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"}
                     alt={pkg.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
