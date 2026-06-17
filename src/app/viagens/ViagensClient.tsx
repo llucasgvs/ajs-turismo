@@ -215,7 +215,7 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
             Explore Nossas <span className="text-gold-400">Viagens</span>
           </h1>
           <p className="text-navy-300 text-base md:text-lg max-w-xl mx-auto">
-            Destinos nacionais e internacionais com parcelamento em até 12x sem juros.
+            Destinos nacionais e internacionais. Parcele no cartão ou pague no PIX, com atendimento personalizado.
           </p>
         </div>
       </section>
