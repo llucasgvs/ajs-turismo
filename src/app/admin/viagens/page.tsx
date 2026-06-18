@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight } from "lucide-react";
+import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
@@ -15,6 +15,7 @@ interface TemplateSummary {
   title: string;
   destination: string;
   image_url: string | null;
+  photos_count: number;
   category: string;
   tag: string | null;
   is_featured: boolean;
@@ -168,6 +169,16 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
           <div className="w-full h-full flex items-center justify-center text-gray-300">
             <MapPin size={32} />
           </div>
+        )}
+
+        {/* Aviso discreto: faltam fotos (ideal são 5) */}
+        {tmpl.photos_count < 5 && (
+          <span
+            title={`${tmpl.photos_count} de 5 fotos — adicione mais`}
+            className="absolute top-2 right-2 z-10 bg-amber-400/95 text-navy-900 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"
+          >
+            <Camera size={9} /> {tmpl.photos_count}/5
+          </span>
         )}
 
         {/* Gradiente na base */}
