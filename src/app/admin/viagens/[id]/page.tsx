@@ -169,6 +169,10 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
     setError("");
     const priceVal = parseFloat(price);
     if (!price || isNaN(priceVal) || priceVal <= 0) { setError("Informe um preço válido."); return; }
+    if (originalPrice) {
+      const origVal = parseFloat(originalPrice);
+      if (isNaN(origVal) || origVal <= priceVal) { setError("O 'Original (De:)' deve ser MAIOR que o preço (ou vazio se não há desconto)."); return; }
+    }
     if (totalSpots <= 0) { setError("Total de vagas deve ser maior que zero."); return; }
     if (availSpots > totalSpots) { setError("Vagas disponíveis não podem exceder o total."); return; }
     // Faixas: nome, idade e preço obrigatórios, sem duplicatas
@@ -486,6 +490,10 @@ function BulkModal({ templateId, onClose, onDone }: {
   const handleSubmit = async () => {
     if (!endDate) { setError("Informe a data de fim."); return; }
     if (!price || parseFloat(price) <= 0) { setError("Informe o preço por pessoa."); return; }
+    if (originalPrice) {
+      const origVal = parseFloat(originalPrice);
+      if (isNaN(origVal) || origVal <= parseFloat(price)) { setError("O 'Original (De:)' deve ser MAIOR que o preço (ou vazio se não há desconto)."); return; }
+    }
     setError(""); setLoading(true);
     try {
       const res = await apiFetch(`/templates/${templateId}/bulk-trips`, {

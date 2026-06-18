@@ -431,6 +431,12 @@ export default function TripDateForm({
     if (!form.price_per_person || isNaN(priceVal) || priceVal <= 0) {
       setError("Informe um preço por pessoa válido."); return;
     }
+    if (form.original_price) {
+      const origVal = parseFloat(form.original_price);
+      if (isNaN(origVal) || origVal <= priceVal) {
+        setError("O 'Preço Original (De:)' deve ser MAIOR que o preço por pessoa (ou deixe vazio se não há desconto)."); return;
+      }
+    }
     if (form.available_spots > form.total_spots) {
       setError("Vagas disponíveis não podem ser maiores que o total de vagas."); return;
     }
