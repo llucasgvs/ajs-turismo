@@ -43,18 +43,27 @@ function travelers(b: Booking): string[] {
 const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");
 
 /* ─── Voucher / cartão de embarque ─── */
-function Voucher({ b }: { b: Booking }) {
+function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const days = b.trip_departure_date ? daysUntil(b.trip_departure_date) : null;
   const roundtrip = sameDay(b.trip_departure_date, b.trip_return_date);
-  const pax = travelers(b);
+  let pax = travelers(b);
+  if (pax.length === 0 && userName) pax = [userName];
   const opts = b.selected_optionals ?? [];
   const locs = (b.trip_departure_locations ?? []).map(locName).filter(Boolean);
   const includes = b.trip_includes ?? [];
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-card overflow-hidden print:shadow-none print:border-gray-300">
+      {/* Cabeçalho só na impressão: logo AJS */}
+      <div className="hidden print:flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-9 h-9"><Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" /></div>
+          <div className="flex flex-col leading-tight"><span className="font-display font-black text-navy-900 text-base">AJS Turismo</span><span className="text-[10px] text-gray-500 tracking-wide">Voucher de viagem</span></div>
+        </div>
+        <span className="font-mono font-black text-navy-800 tracking-wider text-sm">{b.booking_code}</span>
+      </div>
       {/* Topo com foto */}
-      <div className="relative h-44 sm:h-52 text-white">
+      <div className="relative h-44 sm:h-52 text-white print:h-32">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={b.trip_image_url || PLACEHOLDER} alt={b.trip_title ?? ""} className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-900/95 via-navy-900/50 to-navy-900/10" />
@@ -73,7 +82,7 @@ function Voucher({ b }: { b: Booking }) {
       {/* Faixa principal: contagem + datas + código */}
       <div className="px-5 py-4 border-b border-dashed border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-3 justify-between">
         {days !== null && (
-          <div>
+          <div className="print:hidden">
             <p className="font-display font-black text-2xl leading-none text-navy-800">{days <= 0 ? "🎉" : days}</p>
             <p className="text-xs text-gray-400 mt-0.5">{countdownLabel(days)}</p>
           </div>
@@ -139,6 +148,11 @@ function Voucher({ b }: { b: Booking }) {
         <button onClick={() => window.print()} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Printer size={15} /> Salvar / Imprimir</button>
         <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"><MessageCircle size={15} /> WhatsApp</a>
         <Link href={`/viagens/${b.trip_id}`} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors">Ver viagem <ArrowRight size={14} /></Link>
+      </div>
+
+      {/* Rodapé de contato (aparece na impressão) */}
+      <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center print:bg-white">
+        <p className="text-xs text-gray-500">Dúvidas? Fale com a AJS Turismo no WhatsApp <span className="font-bold text-navy-700">(41) 99834-8766</span></p>
       </div>
     </div>
   );
@@ -209,6 +223,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [tab, setTab] = useState<"proxima" | "reservas">("proxima");
+  const [vIdx, setVIdx] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -227,15 +242,15 @@ export default function Dashboard() {
 
   const dleft = (b: Booking) => b.trip_departure_date ? daysUntil(b.trip_departure_date) : 99999;
   const upcomingConfirmed = bookings.filter(b => b.status === "confirmed" && dleft(b) >= 0).sort((a, b) => dleft(a) - dleft(b));
-  const hero = upcomingConfirmed[0];
-  const minhas = upcomingConfirmed.slice(1);
   const pending = bookings.filter(b => b.status === "pending").sort((a, b) => dleft(a) - dleft(b));
   const interesse = bookings.filter(b => b.status === "interesse");
   const realizadas = bookings.filter(b => b.status === "completed" || (b.status === "confirmed" && dleft(b) < 0));
-  const reservasCount = pending.length + interesse.length + minhas.length + realizadas.length;
+  const hasUpcoming = upcomingConfirmed.length > 0;
+  const voucher = upcomingConfirmed[Math.min(vIdx, upcomingConfirmed.length - 1)];
+  const reservasCount = pending.length + interesse.length + realizadas.length;
 
-  // abre na "Próxima viagem" quando há; senão em "Minhas reservas"
-  useEffect(() => { if (!loading) setTab(hero ? "proxima" : "reservas"); /* eslint-disable-next-line */ }, [loading, !!hero]);
+  // abre nas viagens confirmadas quando há; senão em "Reservas & histórico"
+  useEffect(() => { if (!loading) setTab(hasUpcoming ? "proxima" : "reservas"); /* eslint-disable-next-line */ }, [loading, hasUpcoming]);
 
   if (!user) return null;
   if (loading) return <BrandedLoader label="Carregando seu painel..." />;
@@ -285,14 +300,42 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
+            {/* Alerta de pagamento pendente — aparece em qualquer aba */}
+            {pending.length > 0 && (
+              <Link href={`/reservar/${pending[0].booking_code}`} className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 hover:bg-blue-100 transition-colors print:hidden">
+                <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0"><Wallet size={16} className="text-white" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-blue-800">{pending.length === 1 ? "Você tem um pagamento pendente" : `Você tem ${pending.length} pagamentos pendentes`}</p>
+                  <p className="text-xs text-blue-600 truncate">Conclua para garantir {pending.length === 1 ? "sua vaga" : "suas vagas"}.</p>
+                </div>
+                <span className="text-xs font-bold text-blue-700 flex items-center gap-1 flex-shrink-0">Continuar <ArrowRight size={13} /></span>
+              </Link>
+            )}
+
             {/* Abas */}
             <div className="flex gap-2 bg-gray-100 rounded-xl p-1 print:hidden">
-              <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Próxima viagem</button>
-              <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Minhas reservas {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
+              <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "proxima" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
+              <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Reservas & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
             </div>
 
             {tab === "proxima" ? (
-              hero ? <Voucher b={hero} /> : (
+              hasUpcoming ? (
+                <div className="space-y-3">
+                  {/* Seletor quando há mais de uma viagem confirmada */}
+                  {upcomingConfirmed.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
+                      {upcomingConfirmed.map((b, i) => (
+                        <button key={b.id} onClick={() => setVIdx(i)} className={`flex-shrink-0 text-left rounded-xl border px-3 py-2 transition-colors ${i === vIdx ? "bg-navy-800 border-navy-800 text-white" : "bg-white border-gray-200 text-navy-700 hover:border-navy-300"}`}>
+                          <p className="text-[10px] uppercase tracking-wide font-semibold opacity-70">{i === 0 ? "Próxima" : `Viagem ${i + 1}`}</p>
+                          <p className="text-xs font-bold leading-tight max-w-[160px] truncate">{b.trip_title ?? "Viagem"}</p>
+                          {b.trip_departure_date && <p className="text-[11px] opacity-80">{fmtDate(b.trip_departure_date)}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {voucher && <Voucher b={voucher} userName={user.full_name} />}
+                </div>
+              ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
                   <div className="w-14 h-14 bg-navy-50 rounded-full flex items-center justify-center mx-auto mb-3"><Ticket size={24} className="text-navy-300" /></div>
                   <p className="font-display font-black text-navy-800 mb-1">Nenhuma viagem confirmada</p>
@@ -304,9 +347,8 @@ export default function Dashboard() {
               <div className="space-y-6">
                 {pending.length > 0 && <section><SectionTitle dot="bg-blue-400" sub="Conclua o pagamento para garantir sua vaga.">Precisa de você</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
                 {interesse.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="Reservas em análise — nossa equipe entra em contato.">Em análise</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
-                {minhas.length > 0 && <section><SectionTitle dot="bg-emerald-500">Outras viagens confirmadas</SectionTitle><div className="space-y-3">{minhas.map(b => <TripCard key={b.id} b={b} variant="confirmed" />)}</div></section>}
                 {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300">Já realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
-                {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — sua próxima viagem está na outra aba. 🎉</p>}
+                {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — suas viagens confirmadas estão na outra aba. 🎉</p>}
               </div>
             )}
           </>
