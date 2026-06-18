@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X, Users,
-  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet, Clock,
+  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -51,6 +51,22 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const opts = b.selected_optionals ?? [];
   const locs = (b.trip_departure_locations ?? []).map(locName).filter(Boolean);
   const includes = b.trip_includes ?? [];
+
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => { setCanShare(typeof navigator !== "undefined" && !!navigator.share); }, []);
+  const share = async () => {
+    const dateLine = b.trip_departure_date ? (roundtrip ? `📅 ${fmtDate(b.trip_departure_date)} (bate e volta)` : `📅 ${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "";
+    const text = [
+      `🎫 ${b.trip_title ?? "Viagem"} — AJS Turismo`,
+      b.trip_destination ? `📍 ${b.trip_destination}` : "",
+      dateLine,
+      locs.length ? `🚌 Embarque: ${locs.join(" · ")}` : "",
+      `👥 ${pax.length ? pax.join(", ") : pessoas(b.num_travelers)}`,
+      `Código: ${b.booking_code}`,
+    ].filter(Boolean).join("\n");
+    const url = typeof window !== "undefined" ? `${window.location.origin}/viagens/${b.trip_id}` : undefined;
+    try { await navigator.share({ title: `Voucher · ${b.trip_title ?? "Viagem"}`, text, url }); } catch { /* cancelado */ }
+  };
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-card overflow-hidden print:shadow-none print:border-gray-300">
@@ -145,7 +161,9 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
       {/* Ações */}
       <div className="px-5 pb-5 flex flex-wrap gap-2 print:hidden">
-        <button onClick={() => window.print()} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Printer size={15} /> Salvar / Imprimir</button>
+        {canShare
+          ? <button onClick={share} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Share2 size={15} /> Compartilhar</button>
+          : <button onClick={() => window.print()} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Printer size={15} /> Salvar / Imprimir</button>}
         <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"><MessageCircle size={15} /> WhatsApp</a>
         <Link href={`/viagens/${b.trip_id}`} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors">Ver viagem <ArrowRight size={14} /></Link>
       </div>
