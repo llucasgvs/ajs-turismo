@@ -96,7 +96,7 @@ export default function AdminDashboard() {
   const [templates, setTemplates] = useState<Template[]>(_c.templates);
   const [loading, setLoading] = useState(!fresh);
   const [refreshing, setRefreshing] = useState(false);
-  const [chartMode, setChartMode] = useState<"day" | "month">("month");
+  const [chartMode, setChartMode] = useState<"day" | "month">("day");
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
