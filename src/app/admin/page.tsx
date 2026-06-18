@@ -356,7 +356,7 @@ export default function AdminDashboard() {
         <CardHead title="Próximas saídas" icon={<Calendar size={14} className="text-navy-400" />}
           action={<Link href="/admin/viagens" className="text-xs text-gold-600 hover:text-gold-500 font-medium flex items-center gap-1">Ver todos <ChevronRight size={11} /></Link>} />
         {loading ? <div className="flex items-center justify-center py-14"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : upcoming.length === 0 ? <div className="py-14 text-center text-gray-400 text-sm">Nenhuma saída próxima</div> : (
-          <div className="divide-y divide-gray-50 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-x-6">
+          <div className="divide-y divide-gray-50 sm:grid sm:grid-cols-2 sm:grid-rows-3 sm:grid-flow-col sm:divide-y-0 sm:gap-x-6">
             {upcoming.map(t => {
               const unlimited = t.total_spots >= 999;  // sentinela de vagas ilimitadas (bate-e-volta)
               const sold = t.total_spots - t.available_spots;
