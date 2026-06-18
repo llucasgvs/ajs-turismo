@@ -138,8 +138,12 @@ export default function AdminDashboard() {
   const hasPrev = prevRev > 0;
   const delta = hasPrev ? (curRev - prevRev) / prevRev : 0;
 
-  const upcoming = trips.filter(t => t.departure_date && t.is_active && ["active", "sold_out"].includes(t.status))
-    .sort((a, b) => new Date(a.departure_date!).getTime() - new Date(b.departure_date!).getTime()).slice(0, 6);
+  const upcoming = trips.filter(t => {
+    if (!t.departure_date || !t.is_active || !["active", "sold_out"].includes(t.status)) return false;
+    // Open-date (vagas ilimitadas, todo dia) só entra na agenda se tiver ≥1 viajante pago.
+    if (t.total_spots >= 999 && (t.total_spots - t.available_spots) <= 0) return false;
+    return true;
+  }).sort((a, b) => new Date(a.departure_date!).getTime() - new Date(b.departure_date!).getTime()).slice(0, 6);
   const oldInterests = interests.filter(b => daysSince(b.created_at) >= 3);
   const stalePendings = pendings.filter(b => daysSince(b.created_at) >= 1);
   const soldOut = trips.filter(t => t.status === "sold_out" && t.is_active).length;
