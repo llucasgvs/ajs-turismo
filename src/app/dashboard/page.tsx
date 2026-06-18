@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X, Users,
-  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet,
+  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet, Clock,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -227,11 +227,9 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
-  const [tab, setTab] = useState<"proxima" | "reservas">("proxima");
+  const [tab, setTab] = useState<"viagens" | "andamento" | "historico">("viagens");
   const [vIdx, setVIdx] = useState(0);
-  const [showPend, setShowPend] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const pendRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const u = getUser();
@@ -245,7 +243,6 @@ export default function Dashboard() {
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
-      if (pendRef.current && !pendRef.current.contains(e.target as Node)) setShowPend(false);
     };
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
@@ -257,10 +254,15 @@ export default function Dashboard() {
   const realizadas = bookings.filter(b => b.status === "completed" || (b.status === "confirmed" && dleft(b) < 0));
   const hasUpcoming = upcomingConfirmed.length > 0;
   const voucher = upcomingConfirmed[Math.min(vIdx, upcomingConfirmed.length - 1)];
-  const reservasCount = pending.length + interesse.length + realizadas.length;
+  const andamentoCount = pending.length + interesse.length;
+  const destinosVisitados = new Set(realizadas.map(b => b.trip_destination || b.trip_title).filter(Boolean)).size;
 
-  // abre nas viagens confirmadas quando há; senão em "Reservas & histórico"
-  useEffect(() => { if (!loading) setTab(hasUpcoming ? "proxima" : "reservas"); /* eslint-disable-next-line */ }, [loading, hasUpcoming]);
+  // abre na aba mais relevante: viagem confirmada > em andamento > histórico
+  useEffect(() => {
+    if (loading) return;
+    setTab(hasUpcoming ? "viagens" : andamentoCount > 0 ? "andamento" : "historico");
+    /* eslint-disable-next-line */
+  }, [loading, hasUpcoming, andamentoCount > 0]);
 
   if (!user) return null;
   if (loading) return <BrandedLoader label="Carregando seu painel..." />;
@@ -310,45 +312,17 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Abas + aviso discreto de pendências */}
-            <div className="flex items-center gap-2 print:hidden">
-              <div className="flex-1 flex gap-2 bg-gray-100 rounded-xl p-1">
-                <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "proxima" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
-                <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Em andamento & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
-              </div>
-              {pending.length > 0 && (
-                <div className="relative flex-shrink-0" ref={pendRef}>
-                  <button onClick={() => setShowPend(v => !v)} title={pending.length === 1 ? "1 pagamento pendente" : `${pending.length} pagamentos pendentes`} className="relative w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-amber-500 hover:bg-amber-50 transition-colors">
-                    <Wallet size={17} />
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">{pending.length}</span>
-                  </button>
-                  {showPend && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 overflow-hidden">
-                      <div className="px-4 py-2.5 border-b border-gray-100 bg-amber-50">
-                        <p className="text-xs font-bold text-amber-800">{pending.length === 1 ? "Pagamento pendente" : `${pending.length} pagamentos pendentes`}</p>
-                        <p className="text-[11px] text-amber-600">Conclua para garantir {pending.length === 1 ? "sua vaga" : "suas vagas"}.</p>
-                      </div>
-                      <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
-                        {pending.map(b => (
-                          <Link key={b.id} href={`/reservar/${b.booking_code}`} onClick={() => setShowPend(false)} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-navy-800 truncate">{b.trip_title ?? "Viagem"}</p>
-                              <p className="text-[11px] text-gray-400">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "Data a definir"}{b.final_amount > 0 ? ` · R$ ${fmtBRL(b.final_amount)}` : ""}</p>
-                            </div>
-                            <span className="text-[11px] font-bold text-navy-600 flex items-center gap-0.5 flex-shrink-0">Reservar <ArrowRight size={12} /></span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+            {/* Abas: Minhas viagens (destaque) · Em andamento · Histórico */}
+            <div className="flex gap-2 bg-gray-100 rounded-xl p-1 print:hidden">
+              <button onClick={() => setTab("viagens")} className={`flex-[1.5] flex items-center justify-center gap-1.5 text-sm font-bold py-2.5 rounded-lg transition-colors ${tab === "viagens" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={15} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "viagens" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
+              <button onClick={() => setTab("andamento")} className={`flex-1 flex items-center justify-center gap-1.5 text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "andamento" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Em andamento {andamentoCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${pending.length > 0 ? "bg-amber-400 text-white" : tab === "andamento" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{andamentoCount}</span>}</button>
+              <button onClick={() => setTab("historico")} className={`flex-1 flex items-center justify-center gap-1.5 text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "historico" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Histórico {realizadas.length > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "historico" ? "bg-gold-100 text-gold-700" : "bg-gray-200 text-gray-500"}`}>{realizadas.length}</span>}</button>
             </div>
 
-            {tab === "proxima" ? (
+            {/* ── Aba: Minhas viagens (voucher) ── */}
+            {tab === "viagens" && (
               hasUpcoming ? (
                 <div className="space-y-3">
-                  {/* Seletor quando há mais de uma viagem confirmada */}
                   {upcomingConfirmed.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
                       {upcomingConfirmed.map((b, i) => (
@@ -366,17 +340,56 @@ export default function Dashboard() {
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
                   <div className="w-14 h-14 bg-navy-50 rounded-full flex items-center justify-center mx-auto mb-3"><Ticket size={24} className="text-navy-300" /></div>
                   <p className="font-display font-black text-navy-800 mb-1">Nenhuma viagem confirmada</p>
-                  <p className="text-gray-400 text-sm mb-4">Veja suas reservas em andamento ou explore novos destinos.</p>
-                  <button onClick={() => setTab("reservas")} className="inline-flex items-center gap-2 bg-navy-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-navy-700 transition-colors">Ver em andamento & histórico <ChevronRight size={15} /></button>
+                  <p className="text-gray-400 text-sm mb-4">Quando você fechar uma viagem, o cartão de embarque aparece aqui.</p>
+                  <Link href="/viagens" className="inline-flex items-center gap-2 bg-navy-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-navy-700 transition-colors">Explorar viagens <ChevronRight size={15} /></Link>
                 </div>
               )
-            ) : (
-              <div className="space-y-6">
-                {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="As vagas são limitadas e só ficam garantidas após o pagamento.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
-                {interesse.length > 0 && <section><SectionTitle dot="bg-sky-400" sub="Você pediu informações. A equipe da AJS vai te chamar no WhatsApp.">Aguardando contato da AJS</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
-                {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300" sub="Viagens que já aconteceram.">Viagens realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
-                {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — suas viagens confirmadas estão na outra aba. 🎉</p>}
-              </div>
+            )}
+
+            {/* ── Aba: Em andamento (urgência) ── */}
+            {tab === "andamento" && (
+              andamentoCount > 0 ? (
+                <div className="space-y-6">
+                  {pending.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-gold">
+                      <Clock size={20} className="flex-shrink-0" />
+                      <p className="text-sm font-semibold leading-snug">{pending.length === 1 ? "Você tem uma reserva quase pronta." : `Você tem ${pending.length} reservas quase prontas.`} As vagas são limitadas — conclua antes que esgotem.</p>
+                    </div>
+                  )}
+                  {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="As vagas são limitadas e só ficam garantidas após o pagamento.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
+                  {interesse.length > 0 && <section><SectionTitle dot="bg-sky-400" sub="Você pediu informações. A equipe da AJS vai te chamar no WhatsApp.">Aguardando contato da AJS</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3"><CheckCircle2 size={24} className="text-emerald-400" /></div>
+                  <p className="font-display font-black text-navy-800 mb-1">Tudo em dia!</p>
+                  <p className="text-gray-400 text-sm">Você não tem pagamentos ou contatos pendentes.</p>
+                </div>
+              )
+            )}
+
+            {/* ── Aba: Histórico (recordação) ── */}
+            {tab === "historico" && (
+              realizadas.length > 0 ? (
+                <div className="space-y-5">
+                  <div className="bg-gradient-to-br from-navy-800 to-navy-900 text-white rounded-2xl p-5 relative overflow-hidden">
+                    <Sparkles size={80} className="absolute -right-3 -top-3 text-gold-400/20" />
+                    <p className="text-gold-300 text-xs font-bold uppercase tracking-wide mb-1">Suas recordações</p>
+                    <p className="font-display font-black text-2xl leading-tight">Você já viveu {realizadas.length} {realizadas.length === 1 ? "viagem" : "viagens"} com a AJS 💛</p>
+                    {destinosVisitados > 1 && <p className="text-white/70 text-sm mt-1">{destinosVisitados} destinos diferentes — e a próxima já pode estar te esperando.</p>}
+                  </div>
+                  <div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div>
+                  <div className="text-center pt-1">
+                    <Link href="/viagens" className="inline-flex items-center gap-2 text-sm font-bold text-navy-700 hover:text-navy-900 transition-colors">Bora pra próxima? Ver viagens <ArrowRight size={14} /></Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
+                  <div className="w-14 h-14 bg-gold-50 rounded-full flex items-center justify-center mx-auto mb-3"><Sparkles size={24} className="text-gold-400" /></div>
+                  <p className="font-display font-black text-navy-800 mb-1">Sua primeira história começa em breve</p>
+                  <p className="text-gray-400 text-sm">Suas viagens realizadas vão aparecer aqui como recordações.</p>
+                </div>
+              )
             )}
           </>
         )}
