@@ -109,12 +109,22 @@ export default function AdminDashboard() {
         fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/templates/admin-list`, { headers: authHeaders() }),
       ]);
-      const [sD, cD, aD, mD, dD, iD, pD, tD, tmD] = await Promise.all(R.map(r => r.json()));
-      setStats(sD); setCounts(cD); setAn(aD);
-      setSMonth(Array.isArray(mD) ? mD : []); setSDay(Array.isArray(dD) ? dD : []);
-      setInterests(iD.items ?? []); setPendings(pD.items ?? []);
-      setTrips(tD.items ?? []); setTemplates(Array.isArray(tmD) ? tmD : []);
-      Object.assign(_c, { stats: sD, counts: cD, analytics: aD, sMonth: mD, sDay: dD, interests: iD.items ?? [], pendings: pD.items ?? [], trips: tD.items ?? [], templates: Array.isArray(tmD) ? tmD : [], ts: Date.now() });
+      const [sD, cD, aD, mD, dD, iD, pD, tD, tmD] = await Promise.all(R.map(r => r.json().catch(() => null)));
+      // Valida o formato antes de usar — se um endpoint falhar/atrasar, não quebra a tela.
+      const statsV = sD && typeof sD.total_revenue === "number" ? sD : null;
+      const countsV = cD && typeof cD.interesse === "number" ? cD : null;
+      const anV = aD && Array.isArray(aD.top_revenue) ? aD : null;
+      const monthV = Array.isArray(mD) ? mD : [];
+      const dayV = Array.isArray(dD) ? dD : [];
+      const intV = Array.isArray(iD?.items) ? iD.items : [];
+      const penV = Array.isArray(pD?.items) ? pD.items : [];
+      const tripsV = Array.isArray(tD?.items) ? tD.items : [];
+      const tmplV = Array.isArray(tmD) ? tmD : [];
+      setStats(statsV); setCounts(countsV); setAn(anV);
+      setSMonth(monthV); setSDay(dayV);
+      setInterests(intV); setPendings(penV);
+      setTrips(tripsV); setTemplates(tmplV);
+      Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -135,12 +145,15 @@ export default function AdminDashboard() {
   /* insights */
   const insights: string[] = [];
   if (an) {
-    const totalCat = an.by_category.reduce((s, c) => s + c.revenue, 0);
-    if (an.top_revenue[0]?.revenue > 0) insights.push(`💰 "${an.top_revenue[0].title}" é a que mais fatura (${fmtR(an.top_revenue[0].revenue)}).`);
-    if (an.by_category[0] && totalCat > 0) insights.push(`📊 Categoria "${an.by_category[0].category}" = ${pct(an.by_category[0].revenue / totalCat)} da receita.`);
-    if (an.top_customers[0]?.trips > 1) insights.push(`👑 ${an.top_customers[0].name} já fez ${an.top_customers[0].trips} viagens (${fmtR(an.top_customers[0].spend)}).`);
-    if (an.never_sold.length > 0) insights.push(`⚠ ${an.never_sold.length} roteiro${an.never_sold.length > 1 ? "s" : ""} nunca venderam.`);
-    insights.push(`🎯 Conversão interesse → venda: ${pct(an.conversao)}.`);
+    const cats = an.by_category ?? [];
+    const totalCat = cats.reduce((s, c) => s + c.revenue, 0);
+    const topRev = (an.top_revenue ?? [])[0];
+    const topCust = (an.top_customers ?? [])[0];
+    if (topRev && topRev.revenue > 0) insights.push(`💰 "${topRev.title}" é a que mais fatura (${fmtR(topRev.revenue)}).`);
+    if (cats[0] && totalCat > 0) insights.push(`📊 Categoria "${cats[0].category}" = ${pct(cats[0].revenue / totalCat)} da receita.`);
+    if (topCust && topCust.trips > 1) insights.push(`👑 ${topCust.name} já fez ${topCust.trips} viagens (${fmtR(topCust.spend)}).`);
+    if ((an.never_sold ?? []).length > 0) insights.push(`⚠ ${an.never_sold.length} roteiro${an.never_sold.length > 1 ? "s" : ""} nunca venderam.`);
+    insights.push(`🎯 Conversão interesse → venda: ${pct(an.conversao ?? 0)}.`);
   }
 
   return (
