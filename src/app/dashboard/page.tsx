@@ -54,7 +54,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
   const [isTouch, setIsTouch] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     setIsTouch(typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches && typeof navigator !== "undefined" && !!navigator.share);
   }, []);
@@ -62,7 +62,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const filename = `voucher-${b.booking_code}.pdf`;
   const fetchPdf = async (): Promise<Blob> => {
     const res = await apiFetch(`/bookings/my/${b.booking_code}/voucher`);
-    if (!res.ok) throw new Error("falha ao gerar voucher");
+    if (!res.ok) throw new Error(`erro ${res.status}`);
     return res.blob();
   };
   const saveBlob = (blob: Blob) => {
@@ -74,7 +74,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   };
   const onShare = async () => {
     if (busy) return;
-    setBusy(true); setErr(false);
+    setBusy(true); setErr(null);
     try {
       const blob = await fetchPdf();
       const file = new File([blob], filename, { type: "application/pdf" });
@@ -85,13 +85,13 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
       } else {
         saveBlob(blob); // fallback: baixa o arquivo
       }
-    } catch { setErr(true); }
+    } catch (e) { setErr((e as Error)?.message || "erro"); }
     finally { setBusy(false); }
   };
   const onDownload = async () => {
     if (busy) return;
-    setBusy(true); setErr(false);
-    try { saveBlob(await fetchPdf()); } catch { setErr(true); }
+    setBusy(true); setErr(null);
+    try { saveBlob(await fetchPdf()); } catch (e) { setErr((e as Error)?.message || "erro"); }
     finally { setBusy(false); }
   };
 
