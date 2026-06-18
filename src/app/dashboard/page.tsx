@@ -53,7 +53,10 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const includes = b.trip_includes ?? [];
 
   const [canShare, setCanShare] = useState(false);
-  useEffect(() => { setCanShare(typeof navigator !== "undefined" && !!navigator.share); }, []);
+  useEffect(() => {
+    const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    setCanShare(touch && typeof navigator !== "undefined" && !!navigator.share);
+  }, []);
   const share = async () => {
     const dateLine = b.trip_departure_date ? (roundtrip ? `📅 ${fmtDate(b.trip_departure_date)} (bate e volta)` : `📅 ${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "";
     const text = [
@@ -161,9 +164,14 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
       {/* Ações */}
       <div className="px-5 pb-5 space-y-2 print:hidden">
-        {canShare
-          ? <button onClick={share} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Share2 size={16} /> Compartilhar voucher</button>
-          : <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Printer size={16} /> Salvar / Imprimir</button>}
+        {canShare ? (
+          <div className="flex gap-2">
+            <button onClick={share} className="flex-1 flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Share2 size={16} /> Compartilhar</button>
+            <button onClick={() => window.print()} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm px-4 py-3.5 rounded-xl transition-all"><Printer size={16} /> PDF</button>
+          </div>
+        ) : (
+          <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Printer size={16} /> Salvar PDF / Imprimir</button>
+        )}
         <div className="flex gap-2">
           <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
           <Link href={`/viagens/${b.trip_id}`} className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all">Ver viagem <ArrowRight size={14} /></Link>
