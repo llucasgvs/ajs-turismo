@@ -34,20 +34,18 @@ const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.s
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
 const countdownLabel = (days: number) => days <= 0 ? "É hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias`;
 const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* — ${b.trip_title ?? "viagem"}.`);
-function travelers(b: Booking): string[] {
-  const list: string[] = [];
-  if (b.traveler_name) list.push(b.traveler_name);
-  try { (b.travelers_info ? JSON.parse(b.travelers_info) : []).forEach((c: { full_name?: string }) => c.full_name && list.push(c.full_name)); } catch { /* ignore */ }
-  return list;
-}
 const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");
 
 /* ─── Voucher / cartão de embarque ─── */
 function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const days = b.trip_departure_date ? daysUntil(b.trip_departure_date) : null;
   const roundtrip = sameDay(b.trip_departure_date, b.trip_return_date);
-  let pax = travelers(b);
-  if (pax.length === 0 && userName) pax = [userName];
+  const companions: string[] = (() => {
+    try { return (b.travelers_info ? JSON.parse(b.travelers_info) : []).map((c: { full_name?: string }) => c.full_name).filter(Boolean); }
+    catch { return []; }
+  })();
+  const titular = b.traveler_name || userName;
+  const pax = [titular, ...companions].filter(Boolean) as string[];
   const opts = b.selected_optionals ?? [];
   const locs = (b.trip_departure_locations ?? []).map(locName).filter(Boolean);
   const includes = b.trip_includes ?? [];
@@ -187,17 +185,17 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
       </div>
 
       {/* Ações */}
-      <div className="px-5 pb-5 space-y-2 print:hidden">
-        {isTouch ? (
-          <button onClick={onShare} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />} Compartilhar voucher (PDF)</button>
-        ) : (
-          <button onClick={onDownload} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Baixar voucher (PDF)</button>
-        )}
-        <div className="flex gap-2">
-          <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
-          <Link href={`/viagens/${b.trip_id}`} className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all">Ver viagem <ArrowRight size={14} /></Link>
+      <div className="px-5 pb-5 print:hidden">
+        <div className="flex flex-wrap gap-2 sm:justify-start">
+          {isTouch ? (
+            <button onClick={onShare} disabled={busy} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 sm:py-2.5 px-5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />} Compartilhar voucher</button>
+          ) : (
+            <button onClick={onDownload} disabled={busy} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 sm:py-2.5 px-5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Baixar voucher</button>
+          )}
+          <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 sm:py-2.5 px-4 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
+          <Link href={`/viagens/${b.trip_id}`} className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm py-3 sm:py-2.5 px-4 rounded-xl transition-all">Ver viagem <ArrowRight size={14} /></Link>
         </div>
-        {err && <p className="text-xs text-red-500 text-center">Não foi possível gerar o voucher agora. Tente novamente em instantes.</p>}
+        {err && <p className="text-xs text-red-500 text-center mt-2">Não foi possível gerar o voucher agora. Tente novamente em instantes.</p>}
       </div>
 
       {/* Rodapé de contato (aparece na impressão) */}
