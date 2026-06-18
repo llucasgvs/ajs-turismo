@@ -171,7 +171,11 @@ type Variant = "pending" | "interesse" | "confirmed" | "past";
 function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
   const days = b.trip_departure_date ? daysUntil(b.trip_departure_date) : null;
   const roundtrip = sameDay(b.trip_departure_date, b.trip_return_date);
-  const accent = variant === "pending" ? "border-l-blue-400" : variant === "interesse" ? "border-l-amber-400" : variant === "past" ? "border-l-gray-300" : "border-l-emerald-400";
+  const accent = variant === "pending" ? "border-l-amber-400" : variant === "interesse" ? "border-l-sky-400" : variant === "past" ? "border-l-gray-300" : "border-l-emerald-400";
+  const badge = variant === "pending" ? { txt: "Aguardando pagamento", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+    : variant === "interesse" ? { txt: "Aguardando contato", cls: "bg-sky-50 text-sky-700 border-sky-200" }
+    : variant === "past" ? { txt: "Realizada", cls: "bg-gray-100 text-gray-500 border-gray-200" }
+    : { txt: "Confirmada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
   return (
     <div className={`rounded-2xl overflow-hidden border border-gray-100 border-l-4 ${accent} bg-white shadow-sm hover:shadow-md transition-shadow`}>
       <div className="p-4 sm:p-5">
@@ -183,6 +187,7 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
               : <div className="w-full h-full flex items-center justify-center"><Plane size={20} className="text-navy-300" /></div>}
           </div>
           <div className="flex-1 min-w-0">
+            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mb-1 ${badge.cls}`}>{badge.txt}</span>
             <p className="font-display font-black text-navy-800 text-sm sm:text-base leading-tight line-clamp-2">{b.trip_title ?? "Viagem"}</p>
             {b.trip_destination && <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5"><MapPin size={10} /> {b.trip_destination}</p>}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-2">
@@ -196,11 +201,11 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
         </div>
         {variant === "pending" && (
           <div className="mt-3">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700 mb-2.5">{days !== null && days >= 0 ? <>Garanta sua vaga — <span className="font-bold">{days === 0 ? "embarque é hoje!" : days === 1 ? "falta 1 dia" : `faltam ${days} dias`}</span></> : "Conclua o pagamento para confirmar sua vaga."}</div>
-            <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Continuar pagamento <ArrowRight size={14} /></Link>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">Sua vaga está separada, mas só confirma com o pagamento.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias.`}</span></> : ""}</div>
+            <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Concluir reserva <ArrowRight size={14} /></Link>
           </div>
         )}
-        {variant === "interesse" && <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">Nossa equipe vai entrar em contato pra confirmar os detalhes.</p>}
+        {variant === "interesse" && <p className="mt-3 text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2">Você demonstrou interesse nesta viagem. A equipe da AJS vai te chamar no WhatsApp para combinar os detalhes e o pagamento.</p>}
         {variant === "past" && <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada — esperamos que tenha sido incrível! ✨</p>}
         <div className="flex items-center justify-between gap-2 flex-wrap mt-3 pt-3 border-t border-gray-50">
           <span className="text-[11px] font-mono text-gray-400">{b.booking_code}</span>
@@ -330,7 +335,7 @@ export default function Dashboard() {
                               <p className="text-sm font-bold text-navy-800 truncate">{b.trip_title ?? "Viagem"}</p>
                               <p className="text-[11px] text-gray-400">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "Data a definir"}{b.final_amount > 0 ? ` · R$ ${fmtBRL(b.final_amount)}` : ""}</p>
                             </div>
-                            <span className="text-[11px] font-bold text-navy-600 flex items-center gap-0.5 flex-shrink-0">Pagar <ArrowRight size={12} /></span>
+                            <span className="text-[11px] font-bold text-navy-600 flex items-center gap-0.5 flex-shrink-0">Reservar <ArrowRight size={12} /></span>
                           </Link>
                         ))}
                       </div>
@@ -367,9 +372,9 @@ export default function Dashboard() {
               )
             ) : (
               <div className="space-y-6">
-                {pending.length > 0 && <section><SectionTitle dot="bg-blue-400" sub="Conclua o pagamento para garantir sua vaga.">Precisa de você</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
-                {interesse.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="Reservas em análise — nossa equipe entra em contato.">Em análise</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
-                {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300">Já realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
+                {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="Você escolheu, mas ainda falta pagar. Conclua para garantir sua vaga.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
+                {interesse.length > 0 && <section><SectionTitle dot="bg-sky-400" sub="Você pediu informações. A equipe da AJS vai te chamar no WhatsApp.">Aguardando contato da AJS</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
+                {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300" sub="Viagens que já aconteceram.">Viagens realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
                 {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — suas viagens confirmadas estão na outra aba. 🎉</p>}
               </div>
             )}
