@@ -54,6 +54,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
   const [isTouch, setIsTouch] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
   useEffect(() => {
     setIsTouch(typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches && typeof navigator !== "undefined" && !!navigator.share);
   }, []);
@@ -73,23 +74,24 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   };
   const onShare = async () => {
     if (busy) return;
-    setBusy(true);
+    setBusy(true); setErr(false);
     try {
       const blob = await fetchPdf();
       const file = new File([blob], filename, { type: "application/pdf" });
       const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
       if (nav.canShare && nav.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Voucher · ${b.trip_title ?? "Viagem"}` });
+        try { await navigator.share({ files: [file], title: `Voucher · ${b.trip_title ?? "Viagem"}` }); }
+        catch (e) { if ((e as DOMException)?.name !== "AbortError") saveBlob(blob); }
       } else {
         saveBlob(blob); // fallback: baixa o arquivo
       }
-    } catch { /* cancelado ou erro de rede */ }
+    } catch { setErr(true); }
     finally { setBusy(false); }
   };
   const onDownload = async () => {
     if (busy) return;
-    setBusy(true);
-    try { saveBlob(await fetchPdf()); } catch { /* erro */ }
+    setBusy(true); setErr(false);
+    try { saveBlob(await fetchPdf()); } catch { setErr(true); }
     finally { setBusy(false); }
   };
 
@@ -195,6 +197,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
           <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
           <Link href={`/viagens/${b.trip_id}`} className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all">Ver viagem <ArrowRight size={14} /></Link>
         </div>
+        {err && <p className="text-xs text-red-500 text-center">Não foi possível gerar o voucher agora. Tente novamente em instantes.</p>}
       </div>
 
       {/* Rodapé de contato (aparece na impressão) */}
