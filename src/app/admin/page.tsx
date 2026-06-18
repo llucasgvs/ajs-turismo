@@ -32,8 +32,11 @@ const daysSince = (d: string) => Math.floor((Date.now() - new Date(d).getTime())
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 const todayLabel = () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 const fmtR = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const fmtRk = (n: number) => n >= 1000 ? `R$ ${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `R$ ${Math.round(n)}`;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
+/** plural: plw(2,"venda","vendas") → "2 vendas" */
+const plw = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 const authHeaders = () => ({ Authorization: `Bearer ${getToken()}` });
 
 function buildWaUrl(b: Booking) {
@@ -139,7 +142,7 @@ export default function AdminDashboard() {
   const noDates = templates.filter(t => t.active_dates_count === 0 && t.is_active).length;
   const noPhotos = templates.filter(t => t.is_active && t.photos_count < 5).length;
 
-  const series = chartMode === "day" ? sDay : sMonth;
+  const series = chartMode === "day" ? sDay.slice(0, new Date().getDate()) : sMonth;
   const maxRev = Math.max(1, ...series.map(s => s.revenue));
   const sparkMax = Math.max(1, ...sMonth.map(s => s.revenue));
 
@@ -148,19 +151,19 @@ export default function AdminDashboard() {
   /* feed de ações priorizado */
   type Action = { sev: number; icon: React.ReactNode; text: string; href: string };
   const actions: Action[] = [];
-  if (oldInterests.length) actions.push({ sev: 3, icon: <Clock size={14} className="text-amber-500" />, text: `${oldInterests.length} interesse(s) parado(s) há 3+ dias`, href: `${RES}?status=interesse` });
-  if (stalePendings.length) actions.push({ sev: 3, icon: <CreditCard size={14} className="text-blue-500" />, text: `${stalePendings.length} pagamento(s) não concluído(s)`, href: `${RES}?status=pending` });
-  if (soldOut) actions.push({ sev: 2, icon: <TrendingUp size={14} className="text-red-500" />, text: `${soldOut} viagem(ns) esgotada(s)`, href: "/admin/viagens" });
-  if ((an?.never_sold.length ?? 0) > 0) actions.push({ sev: 1, icon: <XCircle size={14} className="text-gray-400" />, text: `${an!.never_sold.length} roteiro(s) que nunca venderam`, href: "/admin/viagens" });
-  if (noDates) actions.push({ sev: 1, icon: <Calendar size={14} className="text-gray-400" />, text: `${noDates} roteiro(s) sem datas ativas`, href: "/admin/viagens" });
-  if (noPhotos) actions.push({ sev: 1, icon: <Camera size={14} className="text-gray-400" />, text: `${noPhotos} roteiro(s) sem as 5 fotos`, href: "/admin/viagens" });
+  if (oldInterests.length) actions.push({ sev: 3, icon: <Clock size={14} className="text-amber-500" />, text: `${oldInterests.length === 1 ? "1 interesse parado" : `${oldInterests.length} interesses parados`} há 3+ dias`, href: `${RES}?status=interesse` });
+  if (stalePendings.length) actions.push({ sev: 3, icon: <CreditCard size={14} className="text-blue-500" />, text: stalePendings.length === 1 ? "1 pagamento não concluído" : `${stalePendings.length} pagamentos não concluídos`, href: `${RES}?status=pending` });
+  if (soldOut) actions.push({ sev: 2, icon: <TrendingUp size={14} className="text-red-500" />, text: soldOut === 1 ? "1 viagem esgotada" : `${soldOut} viagens esgotadas`, href: "/admin/viagens" });
+  if ((an?.never_sold.length ?? 0) > 0) actions.push({ sev: 1, icon: <XCircle size={14} className="text-gray-400" />, text: an!.never_sold.length === 1 ? "1 roteiro que nunca vendeu" : `${an!.never_sold.length} roteiros que nunca venderam`, href: "/admin/viagens" });
+  if (noDates) actions.push({ sev: 1, icon: <Calendar size={14} className="text-gray-400" />, text: noDates === 1 ? "1 roteiro sem datas ativas" : `${noDates} roteiros sem datas ativas`, href: "/admin/viagens" });
+  if (noPhotos) actions.push({ sev: 1, icon: <Camera size={14} className="text-gray-400" />, text: noPhotos === 1 ? "1 roteiro sem as 5 fotos" : `${noPhotos} roteiros sem as 5 fotos`, href: "/admin/viagens" });
   actions.sort((a, b) => b.sev - a.sev);
 
   const rankItems = rankTab === "rev"
-    ? (an?.top_revenue ?? []).map(t => ({ id: t.id, title: t.title, primary: fmtR(t.revenue), secondary: `${t.sales} venda(s)`, val: t.revenue }))
+    ? (an?.top_revenue ?? []).map(t => ({ id: t.id, title: t.title, primary: fmtR(t.revenue), secondary: plw(t.sales, "venda", "vendas"), val: t.revenue }))
     : rankTab === "sales"
-      ? (an?.top_sales ?? []).map(t => ({ id: t.id, title: t.title, primary: `${t.travelers} pax`, secondary: fmtR(t.revenue), val: t.travelers }))
-      : (an?.top_customers ?? []).map(c => ({ id: null as number | null, title: c.name, primary: fmtR(c.spend), secondary: `${c.trips} viagem(ns)`, val: c.spend }));
+      ? (an?.top_sales ?? []).map(t => ({ id: t.id, title: t.title, primary: plw(t.travelers, "viajante", "viajantes"), secondary: fmtR(t.revenue), val: t.travelers }))
+      : (an?.top_customers ?? []).map(c => ({ id: null as number | null, title: c.name, primary: fmtR(c.spend), secondary: plw(c.trips, "viagem", "viagens"), val: c.spend }));
   const rankMax = Math.max(1, ...rankItems.map(i => i.val));
 
   return (
@@ -190,7 +193,7 @@ export default function AdminDashboard() {
             <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
             <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "—" : fmtR(curRev)}</p>
             <div className="flex items-center gap-3 mt-2 text-sm">
-              <span className="text-navy-100">{stats?.month_confirmed ?? 0} venda{(stats?.month_confirmed ?? 0) !== 1 ? "s" : ""}</span>
+              <span className="text-navy-100">{plw(stats?.month_confirmed ?? 0, "venda", "vendas")}</span>
               {!loading && hasPrev && (
                 <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                   {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mês anterior
@@ -227,16 +230,17 @@ export default function AdminDashboard() {
             action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
           {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : (
             <div className="px-5 py-5">
-              <div className="flex items-end justify-between gap-[3px] sm:gap-1.5 h-40">
+              <div className="flex items-end justify-between gap-[3px] sm:gap-1.5 h-48">
                 {series.map((p, i) => {
                   const h = Math.round((p.revenue / maxRev) * 100);
                   const last = i === series.length - 1;
                   const showLabel = chartMode === "month" || i === 0 || last || (i + 1) % 5 === 0;
-                  return <div key={p.month} className="flex-1 flex flex-col items-center justify-end h-full gap-1 group min-w-0">
-                    <div className="w-full flex items-end justify-center h-full">
-                      <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t transition-colors ${last ? "bg-gold-400" : "bg-navy-200 group-hover:bg-navy-400"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} title={`${chartMode === "day" ? "Dia " : ""}${p.label}: ${fmtR(p.revenue)} · ${p.count} venda(s)`} />
+                  return <div key={p.month} className="flex-1 flex flex-col h-full min-w-0 group" title={`${chartMode === "day" ? "Dia " : ""}${p.label}: ${fmtR(p.revenue)} · ${plw(p.count, "venda", "vendas")}`}>
+                    <span className={`h-4 text-[9px] font-bold tabular-nums text-center truncate ${last ? "text-gold-600" : "text-navy-500"} ${p.revenue > 0 ? "" : "opacity-0"}`}>{p.revenue > 0 ? fmtRk(p.revenue) : "·"}</span>
+                    <div className="flex-1 flex items-end justify-center">
+                      <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t transition-colors ${last ? "bg-gold-400" : "bg-navy-200 group-hover:bg-navy-400"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} />
                     </div>
-                    <span className={`text-[10px] font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"} ${showLabel ? "" : "opacity-0"}`}>{p.label}</span>
+                    <span className={`h-4 text-[10px] font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"} ${showLabel ? "" : "opacity-0"}`}>{p.label}</span>
                   </div>;
                 })}
               </div>
@@ -279,7 +283,10 @@ export default function AdminDashboard() {
                   <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${i === 0 ? "bg-gold-400 text-navy-900" : "bg-gray-100 text-gray-400"}`}>{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-navy-800 truncate">{it.title}</span>
+                      <span className="text-sm font-semibold text-navy-800 truncate flex items-center gap-1 min-w-0">
+                        {rankTab === "cust" && i === 0 && <Crown size={13} className="text-gold-500 flex-shrink-0" />}
+                        <span className="truncate">{it.title}</span>
+                      </span>
                       <span className="text-sm font-black text-navy-700 whitespace-nowrap tabular-nums">{it.primary}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -287,7 +294,6 @@ export default function AdminDashboard() {
                       <span className="text-[10px] text-gray-400 whitespace-nowrap">{it.secondary}</span>
                     </div>
                   </div>
-                  {rankTab === "cust" && i === 0 && <Crown size={14} className="text-gold-500 flex-shrink-0" />}
                 </div>
               );
               return it.id ? <Link key={i} href={`/admin/viagens/${it.id}`} className="block hover:opacity-90 transition-opacity">{body}</Link> : <div key={i}>{body}</div>;
