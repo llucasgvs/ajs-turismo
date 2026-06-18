@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s — AJS Turismo",
   },
   description:
-    "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes completos para Maceió, Gramado, Nordeste e muito mais. Reserve com segurança e parcele em até 12x sem juros!",
+    "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes completos para Maceió, Gramado, Nordeste e muito mais. Reserve com segurança, parcele no cartão ou pague no PIX.",
   keywords: [
     "agência de viagens Curitiba",
     "pacotes de viagem Curitiba",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AJS Turismo — Pacotes de Viagem Saindo de Curitiba",
     description:
-      "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes completos, preços acessíveis e parcelamento em até 12x sem juros.",
+      "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes completos, preços acessíveis, parcelamento no cartão ou PIX.",
     url: SITE,
     siteName: "AJS Turismo",
     locale: "pt_BR",

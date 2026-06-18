@@ -5,7 +5,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://ajsturismo.com.br";
 export const metadata: Metadata = {
   title: "Todas as Viagens",
   description:
-    "Explore todos os pacotes de viagem da AJS Turismo saindo de Curitiba. Maceió, Gramado, Nordeste, Rio de Janeiro e muito mais. Preços acessíveis com parcelamento em até 12x sem juros.",
+    "Explore todos os pacotes de viagem da AJS Turismo saindo de Curitiba. Maceió, Gramado, Nordeste, Rio de Janeiro e muito mais. Preços acessíveis, parcelamento no cartão ou PIX.",
   keywords: [
     "pacotes de viagem Curitiba",
     "excursões saindo de Curitiba",
