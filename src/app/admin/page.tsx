@@ -37,6 +37,9 @@ const pct = (n: number) => `${Math.round(n * 100)}%`;
 const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
 /** plural: plw(2,"venda","vendas") → "2 vendas" */
 const plw = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
+const weekdayFull = (iso: string) => cap(new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long" }));
+const dayMonth = (iso: string) => { const d = new Date(iso + "T12:00:00"); return `${d.getDate()}/${d.getMonth() + 1}`; };
+const MES_FULL = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const authHeaders = () => ({ Authorization: `Bearer ${getToken()}` });
 
 function buildWaUrl(b: Booking) {
@@ -231,25 +234,36 @@ export default function AdminDashboard() {
             action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
           {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : (
             <div className="px-5 py-5">
-              <div className="relative" onMouseLeave={() => setHoverIdx(null)}>
-                {/* tooltip estilizado (instantâneo) */}
-                {hoverIdx !== null && series[hoverIdx] && (
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-20 bg-navy-800 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
-                    {chartMode === "day" ? "Dia " : ""}{cap(series[hoverIdx].label)} · {fmtR(series[hoverIdx].revenue)} · {plw(series[hoverIdx].count, "venda", "vendas")}
-                  </div>
-                )}
-                <div className="flex items-end justify-between gap-[3px] sm:gap-1.5 h-48 pt-5">
+              <div className="relative pt-12" onMouseLeave={() => setHoverIdx(null)}>
+                {/* tooltip que SEGUE a barra ativa */}
+                {hoverIdx !== null && series[hoverIdx] && (() => {
+                  const n = series.length;
+                  const leftPct = ((hoverIdx + 0.5) / n) * 100;
+                  const tx = hoverIdx <= 1 ? "0%" : hoverIdx >= n - 2 ? "-100%" : "-50%";
+                  const p = series[hoverIdx];
+                  return (
+                    <div className="absolute top-0 z-20 pointer-events-none transition-[left] duration-100" style={{ left: `${leftPct}%`, transform: `translateX(${tx})` }}>
+                      <div className="bg-navy-800 text-white rounded-xl shadow-xl px-3.5 py-2 whitespace-nowrap">
+                        <p className="text-[11px] font-bold leading-tight">
+                          {chartMode === "day" ? `${weekdayFull(p.month)}, ${dayMonth(p.month)}` : MES_FULL[parseInt(p.month.split("-")[1]) - 1]}
+                        </p>
+                        <p className="text-[12px] font-black text-gold-300 leading-tight mt-0.5">{fmtR(p.revenue)}</p>
+                        <p className="text-[10px] text-navy-200 leading-tight">{plw(p.count, "venda", "vendas")}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="flex items-end justify-between gap-[3px] sm:gap-1.5 h-48">
                   {series.map((p, i) => {
                     const h = Math.round((p.revenue / maxRev) * 100);
                     const last = i === series.length - 1;
                     const active = hoverIdx === i;
-                    const showLabel = chartMode === "month" || i === 0 || last || (i + 1) % 5 === 0;
                     return <div key={p.month} className="flex-1 flex flex-col h-full min-w-0 cursor-default" onMouseEnter={() => setHoverIdx(i)}>
                       <span className={`h-4 text-[9px] font-bold tabular-nums text-center truncate ${last ? "text-gold-600" : "text-navy-500"} ${p.revenue > 0 ? "" : "opacity-0"}`}>{p.revenue > 0 ? fmtRk(p.revenue) : "·"}</span>
-                      <div className="flex-1 flex items-end justify-center">
-                        <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} />
+                      <div className="flex-1 flex items-end justify-center px-px">
+                        <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} />
                       </div>
-                      <span className={`h-4 text-[10px] font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"} ${showLabel ? "" : "opacity-0"}`}>{p.label}</span>
+                      <span className={`mt-1 ${chartMode === "day" ? "text-[8px]" : "text-[10px]"} font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"}`}>{p.label}</span>
                     </div>;
                   })}
                 </div>
