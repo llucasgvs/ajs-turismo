@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X, Users,
-  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2,
+  Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
@@ -52,23 +52,45 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
   const locs = (b.trip_departure_locations ?? []).map(locName).filter(Boolean);
   const includes = b.trip_includes ?? [];
 
-  const [canShare, setCanShare] = useState(false);
+  const [isTouch, setIsTouch] = useState(false);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
-    const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-    setCanShare(touch && typeof navigator !== "undefined" && !!navigator.share);
+    setIsTouch(typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches && typeof navigator !== "undefined" && !!navigator.share);
   }, []);
-  const share = async () => {
-    const dateLine = b.trip_departure_date ? (roundtrip ? `📅 ${fmtDate(b.trip_departure_date)} (bate e volta)` : `📅 ${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "";
-    const text = [
-      `🎫 ${b.trip_title ?? "Viagem"} — AJS Turismo`,
-      b.trip_destination ? `📍 ${b.trip_destination}` : "",
-      dateLine,
-      locs.length ? `🚌 Embarque: ${locs.join(" · ")}` : "",
-      `👥 ${pax.length ? pax.join(", ") : pessoas(b.num_travelers)}`,
-      `Código: ${b.booking_code}`,
-    ].filter(Boolean).join("\n");
-    const url = typeof window !== "undefined" ? `${window.location.origin}/viagens/${b.trip_id}` : undefined;
-    try { await navigator.share({ title: `Voucher · ${b.trip_title ?? "Viagem"}`, text, url }); } catch { /* cancelado */ }
+
+  const filename = `voucher-${b.booking_code}.pdf`;
+  const fetchPdf = async (): Promise<Blob> => {
+    const res = await apiFetch(`/bookings/my/${b.booking_code}/voucher`);
+    if (!res.ok) throw new Error("falha ao gerar voucher");
+    return res.blob();
+  };
+  const saveBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  const onShare = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const blob = await fetchPdf();
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Voucher · ${b.trip_title ?? "Viagem"}` });
+      } else {
+        saveBlob(blob); // fallback: baixa o arquivo
+      }
+    } catch { /* cancelado ou erro de rede */ }
+    finally { setBusy(false); }
+  };
+  const onDownload = async () => {
+    if (busy) return;
+    setBusy(true);
+    try { saveBlob(await fetchPdf()); } catch { /* erro */ }
+    finally { setBusy(false); }
   };
 
   return (
@@ -164,13 +186,10 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
       {/* Ações */}
       <div className="px-5 pb-5 space-y-2 print:hidden">
-        {canShare ? (
-          <div className="flex gap-2">
-            <button onClick={share} className="flex-1 flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Share2 size={16} /> Compartilhar</button>
-            <button onClick={() => window.print()} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm px-4 py-3.5 rounded-xl transition-all"><Printer size={16} /> PDF</button>
-          </div>
+        {isTouch ? (
+          <button onClick={onShare} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />} Compartilhar voucher (PDF)</button>
         ) : (
-          <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Printer size={16} /> Salvar PDF / Imprimir</button>
+          <button onClick={onDownload} disabled={busy} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] disabled:opacity-60 text-white font-bold text-sm py-3.5 rounded-xl transition-all">{busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Baixar voucher (PDF)</button>
         )}
         <div className="flex gap-2">
           <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
