@@ -160,12 +160,14 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
       </div>
 
       {/* Ações */}
-      <div className="px-5 pb-5 flex flex-wrap gap-2 print:hidden">
+      <div className="px-5 pb-5 space-y-2 print:hidden">
         {canShare
-          ? <button onClick={share} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Share2 size={15} /> Compartilhar</button>
-          : <button onClick={() => window.print()} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Printer size={15} /> Salvar / Imprimir</button>}
-        <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"><MessageCircle size={15} /> WhatsApp</a>
-        <Link href={`/viagens/${b.trip_id}`} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors">Ver viagem <ArrowRight size={14} /></Link>
+          ? <button onClick={share} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Share2 size={16} /> Compartilhar voucher</button>
+          : <button onClick={() => window.print()} className="w-full flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 active:scale-[.99] text-white font-bold text-sm py-3.5 rounded-xl transition-all"><Printer size={16} /> Salvar / Imprimir</button>}
+        <div className="flex gap-2">
+          <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all"><MessageCircle size={16} /> WhatsApp</a>
+          <Link href={`/viagens/${b.trip_id}`} className="flex-1 flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 active:scale-[.99] font-bold text-sm py-3 rounded-xl transition-all">Ver viagem <ArrowRight size={14} /></Link>
+        </div>
       </div>
 
       {/* Rodapé de contato (aparece na impressão) */}
@@ -331,10 +333,10 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Abas: Minhas viagens (destaque) · Em andamento · Histórico */}
-            <div className="flex gap-2 bg-gray-100 rounded-xl p-1 print:hidden">
-              <button onClick={() => setTab("viagens")} className={`flex-[1.5] flex items-center justify-center gap-1.5 text-sm font-bold py-2.5 rounded-lg transition-colors ${tab === "viagens" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={15} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "viagens" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
-              <button onClick={() => setTab("andamento")} className={`flex-1 flex items-center justify-center gap-1.5 text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "andamento" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Em andamento {andamentoCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${pending.length > 0 ? "bg-amber-400 text-white" : tab === "andamento" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{andamentoCount}</span>}</button>
-              <button onClick={() => setTab("historico")} className={`flex-1 flex items-center justify-center gap-1.5 text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "historico" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Histórico {realizadas.length > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "historico" ? "bg-gold-100 text-gold-700" : "bg-gray-200 text-gray-500"}`}>{realizadas.length}</span>}</button>
+            <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 print:hidden">
+              <button onClick={() => setTab("viagens")} className={`flex-[1.4] flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "viagens" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} className="flex-shrink-0" /> <span className="sm:hidden">Viagens</span><span className="hidden sm:inline">Minhas viagens</span> {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "viagens" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
+              <button onClick={() => setTab("andamento")} className={`flex-1 flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "andamento" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Andamento {andamentoCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${pending.length > 0 ? "bg-amber-400 text-white" : tab === "andamento" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{andamentoCount}</span>}</button>
+              <button onClick={() => setTab("historico")} className={`flex-1 flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "historico" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Histórico {realizadas.length > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "historico" ? "bg-gold-100 text-gold-700" : "bg-gray-200 text-gray-500"}`}>{realizadas.length}</span>}</button>
             </div>
 
             {/* ── Aba: Minhas viagens (voucher) ── */}
