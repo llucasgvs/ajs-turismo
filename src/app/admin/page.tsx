@@ -177,7 +177,7 @@ export default function AdminDashboard() {
       <div className="flex flex-wrap gap-3 items-start justify-between">
         <div>
           <h1 className="text-2xl font-display font-black text-navy-900 flex items-center gap-2">{greet()}, Admin!{refreshing && <Loader2 size={14} className="text-gray-400 animate-spin" />}</h1>
-          <p className="text-gray-400 text-sm mt-0.5 capitalize">{todayLabel()}</p>
+          <p className="text-gray-400 text-sm mt-0.5">{cap(todayLabel())}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Link href={RES} className="relative flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-navy-700 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm">
@@ -358,6 +358,7 @@ export default function AdminDashboard() {
         {loading ? <div className="flex items-center justify-center py-14"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : upcoming.length === 0 ? <div className="py-14 text-center text-gray-400 text-sm">Nenhuma saída próxima</div> : (
           <div className="divide-y divide-gray-50 sm:grid sm:grid-cols-2 sm:divide-y-0 sm:gap-x-6">
             {upcoming.map(t => {
+              const unlimited = t.total_spots >= 999;  // sentinela de vagas ilimitadas (bate-e-volta)
               const sold = t.total_spots - t.available_spots;
               const fill = t.total_spots > 0 ? Math.round((sold / t.total_spots) * 100) : 0;
               const days = t.departure_date ? daysUntil(t.departure_date) : null;
@@ -367,10 +368,14 @@ export default function AdminDashboard() {
                   <div className="flex-shrink-0 w-11 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p></> : <span className="text-gray-300 text-xs">—</span>}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2"><p className="font-semibold text-navy-800 text-sm truncate">{t.title}</p>{t.status === "sold_out" && <span className="flex-shrink-0 text-[10px] font-bold bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Esgotado</span>}</div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${fill >= 90 ? "bg-red-400" : fill >= 60 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${fill}%` }} /></div>
-                      <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">{sold}/{t.total_spots}</span>
-                    </div>
+                    {unlimited ? (
+                      <p className="text-[11px] text-gray-400 font-medium mt-1.5">{plw(sold, "vendido", "vendidos")} · vagas livres</p>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${fill >= 90 ? "bg-red-400" : fill >= 60 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${fill}%` }} /></div>
+                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">{sold}/{t.total_spots}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-shrink-0 text-right">{days !== null && <p className={`text-xs font-bold ${days <= 7 ? "text-red-500" : days <= 30 ? "text-amber-500" : "text-gray-400"}`}>{days === 0 ? "Hoje!" : days === 1 ? "Amanhã" : `${days}d`}</p>}<p className="text-xs text-navy-600 font-semibold mt-0.5">{fmtR(t.price_per_person)}</p></div>
                 </div>
