@@ -4,83 +4,160 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle,
-  Menu, X, Users, Plane, CheckCircle2, ArrowRight,
+  LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X, Users,
+  Plane, CheckCircle2, ArrowRight, Printer, Ticket, FileText, Sparkles, Bus, Wallet,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
 interface StoredUser { full_name: string; email: string; is_admin: boolean }
+interface Optional { name: string; price: number }
 interface Booking {
   id: number; booking_code: string; trip_id: number; num_travelers: number;
   price_per_person: number; final_amount: number; status: string; created_at: string;
-  notes?: string; trip_title?: string; trip_destination?: string;
-  trip_departure_date?: string; trip_return_date?: string; trip_image_url?: string;
+  traveler_name?: string | null; payment_method?: string | null; installments?: number;
+  selected_optionals?: Optional[]; travelers_info?: string | null;
+  trip_title?: string; trip_destination?: string; trip_departure_date?: string;
+  trip_return_date?: string; trip_image_url?: string;
+  trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
 }
 
 const WA_BASE = "https://wa.me/5541998348766?text=";
 const WA_HELP = WA_BASE + encodeURIComponent("Olá! Preciso de ajuda com minha reserva.");
 const PLACEHOLDER = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&q=80";
+const PAY: Record<string, string> = { whatsapp: "Presencial / WhatsApp", pix: "PIX", credit_card: "Cartão de crédito", transfer: "Transferência" };
 
-/* ─── Helpers ─── */
 const fmtDate = (d: string) => { const [y, m, day] = d.slice(0, 10).split("-"); return `${day}/${m}/${y}`; };
 const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
 const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
 const countdownLabel = (days: number) => days <= 0 ? "É hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias`;
-
-function waMsg(b: Booking) {
-  return WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* — ${b.trip_title ?? "viagem"}.`);
+const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* — ${b.trip_title ?? "viagem"}.`);
+function travelers(b: Booking): string[] {
+  const list: string[] = [];
+  if (b.traveler_name) list.push(b.traveler_name);
+  try { (b.travelers_info ? JSON.parse(b.travelers_info) : []).forEach((c: { full_name?: string }) => c.full_name && list.push(c.full_name)); } catch { /* ignore */ }
+  return list;
 }
+const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");
 
-/* ─── Hero: próxima viagem ─── */
-function HeroNextTrip({ b }: { b: Booking }) {
+/* ─── Voucher / cartão de embarque ─── */
+function Voucher({ b }: { b: Booking }) {
   const days = b.trip_departure_date ? daysUntil(b.trip_departure_date) : null;
   const roundtrip = sameDay(b.trip_departure_date, b.trip_return_date);
-  return (
-    <div className="relative rounded-3xl overflow-hidden shadow-card text-white min-h-[260px] flex flex-col justify-end">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={b.trip_image_url || PLACEHOLDER} alt={b.trip_title ?? ""} className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-navy-900/95 via-navy-900/55 to-navy-900/15" />
-      <div className="relative p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="inline-flex items-center gap-1.5 bg-emerald-500/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-full"><CheckCircle2 size={11} /> Confirmada</span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/80 uppercase tracking-wide">Sua próxima viagem</span>
-        </div>
-        <h2 className="font-display font-black text-2xl sm:text-3xl leading-tight drop-shadow">{b.trip_title ?? "Viagem"}</h2>
-        {b.trip_destination && <p className="flex items-center gap-1.5 text-white/80 text-sm mt-1"><MapPin size={13} /> {b.trip_destination}</p>}
+  const pax = travelers(b);
+  const opts = b.selected_optionals ?? [];
+  const locs = (b.trip_departure_locations ?? []).map(locName).filter(Boolean);
+  const includes = b.trip_includes ?? [];
 
-        <div className="flex flex-wrap items-end justify-between gap-4 mt-4">
-          <div className="flex items-center gap-4">
-            {days !== null && (
-              <div>
-                <p className="font-display font-black text-3xl leading-none text-gold-300">{days <= 0 ? "🎉" : days}</p>
-                <p className="text-xs text-white/80 mt-0.5">{countdownLabel(days)}</p>
-              </div>
-            )}
-            <div className="border-l border-white/20 pl-4">
-              <p className="text-[10px] text-white/60 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída"}</p>
-              <p className="text-sm font-bold">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "—"}{roundtrip ? " · bate e volta" : ""}</p>
-              {!roundtrip && b.trip_return_date && <p className="text-xs text-white/70 mt-0.5">Volta {fmtDate(b.trip_return_date)}</p>}
-            </div>
+  return (
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-card overflow-hidden print:shadow-none print:border-gray-300">
+      {/* Topo com foto */}
+      <div className="relative h-44 sm:h-52 text-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={b.trip_image_url || PLACEHOLDER} alt={b.trip_title ?? ""} className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-navy-900/95 via-navy-900/50 to-navy-900/10" />
+        <div className="relative h-full flex flex-col justify-between p-5">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 bg-emerald-500/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-full"><CheckCircle2 size={11} /> Confirmada</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white/85 uppercase tracking-wide"><Ticket size={12} /> Voucher</span>
           </div>
-          <Link href={`/viagens/${b.trip_id}`} className="inline-flex items-center gap-1.5 bg-gold-500 hover:bg-gold-400 text-navy-900 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-gold">
-            Ver viagem <ArrowRight size={15} />
-          </Link>
+          <div>
+            <h2 className="font-display font-black text-2xl sm:text-3xl leading-tight drop-shadow">{b.trip_title ?? "Viagem"}</h2>
+            {b.trip_destination && <p className="flex items-center gap-1.5 text-white/85 text-sm mt-0.5"><MapPin size={13} /> {b.trip_destination}</p>}
+          </div>
         </div>
+      </div>
+
+      {/* Faixa principal: contagem + datas + código */}
+      <div className="px-5 py-4 border-b border-dashed border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-3 justify-between">
+        {days !== null && (
+          <div>
+            <p className="font-display font-black text-2xl leading-none text-navy-800">{days <= 0 ? "🎉" : days}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{countdownLabel(days)}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
+          <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "—"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
+          <p className="font-mono font-black text-navy-800 tracking-wider">{b.booking_code}</p>
+        </div>
+      </div>
+
+      {/* Blocos */}
+      <div className="p-5 space-y-5">
+        {/* Viajantes */}
+        <VBlock icon={<Users size={13} className="text-gold-500" />} title={`Viajantes (${pax.length || b.num_travelers})`}>
+          {pax.length > 0
+            ? <div className="flex flex-wrap gap-1.5">{pax.map((n, i) => <span key={i} className="bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1 text-xs text-navy-700 font-medium">{n}</span>)}</div>
+            : <p className="text-sm text-gray-500">{pessoas(b.num_travelers)}</p>}
+        </VBlock>
+
+        {/* Embarque */}
+        {locs.length > 0 && (
+          <VBlock icon={<Bus size={13} className="text-gold-500" />} title="Local de embarque">
+            <ul className="space-y-1">{locs.map((l, i) => <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5"><MapPin size={12} className="text-gray-300 mt-0.5 flex-shrink-0" /> {l}</li>)}</ul>
+          </VBlock>
+        )}
+
+        {/* Extras comprados */}
+        {opts.length > 0 && (
+          <VBlock icon={<Sparkles size={13} className="text-gold-500" />} title="Extras comprados">
+            <ul className="space-y-1">{opts.map((o, i) => <li key={i} className="flex items-center justify-between text-sm"><span className="text-gray-600">{o.name}</span><span className="text-gray-400">R$ {fmtBRL(o.price * b.num_travelers)}</span></li>)}</ul>
+          </VBlock>
+        )}
+
+        {/* Inclui */}
+        {includes.length > 0 && (
+          <VBlock icon={<CheckCircle2 size={13} className="text-emerald-500" />} title="O que inclui">
+            <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1">{includes.map((it, i) => <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5"><CheckCircle2 size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" /> {it}</li>)}</ul>
+          </VBlock>
+        )}
+
+        {/* Documentos */}
+        {b.trip_required_documents && (
+          <VBlock icon={<FileText size={13} className="text-gold-500" />} title="Documentos necessários">
+            <p className="text-sm text-gray-600 whitespace-pre-line">{b.trip_required_documents}</p>
+          </VBlock>
+        )}
+
+        {/* Pagamento */}
+        <VBlock icon={<Wallet size={13} className="text-gold-500" />} title="Pagamento">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "—"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
+            <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(b.final_amount)}</span>
+          </div>
+        </VBlock>
+      </div>
+
+      {/* Ações */}
+      <div className="px-5 pb-5 flex flex-wrap gap-2 print:hidden">
+        <button onClick={() => window.print()} className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors"><Printer size={15} /> Salvar / Imprimir</button>
+        <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"><MessageCircle size={15} /> WhatsApp</a>
+        <Link href={`/viagens/${b.trip_id}`} className="flex items-center justify-center gap-2 border border-gray-200 text-navy-700 hover:bg-navy-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors">Ver viagem <ArrowRight size={14} /></Link>
       </div>
     </div>
   );
 }
+function VBlock({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 mb-2">{icon} {title}</p>
+      {children}
+    </div>
+  );
+}
 
-/* ─── Card de reserva (seções) ─── */
+/* ─── Card de reserva (aba "Minhas reservas") ─── */
 type Variant = "pending" | "interesse" | "confirmed" | "past";
 function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
   const days = b.trip_departure_date ? daysUntil(b.trip_departure_date) : null;
   const roundtrip = sameDay(b.trip_departure_date, b.trip_return_date);
   const accent = variant === "pending" ? "border-l-blue-400" : variant === "interesse" ? "border-l-amber-400" : variant === "past" ? "border-l-gray-300" : "border-l-emerald-400";
-
   return (
     <div className={`rounded-2xl overflow-hidden border border-gray-100 border-l-4 ${accent} bg-white shadow-sm hover:shadow-md transition-shadow`}>
       <div className="p-4 sm:p-5">
@@ -103,51 +180,27 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
             </div>
           </div>
         </div>
-
-        {/* faixa de estado/ação */}
         {variant === "pending" && (
           <div className="mt-3">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700 mb-2.5">
-              {days !== null && days >= 0 ? <>Garanta sua vaga — <span className="font-bold">{days === 0 ? "embarque é hoje!" : days === 1 ? "falta 1 dia" : `faltam ${days} dias`}</span></> : "Conclua o pagamento para confirmar sua vaga."}
-            </div>
-            <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">
-              Continuar pagamento <ArrowRight size={14} />
-            </Link>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700 mb-2.5">{days !== null && days >= 0 ? <>Garanta sua vaga — <span className="font-bold">{days === 0 ? "embarque é hoje!" : days === 1 ? "falta 1 dia" : `faltam ${days} dias`}</span></> : "Conclua o pagamento para confirmar sua vaga."}</div>
+            <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Continuar pagamento <ArrowRight size={14} /></Link>
           </div>
         )}
-        {variant === "interesse" && (
-          <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">Nossa equipe vai entrar em contato pra confirmar os detalhes.</p>
-        )}
-        {variant === "past" && (
-          <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada — esperamos que tenha sido incrível! ✨</p>
-        )}
-
-        {/* rodapé */}
+        {variant === "interesse" && <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">Nossa equipe vai entrar em contato pra confirmar os detalhes.</p>}
+        {variant === "past" && <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada — esperamos que tenha sido incrível! ✨</p>}
         <div className="flex items-center justify-between gap-2 flex-wrap mt-3 pt-3 border-t border-gray-50">
           <span className="text-[11px] font-mono text-gray-400">{b.booking_code}</span>
           <div className="flex items-center gap-2">
-            {(variant === "pending" || variant === "interesse") && (
-              <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#25D366] bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-colors">
-                <MessageCircle size={12} /> WhatsApp
-              </a>
-            )}
-            <Link href={`/viagens/${b.trip_id}`} className="flex items-center gap-1 text-xs font-semibold text-navy-600 bg-white border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-navy-50 hover:border-navy-200 transition-colors">
-              Ver viagem <ArrowRight size={11} />
-            </Link>
+            {(variant === "pending" || variant === "interesse") && <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-[#25D366] bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition-colors"><MessageCircle size={12} /> WhatsApp</a>}
+            <Link href={`/viagens/${b.trip_id}`} className="flex items-center gap-1 text-xs font-semibold text-navy-600 bg-white border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-navy-50 hover:border-navy-200 transition-colors">Ver viagem <ArrowRight size={11} /></Link>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
 function SectionTitle({ dot, children, sub }: { dot: string; children: React.ReactNode; sub?: string }) {
-  return (
-    <div className="mb-3">
-      <h2 className="font-display font-black text-navy-800 text-base flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${dot}`} /> {children}</h2>
-      {sub && <p className="text-xs text-gray-400 mt-0.5 ml-4">{sub}</p>}
-    </div>
-  );
+  return (<div className="mb-3"><h2 className="font-display font-black text-navy-800 text-base flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${dot}`} /> {children}</h2>{sub && <p className="text-xs text-gray-400 mt-0.5 ml-4">{sub}</p>}</div>);
 }
 
 export default function Dashboard() {
@@ -155,6 +208,7 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [tab, setTab] = useState<"proxima" | "reservas">("proxima");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -162,26 +216,15 @@ export default function Dashboard() {
     if (!u) { window.location.href = "/login"; return; }
     if (u.is_admin) { window.location.href = "/admin"; return; }
     setUser(u);
-    apiFetch("/bookings/my")
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setBookings(data.filter((b: Booking) => b.status !== "cancelled" && b.status !== "refunded")); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    apiFetch("/bookings/my").then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setBookings(data.filter((b: Booking) => b.status !== "cancelled" && b.status !== "refunded")); })
+      .catch(() => {}).finally(() => setLoading(false));
   }, []);
-
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); };
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  if (!user) return null;
-  if (loading) return <BrandedLoader label="Carregando seu painel..." />;
-
-  const firstName = user.full_name.split(" ")[0];
-  const initial = user.full_name[0]?.toUpperCase() ?? "?";
-
-  /* agrupamento por ação */
   const dleft = (b: Booking) => b.trip_departure_date ? daysUntil(b.trip_departure_date) : 99999;
   const upcomingConfirmed = bookings.filter(b => b.status === "confirmed" && dleft(b) >= 0).sort((a, b) => dleft(a) - dleft(b));
   const hero = upcomingConfirmed[0];
@@ -189,18 +232,23 @@ export default function Dashboard() {
   const pending = bookings.filter(b => b.status === "pending").sort((a, b) => dleft(a) - dleft(b));
   const interesse = bookings.filter(b => b.status === "interesse");
   const realizadas = bookings.filter(b => b.status === "completed" || (b.status === "confirmed" && dleft(b) < 0));
+  const reservasCount = pending.length + interesse.length + minhas.length + realizadas.length;
+
+  // abre na "Próxima viagem" quando há; senão em "Minhas reservas"
+  useEffect(() => { if (!loading) setTab(hero ? "proxima" : "reservas"); /* eslint-disable-next-line */ }, [loading, !!hero]);
+
+  if (!user) return null;
+  if (loading) return <BrandedLoader label="Carregando seu painel..." />;
+  const firstName = user.full_name.split(" ")[0];
+  const initial = user.full_name[0]?.toUpperCase() ?? "?";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-30">
+    <div className="min-h-screen bg-gray-50 flex flex-col print:bg-white">
+      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-30 print:hidden">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="relative w-9 h-9"><Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" priority /></div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-display font-black text-navy-900 text-base tracking-tight">AJS</span>
-              <span className="text-gold-500 text-[10px] font-semibold tracking-[0.2em] uppercase leading-none">Turismo</span>
-            </div>
+            <div className="flex flex-col leading-tight"><span className="font-display font-black text-navy-900 text-base tracking-tight">AJS</span><span className="text-gold-500 text-[10px] font-semibold tracking-[0.2em] uppercase leading-none">Turismo</span></div>
           </Link>
           <div className="relative" ref={menuRef}>
             <button onClick={() => setShowMenu(!showMenu)} className="flex items-center gap-2 text-gray-700 hover:text-navy-800 transition-colors py-1.5 px-2 rounded-xl hover:bg-gray-100">
@@ -210,27 +258,20 @@ export default function Dashboard() {
             </button>
             {showMenu && (
               <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 w-56 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gold-500 flex items-center justify-center text-navy-900 font-black text-sm flex-shrink-0">{initial}</div>
-                  <div className="min-w-0"><p className="text-xs font-bold text-navy-800 truncate">{user.full_name}</p><p className="text-xs text-gray-400 truncate">{user.email}</p></div>
-                </div>
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-gold-500 flex items-center justify-center text-navy-900 font-black text-sm flex-shrink-0">{initial}</div><div className="min-w-0"><p className="text-xs font-bold text-navy-800 truncate">{user.full_name}</p><p className="text-xs text-gray-400 truncate">{user.email}</p></div></div>
                 <div className="py-1">
                   <Link href="/viagens" onClick={() => setShowMenu(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><Search size={14} className="text-gray-400" /> Explorar viagens</Link>
                   <a href={WA_HELP} target="_blank" rel="noopener noreferrer" onClick={() => setShowMenu(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"><MessageCircle size={14} className="text-emerald-500" /> Falar no WhatsApp</a>
                 </div>
-                <div className="border-t border-gray-100 py-1">
-                  <button onClick={() => { setShowMenu(false); logout(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"><LogOut size={14} /> Sair da conta</button>
-                </div>
+                <div className="border-t border-gray-100 py-1"><button onClick={() => { setShowMenu(false); logout(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"><LogOut size={14} /> Sair da conta</button></div>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-6 pb-12">
-
-        {/* Saudação */}
-        <div>
+      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-5 pb-12">
+        <div className="print:hidden">
           <h1 className="font-display font-black text-navy-900 text-xl">Olá, {firstName}! 👋</h1>
           <p className="text-gray-400 text-sm mt-0.5">{bookings.length === 0 ? "Pronto pra primeira viagem?" : "Aqui estão suas viagens com a AJS."}</p>
         </div>
@@ -244,53 +285,36 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Herói: próxima viagem */}
-            {hero && <HeroNextTrip b={hero} />}
+            {/* Abas */}
+            <div className="flex gap-2 bg-gray-100 rounded-xl p-1 print:hidden">
+              <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Próxima viagem</button>
+              <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Minhas reservas {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
+            </div>
 
-            {/* Precisa de você */}
-            {pending.length > 0 && (
-              <section>
-                <SectionTitle dot="bg-blue-400" sub="Conclua o pagamento para garantir sua vaga.">Precisa de você</SectionTitle>
-                <div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div>
-              </section>
-            )}
-
-            {/* Em análise */}
-            {interesse.length > 0 && (
-              <section>
-                <SectionTitle dot="bg-amber-400" sub="Reservas em análise — nossa equipe entra em contato.">Em análise</SectionTitle>
-                <div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div>
-              </section>
-            )}
-
-            {/* Minhas viagens (outras confirmadas) */}
-            {minhas.length > 0 && (
-              <section>
-                <SectionTitle dot="bg-emerald-500">Minhas próximas viagens</SectionTitle>
-                <div className="space-y-3">{minhas.map(b => <TripCard key={b.id} b={b} variant="confirmed" />)}</div>
-              </section>
-            )}
-
-            {/* Realizadas */}
-            {realizadas.length > 0 && (
-              <section>
-                <SectionTitle dot="bg-gray-300">Já realizadas</SectionTitle>
-                <div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div>
-              </section>
+            {tab === "proxima" ? (
+              hero ? <Voucher b={hero} /> : (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
+                  <div className="w-14 h-14 bg-navy-50 rounded-full flex items-center justify-center mx-auto mb-3"><Ticket size={24} className="text-navy-300" /></div>
+                  <p className="font-display font-black text-navy-800 mb-1">Nenhuma viagem confirmada</p>
+                  <p className="text-gray-400 text-sm mb-4">Veja suas reservas em andamento ou explore novos destinos.</p>
+                  <button onClick={() => setTab("reservas")} className="inline-flex items-center gap-2 bg-navy-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-navy-700 transition-colors">Ver minhas reservas <ChevronRight size={15} /></button>
+                </div>
+              )
+            ) : (
+              <div className="space-y-6">
+                {pending.length > 0 && <section><SectionTitle dot="bg-blue-400" sub="Conclua o pagamento para garantir sua vaga.">Precisa de você</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
+                {interesse.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="Reservas em análise — nossa equipe entra em contato.">Em análise</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
+                {minhas.length > 0 && <section><SectionTitle dot="bg-emerald-500">Outras viagens confirmadas</SectionTitle><div className="space-y-3">{minhas.map(b => <TripCard key={b.id} b={b} variant="confirmed" />)}</div></section>}
+                {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300">Já realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
+                {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — sua próxima viagem está na outra aba. 🎉</p>}
+              </div>
             )}
           </>
         )}
 
-        {/* Ações rápidas */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/viagens" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-navy-200 transition-shadow group">
-            <div className="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center group-hover:bg-navy-100 transition-colors"><Search size={18} className="text-navy-600" /></div>
-            <span className="text-xs font-bold text-navy-700">Explorar viagens</span>
-          </Link>
-          <a href={WA_HELP} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-emerald-200 transition-shadow group">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors"><MessageCircle size={18} className="text-emerald-600" /></div>
-            <span className="text-xs font-bold text-emerald-700">Suporte WhatsApp</span>
-          </a>
+        <div className="grid grid-cols-2 gap-3 print:hidden">
+          <Link href="/viagens" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-navy-200 transition-shadow group"><div className="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center group-hover:bg-navy-100 transition-colors"><Search size={18} className="text-navy-600" /></div><span className="text-xs font-bold text-navy-700">Explorar viagens</span></Link>
+          <a href={WA_HELP} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-emerald-200 transition-shadow group"><div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors"><MessageCircle size={18} className="text-emerald-600" /></div><span className="text-xs font-bold text-emerald-700">Suporte WhatsApp</span></a>
         </div>
       </div>
     </div>
