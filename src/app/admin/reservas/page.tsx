@@ -1100,7 +1100,8 @@ export default function AdminReservasPage() {
     stats: { confirmed_revenue: 0, pending_value: 0, month_count: 0, month_value: 0 },
   });
   const [trips, setTrips] = useState<Trip[]>(_tripsCache.data ?? []);
-  const [tab, setTab] = useState<string>("interesse");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<string>(searchParams.get("status") ?? "interesse");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -1113,7 +1114,6 @@ export default function AdminReservasPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
-  const searchParams = useSearchParams();
   const [tripFilter, setTripFilter] = useState<string>(searchParams.get("trip_id") ?? "");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
