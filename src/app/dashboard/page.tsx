@@ -201,7 +201,7 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
         </div>
         {variant === "pending" && (
           <div className="mt-3">
-            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">Sua vaga está separada, mas só confirma com o pagamento.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias.`}</span></> : ""}</div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">As vagas são limitadas e só ficam garantidas após o pagamento — não deixe sua escolha esgotar.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam só ${days} dias.`}</span></> : ""}</div>
             <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Concluir reserva <ArrowRight size={14} /></Link>
           </div>
         )}
@@ -314,7 +314,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 print:hidden">
               <div className="flex-1 flex gap-2 bg-gray-100 rounded-xl p-1">
                 <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "proxima" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
-                <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Reservas & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
+                <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Em andamento & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
               </div>
               {pending.length > 0 && (
                 <div className="relative flex-shrink-0" ref={pendRef}>
@@ -367,12 +367,12 @@ export default function Dashboard() {
                   <div className="w-14 h-14 bg-navy-50 rounded-full flex items-center justify-center mx-auto mb-3"><Ticket size={24} className="text-navy-300" /></div>
                   <p className="font-display font-black text-navy-800 mb-1">Nenhuma viagem confirmada</p>
                   <p className="text-gray-400 text-sm mb-4">Veja suas reservas em andamento ou explore novos destinos.</p>
-                  <button onClick={() => setTab("reservas")} className="inline-flex items-center gap-2 bg-navy-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-navy-700 transition-colors">Ver minhas reservas <ChevronRight size={15} /></button>
+                  <button onClick={() => setTab("reservas")} className="inline-flex items-center gap-2 bg-navy-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-navy-700 transition-colors">Ver em andamento & histórico <ChevronRight size={15} /></button>
                 </div>
               )
             ) : (
               <div className="space-y-6">
-                {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="Você escolheu, mas ainda falta pagar. Conclua para garantir sua vaga.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
+                {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="As vagas são limitadas e só ficam garantidas após o pagamento.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
                 {interesse.length > 0 && <section><SectionTitle dot="bg-sky-400" sub="Você pediu informações. A equipe da AJS vai te chamar no WhatsApp.">Aguardando contato da AJS</SectionTitle><div className="space-y-3">{interesse.map(b => <TripCard key={b.id} b={b} variant="interesse" />)}</div></section>}
                 {realizadas.length > 0 && <section><SectionTitle dot="bg-gray-300" sub="Viagens que já aconteceram.">Viagens realizadas</SectionTitle><div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div></section>}
                 {reservasCount === 0 && <p className="text-center text-gray-400 text-sm py-8">Nada por aqui — suas viagens confirmadas estão na outra aba. 🎉</p>}
