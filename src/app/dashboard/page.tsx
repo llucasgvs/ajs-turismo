@@ -224,7 +224,9 @@ export default function Dashboard() {
   const [showMenu, setShowMenu] = useState(false);
   const [tab, setTab] = useState<"proxima" | "reservas">("proxima");
   const [vIdx, setVIdx] = useState(0);
+  const [showPend, setShowPend] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const pendRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const u = getUser();
@@ -236,7 +238,10 @@ export default function Dashboard() {
       .catch(() => {}).finally(() => setLoading(false));
   }, []);
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); };
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+      if (pendRef.current && !pendRef.current.contains(e.target as Node)) setShowPend(false);
+    };
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
@@ -300,22 +305,39 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Alerta de pagamento pendente — aparece em qualquer aba */}
-            {pending.length > 0 && (
-              <Link href={`/reservar/${pending[0].booking_code}`} className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 hover:bg-blue-100 transition-colors print:hidden">
-                <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0"><Wallet size={16} className="text-white" /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-blue-800">{pending.length === 1 ? "Você tem um pagamento pendente" : `Você tem ${pending.length} pagamentos pendentes`}</p>
-                  <p className="text-xs text-blue-600 truncate">Conclua para garantir {pending.length === 1 ? "sua vaga" : "suas vagas"}.</p>
+            {/* Abas + aviso discreto de pendências */}
+            <div className="flex items-center gap-2 print:hidden">
+              <div className="flex-1 flex gap-2 bg-gray-100 rounded-xl p-1">
+                <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "proxima" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
+                <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Reservas & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
+              </div>
+              {pending.length > 0 && (
+                <div className="relative flex-shrink-0" ref={pendRef}>
+                  <button onClick={() => setShowPend(v => !v)} title={pending.length === 1 ? "1 pagamento pendente" : `${pending.length} pagamentos pendentes`} className="relative w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-amber-500 hover:bg-amber-50 transition-colors">
+                    <Wallet size={17} />
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">{pending.length}</span>
+                  </button>
+                  {showPend && (
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 overflow-hidden">
+                      <div className="px-4 py-2.5 border-b border-gray-100 bg-amber-50">
+                        <p className="text-xs font-bold text-amber-800">{pending.length === 1 ? "Pagamento pendente" : `${pending.length} pagamentos pendentes`}</p>
+                        <p className="text-[11px] text-amber-600">Conclua para garantir {pending.length === 1 ? "sua vaga" : "suas vagas"}.</p>
+                      </div>
+                      <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+                        {pending.map(b => (
+                          <Link key={b.id} href={`/reservar/${b.booking_code}`} onClick={() => setShowPend(false)} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-navy-800 truncate">{b.trip_title ?? "Viagem"}</p>
+                              <p className="text-[11px] text-gray-400">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "Data a definir"}{b.final_amount > 0 ? ` · R$ ${fmtBRL(b.final_amount)}` : ""}</p>
+                            </div>
+                            <span className="text-[11px] font-bold text-navy-600 flex items-center gap-0.5 flex-shrink-0">Pagar <ArrowRight size={12} /></span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs font-bold text-blue-700 flex items-center gap-1 flex-shrink-0">Continuar <ArrowRight size={13} /></span>
-              </Link>
-            )}
-
-            {/* Abas */}
-            <div className="flex gap-2 bg-gray-100 rounded-xl p-1 print:hidden">
-              <button onClick={() => setTab("proxima")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "proxima" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} /> Minhas viagens {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "proxima" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
-              <button onClick={() => setTab("reservas")} className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-bold py-2 rounded-lg transition-colors ${tab === "reservas" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Reservas & histórico {reservasCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "reservas" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{reservasCount}</span>}</button>
+              )}
             </div>
 
             {tab === "proxima" ? (
@@ -353,11 +375,6 @@ export default function Dashboard() {
             )}
           </>
         )}
-
-        <div className="grid grid-cols-2 gap-3 print:hidden">
-          <Link href="/viagens" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-navy-200 transition-shadow group"><div className="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center group-hover:bg-navy-100 transition-colors"><Search size={18} className="text-navy-600" /></div><span className="text-xs font-bold text-navy-700">Explorar viagens</span></Link>
-          <a href={WA_HELP} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center gap-2 text-center shadow-sm hover:shadow-md hover:border-emerald-200 transition-shadow group"><div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors"><MessageCircle size={18} className="text-emerald-600" /></div><span className="text-xs font-bold text-emerald-700">Suporte WhatsApp</span></a>
-        </div>
       </div>
     </div>
   );
