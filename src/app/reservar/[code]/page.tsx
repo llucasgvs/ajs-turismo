@@ -432,6 +432,10 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       tier_breakdown: tier_breakdown.map(t => ({ label: t.label, qty: t.qty, price: priceOf(t.label) })),
     });
 
+    // Pré-login (sem code): edição local, sem servidor — o preço é recalculado
+    // de forma autoritativa quando a reserva for criada.
+    if (!code) { if (my === seq.current) setBusy(false); return; }
+
     try {
       const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown }) });
       if (r.ok && my === seq.current) onUpdate(await r.json());
@@ -473,11 +477,14 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       const base = hasTiers ? booking.total_amount : total * newPrice;
       onUpdate({
         ...booking,
+        trip_id: tid,
         trip_departure_date: target.departure_date,
         trip_return_date: target.return_date ?? null,
         ...(hasTiers ? {} : { total_amount: base, optionals_amount, final_amount: base + optionals_amount }),
       });
     }
+    // Pré-login (sem code): só a atualização otimista acima.
+    if (!code) return;
     setBusy(true);
     try {
       const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown, trip_id: tid }) });
@@ -1078,6 +1085,8 @@ function PreCheckout() {
   const [showAuth, setShowAuth] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  // Reserva "de mentira" (editável) antes do login. Vira a reserva real no checkout.
+  const [book, setBook] = useState<Booking | null>(null);
 
   // Seleção feita na página da viagem (JSON na URL).
   const sel = useMemo(() => {
@@ -1095,25 +1104,54 @@ function PreCheckout() {
 
   const createBooking = useCallback(async () => {
     setCreating(true); setError("");
+    // Usa o que o cliente editou (book); se ainda não inicializou, cai na seleção da URL.
+    const payload = book
+      ? {
+          trip_id: book.trip_id,
+          num_travelers: book.num_travelers,
+          selected_optionals: book.selected_optionals,
+          tier_breakdown: (book.tier_breakdown || []).map(t => ({ label: t.label, qty: t.qty })),
+        }
+      : { trip_id: Number(tripId), num_travelers: people, selected_optionals: selOptionals, tier_breakdown: selTiers };
     try {
       const res = await apiFetch(`/payments/checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trip_id: Number(tripId), num_travelers: people, selected_optionals: selOptionals, tier_breakdown: selTiers }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) { const e = await res.json(); setError(typeof e.detail === "string" ? e.detail : "Não foi possível iniciar a reserva."); setCreating(false); return; }
       const d = await res.json();
-      // Passa a viagem (já buscada aqui) adiante pra a tela [code] renderizar o
-      // resumo na hora, sem refazer GET /trips no carregamento.
-      try { if (trip) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
+      // Passa a viagem adiante p/ a tela [code] renderizar na hora — só se a data não mudou
+      // (se mudou, o trip_id difere; a tela [code] busca a viagem certa).
+      try { if (trip && payload.trip_id === trip.id) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
       router.replace(`/reservar/${d.booking_code}`);
     } catch { setError("Erro de conexão. Tente novamente."); setCreating(false); }
-  }, [tripId, people, selOptionals, selTiers, router]);
+  }, [book, tripId, people, selOptionals, selTiers, trip, router]);
 
   // Já logado → cria a reserva e segue direto (sem passar pelo passo de login).
   const tried = useRef(false);
   useEffect(() => {
     if (trip && getToken() && !tried.current) { tried.current = true; createBooking(); }
   }, [trip, createBooking]);
+
+  // Resumo editável (pseudo-reserva). Recalculado no cliente; o servidor reconcilia ao criar.
+  const hasTiers = selTiers.length > 0;
+  const pseudo = useMemo<Booking | null>(() => {
+    if (!trip) return null;
+    const priceForLabel = (label: string) => label === ADULT ? trip.price_per_person : (trip.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person);
+    const tier_breakdown = selTiers.map(t => ({ label: t.label, qty: t.qty, price: priceForLabel(t.label) }));
+    const base = hasTiers ? tier_breakdown.reduce((s, t) => s + t.qty * t.price, 0) : people * trip.price_per_person;
+    const optionals_amount = selOptionals.reduce((s, o) => s + o.price * people, 0);
+    return {
+      booking_code: "", trip_id: trip.id, final_amount: base + optionals_amount, total_amount: base,
+      optionals_amount, num_travelers: people, status: "pending",
+      selected_optionals: selOptionals, tier_breakdown,
+      trip_title: trip.title || undefined, trip_destination: trip.destination || undefined,
+      trip_departure_date: trip.departure_date, trip_return_date: trip.return_date,
+      trip_image_url: trip.image_url || undefined,
+      trip_max_installments: trip.max_installments, installments_max: trip.max_installments, installment_options: [],
+    };
+  }, [trip, hasTiers, people, selOptionals, selTiers]);
+  useEffect(() => { if (pseudo) setBook(prev => prev ?? pseudo); }, [pseudo]);
 
   if (loading || (getToken() && !error)) {
     return <BrandedLoader label="Abrindo sua reserva..." />;
@@ -1122,21 +1160,7 @@ function PreCheckout() {
     return <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4"><div className="text-center"><p className="text-gray-600 mb-4">Viagem não encontrada.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div></main>;
   }
 
-  // Resumo calculado no cliente (pseudo-reserva só para exibição).
-  const hasTiers = selTiers.length > 0;
-  const priceForLabel = (label: string) => label === ADULT ? trip.price_per_person : (trip.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person);
-  const tier_breakdown = selTiers.map(t => ({ label: t.label, qty: t.qty, price: priceForLabel(t.label) }));
-  const base = hasTiers ? tier_breakdown.reduce((s, t) => s + t.qty * t.price, 0) : people * trip.price_per_person;
-  const optionals_amount = selOptionals.reduce((s, o) => s + o.price * people, 0);
-  const pseudo: Booking = {
-    booking_code: "", trip_id: trip.id, final_amount: base + optionals_amount, total_amount: base,
-    optionals_amount, num_travelers: people, status: "pending",
-    selected_optionals: selOptionals, tier_breakdown,
-    trip_title: trip.title || undefined, trip_destination: trip.destination || undefined,
-    trip_departure_date: trip.departure_date, trip_return_date: trip.return_date,
-    trip_image_url: trip.image_url || undefined,
-    trip_max_installments: trip.max_installments, installments_max: trip.max_installments, installment_options: [],
-  };
+  const view = book ?? pseudo;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
@@ -1170,7 +1194,7 @@ function PreCheckout() {
                 <div className="flex items-center gap-3 px-5 py-4"><StepBadge n={3} done={false} active={false} /><h2 className="font-bold text-navy-800">Forma de pagamento</h2></div>
               </section>
             </div>
-            <ReservationCard booking={pseudo} trip={trip} code="" onUpdate={() => {}} editable={false} method="pix" installments={1} />
+            <ReservationCard booking={view!} trip={trip} code="" onUpdate={setBook} editable={true} method="pix" installments={1} />
           </div>
         </div>
       </main>
