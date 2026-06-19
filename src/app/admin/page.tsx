@@ -160,7 +160,7 @@ export default function AdminDashboard() {
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
   // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
   const markup = margin < 100 ? (margin / (100 - margin)) * 100 : null;
-  const markupLabel = markup === null ? "-" : `${markup.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+  const markupLabel = markup === null ? "-" : `${Math.round(markup)}%`;
 
   const catTotal = (an?.by_category ?? []).reduce((s, c) => s + c.revenue, 0);
 
