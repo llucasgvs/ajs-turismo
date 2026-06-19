@@ -158,6 +158,9 @@ export default function AdminDashboard() {
 
   const monthCount = stats?.month_confirmed ?? 0;
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
+  // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
+  const markup = margin < 100 ? (margin / (100 - margin)) * 100 : null;
+  const markupLabel = markup === null ? "-" : `${markup.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
   const catTotal = (an?.by_category ?? []).reduce((s, c) => s + c.revenue, 0);
 
@@ -218,16 +221,24 @@ export default function AdminDashboard() {
 
           {/* lucro presumido (estimativa interativa) */}
           <div className="border-t border-white/10 pt-4">
-            <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Lucro presumido <span className="text-navy-400 normal-case">(estimativa)</span></p>
-            <p className="text-2xl sm:text-3xl font-display font-black tabular-nums mt-0.5 text-gold-300 leading-none">{loading ? "-" : fmtR(profit)}</p>
+            <div className="flex items-end justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Lucro presumido <span className="text-navy-400 normal-case">(estimativa)</span></p>
+                <p className="text-2xl sm:text-3xl font-display font-black tabular-nums mt-0.5 text-gold-300 leading-none">{loading ? "-" : fmtR(profit)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Margem</p>
+                <p className="text-xl font-display font-black tabular-nums leading-none mt-0.5">{margin}%</p>
+              </div>
+            </div>
             <input
               type="range" min={0} max={100} step={1} value={margin}
               onChange={e => onMargin(Number(e.target.value))}
-              aria-label="Percentual aplicado sobre a receita"
+              aria-label="Margem de lucro presumida"
               className="mt-3 w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/15 accent-gold-400"
               style={{ background: `linear-gradient(to right, rgb(212 175 90) ${margin}%, rgba(255,255,255,0.15) ${margin}%)` }}
             />
-            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita do mês · arraste para ajustar <span className="text-navy-400 tabular-nums">({margin}%)</span></p>
+            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita do mês. Ajuste a margem para a sua realidade. <span className="text-navy-400">· markup {markupLabel}</span></p>
           </div>
         </div>
         {/* KPIs de apoio */}
