@@ -192,14 +192,14 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ════ ATO 1 — PULSO ════ */}
+      {/* ════ ATO 1 - PULSO ════ */}
       <Eyebrow kicker="Visão geral" title="Como o mês está indo" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Hero */}
         <div className="lg:col-span-2 bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-6 text-white shadow-card flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1">
             <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
-            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "—" : fmtR(curRev)}</p>
+            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "-" : fmtR(curRev)}</p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(stats?.month_confirmed ?? 0, "venda", "vendas")}</span>
               {!loading && hasPrev && (
@@ -224,13 +224,13 @@ export default function AdminDashboard() {
         </div>
         {/* KPIs de apoio */}
         <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
-          <MiniKpi icon={<CreditCard size={15} />} label="Aguardando pgto" value={loading ? "—" : fmtR(cs?.pending_value ?? 0)} sub={`${counts?.pending ?? 0} a pagar`} href={`${RES}?status=pending`} />
-          <MiniKpi icon={<DollarSign size={15} />} label="Ticket médio" value={loading ? "—" : fmtR(an?.ticket_medio ?? 0)} sub="por venda" />
-          <MiniKpi icon={<Target size={15} />} label="Conversão" value={loading ? "—" : pct(an?.conversao ?? 0)} sub="interesse → venda" />
+          <MiniKpi icon={<CreditCard size={15} />} label="Aguardando pgto" value={loading ? "-" : fmtR(cs?.pending_value ?? 0)} sub={`${counts?.pending ?? 0} a pagar`} href={`${RES}?status=pending`} />
+          <MiniKpi icon={<DollarSign size={15} />} label="Ticket médio" value={loading ? "-" : fmtR(an?.ticket_medio ?? 0)} sub="por venda" />
+          <MiniKpi icon={<Target size={15} />} label="Conversão" value={loading ? "-" : pct(an?.conversao ?? 0)} sub="interesse → venda" />
         </div>
       </div>
 
-      {/* ════ ATO 2 — DESEMPENHO ════ */}
+      {/* ════ ATO 2 - DESEMPENHO ════ */}
       <Eyebrow kicker="Desempenho" title="De onde vem o dinheiro" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 overflow-hidden">
@@ -330,7 +330,7 @@ export default function AdminDashboard() {
         )}
       </Card>
 
-      {/* ════ ATO 3 — AÇÕES ════ */}
+      {/* ════ ATO 3 - AÇÕES ════ */}
       <Eyebrow kicker="Ações" title="O que pede atenção agora" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Prioridades */}
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
         <FollowupList title="Pagamentos pendentes" icon={<CreditCard size={14} className="text-blue-400" />} items={pendings} loading={loading} emptyMsg="Nenhum pagamento em aberto" tone="blue" status="pending" />
       </div>
 
-      {/* ════ ATO 4 — AGENDA ════ */}
+      {/* ════ ATO 4 - AGENDA ════ */}
       <Eyebrow kicker="Agenda" title="O que vem por aí" />
       <Card className="overflow-hidden">
         <CardHead title="Próximas saídas" icon={<Calendar size={14} className="text-navy-400" />}
@@ -369,7 +369,7 @@ export default function AdminDashboard() {
               const dep = t.departure_date ? new Date(t.departure_date.slice(0, 10) + "T12:00:00") : null;
               return (
                 <div key={t.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors sm:border-b sm:border-gray-50">
-                  <div className="flex-shrink-0 w-11 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p></> : <span className="text-gray-300 text-xs">—</span>}</div>
+                  <div className="flex-shrink-0 w-11 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p></> : <span className="text-gray-300 text-xs">-</span>}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2"><p className="font-semibold text-navy-800 text-sm truncate">{t.title}</p>{t.status === "sold_out" && <span className="flex-shrink-0 text-[10px] font-bold bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Esgotado</span>}</div>
                     {unlimited ? (

@@ -62,7 +62,7 @@ interface Counts {
 
 const PAGE_SIZE = 10;
 
-// Cache em nível de módulo por templateId — evita spinner ao reentrar no roteiro.
+// Cache em nível de módulo por templateId - evita spinner ao reentrar no roteiro.
 // Sempre revalida em background no mount, então os dados ficam frescos.
 const _tmplCache: Record<number, { template: TripTemplate; counts: Counts; ts: number }> = {};
 
@@ -269,7 +269,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                 <p className="text-[11px] text-gray-400 mb-1">Original (De:)</p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
-                  <input type="number" min="0" step="0.01" placeholder="—" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)}
+                  <input type="number" min="0" step="0.01" placeholder="-" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)}
                     className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
@@ -1043,7 +1043,7 @@ export default function TemplateDetailPage() {
         </Link>
       </div>
 
-      {/* Card de info do roteiro — clicável */}
+      {/* Card de info do roteiro - clicável */}
       <button
         type="button"
         onClick={() => setDrawerOpen(true)}
@@ -1279,7 +1279,7 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
   const barCls = pct >= 90 ? "bg-red-400" : pct >= 60 ? "bg-amber-400" : "bg-green-400";
   const availCls = pct >= 90 ? "text-red-500 font-semibold" : pct >= 60 ? "text-amber-500 font-semibold" : "text-green-600 font-semibold";
 
-  // Badge "em X dias" — só para datas futuras ativas/esgotadas
+  // Badge "em X dias" - só para datas futuras ativas/esgotadas
   const dDays = daysUntil(date.departure_date);
   const showCountdown = !isHidden && !isCompleted && dDays >= 0;
   const countdownLabel = dDays === 0 ? "Hoje" : dDays === 1 ? "Amanhã" : `em ${dDays} dias`;

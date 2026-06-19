@@ -209,7 +209,7 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle, #C9A84C 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
         <div className="relative container-custom py-12 md:py-16 text-center">
           <div className="inline-flex items-center gap-2 bg-gold-500/20 border border-gold-500/30 text-gold-400 text-xs font-semibold px-4 py-2 rounded-full mb-6">
-            <Plane size={12} /> Saindo de Curitiba — PR
+            <Plane size={12} /> Saindo de Curitiba - PR
           </div>
           <h1 className="font-display font-black text-4xl md:text-6xl text-white mb-4 leading-tight">
             Explore Nossas <span className="text-gold-400">Viagens</span>

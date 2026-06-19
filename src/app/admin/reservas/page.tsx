@@ -11,7 +11,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const PAGE_SIZE = 25;
 
 // Cache da lista de viagens (dados de referência p/ dropdown + venda externa).
-// Reservas em si NÃO são cacheadas — sempre refrescadas a cada visita.
+// Reservas em si NÃO são cacheadas - sempre refrescadas a cada visita.
 const _tripsCache: { data: Trip[] | null; ts: number } = { data: null, ts: 0 };
 const TRIPS_TTL = 60_000;
 
@@ -74,12 +74,12 @@ const PAYMENT_LABEL: Record<string, string> = {
 };
 
 function paymentLabel(method: string | null, installments?: number): string {
-  const base = PAYMENT_LABEL[method ?? ""] ?? method ?? "—";
+  const base = PAYMENT_LABEL[method ?? ""] ?? method ?? "-";
   return installments && installments > 1 ? `${base} · ${installments}x` : base;
 }
 
 function fmt(d: string) {
-  if (!d) return "—";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
@@ -120,7 +120,7 @@ function buildWaUrl(b: Booking) {
   const number = clean.startsWith("55") ? clean : `55${clean}`;
   const trip = b.trip_title || "sua viagem";
   const when = b.trip_departure_date ? ` (saída em ${fmt(b.trip_departure_date)})` : "";
-  // Mensagem específica da viagem — o cliente reconhece o destino, não só um código.
+  // Mensagem específica da viagem - o cliente reconhece o destino, não só um código.
   const msg = `Olá, ${name}! Aqui é a equipe da AJS Turismo. Estou entrando em contato sobre sua reserva da viagem *${trip}*${when}. (Código ${b.booking_code})`;
   return `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
 }
@@ -297,7 +297,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 <span>Total</span>
                 <span>R$ {fmtBRL(booking.final_amount)}</span>
               </div>
-              <p className="text-xs text-gray-400">{PAYMENT_LABEL[booking.payment_method ?? ""] ?? booking.payment_method ?? "—"}{booking.installments > 1 ? ` · ${booking.installments}x` : ""}</p>
+              <p className="text-xs text-gray-400">{PAYMENT_LABEL[booking.payment_method ?? ""] ?? booking.payment_method ?? "-"}{booking.installments > 1 ? ` · ${booking.installments}x` : ""}</p>
             </div>
           </section>
 
@@ -707,7 +707,7 @@ function parseApiError(err: unknown): string {
   const e = err as Record<string, unknown>;
   if (typeof e.detail === "string") return e.detail;
   if (Array.isArray(e.detail)) {
-    // Pydantic 422 — array de objetos com { msg, loc }
+    // Pydantic 422 - array de objetos com { msg, loc }
     return e.detail.map((d: unknown) => {
       if (d && typeof d === "object") {
         const de = d as Record<string, unknown>;
@@ -904,7 +904,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                 <option value="">Selecione o roteiro...</option>
                 {templateOptions.map((t) => (
                   <option key={t.template_id ?? t.title} value={String(t.template_id ?? t.title)}>
-                    {t.title} — {t.destination}
+                    {t.title} - {t.destination}
                   </option>
                 ))}
               </select>
@@ -957,11 +957,11 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
             </div>
             {cpfStatus === "found" && (
               <p className="mt-1.5 text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <Check size={11} /> Cliente encontrado — dados preenchidos automaticamente
+                <Check size={11} /> Cliente encontrado - dados preenchidos automaticamente
               </p>
             )}
             {cpfStatus === "not_found" && (
-              <p className="mt-1.5 text-xs text-gray-400">Novo cliente — preencha os dados abaixo</p>
+              <p className="mt-1.5 text-xs text-gray-400">Novo cliente - preencha os dados abaixo</p>
             )}
           </div>
 
@@ -1302,7 +1302,7 @@ export default function AdminReservasPage() {
             <WhatsAppGlyph size={14} />{!compact && " WhatsApp"}
           </a>
         )}
-        {!actionable && !b.traveler_phone && <span className="text-xs text-gray-300">—</span>}
+        {!actionable && !b.traveler_phone && <span className="text-xs text-gray-300">-</span>}
       </div>
     );
   };

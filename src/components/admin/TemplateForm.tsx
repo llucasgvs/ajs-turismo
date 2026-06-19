@@ -574,7 +574,7 @@ export default function TemplateForm({
 
           <Section title="Roteiro">
             <p className="text-xs text-gray-400 mb-4">
-              Organize o roteiro em seções com título livre — pode ser o dia da semana, um tema ou qualquer nome que faça sentido para esta viagem.
+              Organize o roteiro em seções com título livre - pode ser o dia da semana, um tema ou qualquer nome que faça sentido para esta viagem.
             </p>
             <div className="space-y-4">
               {form.itinerary.map((section, si) => (
@@ -801,7 +801,7 @@ function UnifiedGallery({ images, onChange }: {
         next.push(url);
       }
       onChange(next);
-      if (skipped > 0) setUploadError(`${skipped} imagem(ns) ignorada(s) — duplicada ou limite de ${MAX} atingido.`);
+      if (skipped > 0) setUploadError(`${skipped} imagem(ns) ignorada(s) - duplicada ou limite de ${MAX} atingido.`);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Erro no upload");
     } finally {
@@ -831,7 +831,7 @@ function UnifiedGallery({ images, onChange }: {
               </span>
             )}
 
-            {/* Set as main — always visible on mobile, hover-only on desktop */}
+            {/* Set as main - always visible on mobile, hover-only on desktop */}
             {i !== 0 && (
               <button
                 type="button"
@@ -843,7 +843,7 @@ function UnifiedGallery({ images, onChange }: {
               </button>
             )}
 
-            {/* Remove — always visible on mobile, hover-only on desktop */}
+            {/* Remove - always visible on mobile, hover-only on desktop */}
             <button
               type="button"
               onClick={() => remove(i)}
@@ -861,7 +861,7 @@ function UnifiedGallery({ images, onChange }: {
           </div>
         ))}
 
-        {/* Add button — hidden when at limit */}
+        {/* Add button - hidden when at limit */}
         {images.length < MAX && <label className={`flex flex-col items-center justify-center h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
           uploading
             ? "border-gray-200 text-gray-400 cursor-not-allowed"
@@ -897,7 +897,7 @@ function UnifiedGallery({ images, onChange }: {
           <p className="text-xs text-gray-400">{images.length}/{MAX} imagens</p>
         )}
         {images.length >= MAX && (
-          <p className="text-xs text-amber-600 font-medium">Limite atingido — remova uma para adicionar outra.</p>
+          <p className="text-xs text-amber-600 font-medium">Limite atingido - remova uma para adicionar outra.</p>
         )}
       </div>
 

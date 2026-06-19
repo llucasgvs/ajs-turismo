@@ -615,7 +615,7 @@ export default function TripDateForm({
               <label className="block text-sm font-medium text-navy-700">Valores por idade <span className="text-gray-400 font-normal">(opcional)</span></label>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              O preço acima é o padrão (Adulto). Adicione categorias com nome, faixa de idade e valor —
+              O preço acima é o padrão (Adulto). Adicione categorias com nome, faixa de idade e valor -
               ex: Criança · 5 a 12 anos · R$ 250. Sem categorias, a viagem usa só o preço padrão.
             </p>
 

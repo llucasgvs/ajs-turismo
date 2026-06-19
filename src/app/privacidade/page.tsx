@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — AJS Turismo",
+  title: "Política de Privacidade - AJS Turismo",
   description: "Saiba como a AJS Turismo coleta, usa e protege seus dados pessoais.",
 };
 
@@ -31,7 +31,7 @@ export default function PoliticaDePrivacidade() {
           <section>
             <h2 className="font-bold text-navy-800 text-lg mb-3">1. Quem somos</h2>
             <p>
-              A <strong>AJS Turismo</strong> é uma agência de viagens com sede em Curitiba – PR. Operamos o site{" "}
+              A <strong>AJS Turismo</strong> é uma agência de viagens com sede em Curitiba - PR. Operamos o site{" "}
               <span className="text-navy-700 font-medium">ajsturismo.com.br</span> e somos responsáveis pelo tratamento
               dos dados pessoais coletados através dele.
             </p>
@@ -93,9 +93,9 @@ export default function PoliticaDePrivacidade() {
             </p>
             <ul className="space-y-1.5 mt-3">
               {[
-                "Execução de contrato — para processar e executar a reserva de viagem",
-                "Consentimento — quando você nos fornece dados voluntariamente ao se cadastrar",
-                "Obrigação legal — quando necessário para cumprir obrigações fiscais ou regulatórias",
+                "Execução de contrato - para processar e executar a reserva de viagem",
+                "Consentimento - quando você nos fornece dados voluntariamente ao se cadastrar",
+                "Obrigação legal - quando necessário para cumprir obrigações fiscais ou regulatórias",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0" />
@@ -109,7 +109,7 @@ export default function PoliticaDePrivacidade() {
             <h2 className="font-bold text-navy-800 text-lg mb-3">5. Armazenamento e segurança</h2>
             <p>
               Seus dados são armazenados em servidores seguros com criptografia em trânsito (HTTPS) e em repouso.
-              Utilizamos a plataforma <strong>Supabase</strong> (hospedada na AWS — região São Paulo) para gerenciar
+              Utilizamos a plataforma <strong>Supabase</strong> (hospedada na AWS - região São Paulo) para gerenciar
               autenticação e banco de dados.
             </p>
             <p className="mt-2">
@@ -160,7 +160,7 @@ export default function PoliticaDePrivacidade() {
           </section>
 
           <div className="pt-4 border-t border-gray-100 text-sm text-gray-400">
-            AJS Turismo · Curitiba – PR · CNPJ: 28.702.277/0001-85 ·{" "}
+            AJS Turismo · Curitiba - PR · CNPJ: 28.702.277/0001-85 ·{" "}
             <a href="mailto:admin@ajsturismo.com.br" className="hover:text-gold-600 transition-colors">
               admin@ajsturismo.com.br
             </a>

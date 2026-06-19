@@ -51,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <p className="text-navy-400 text-xs">Painel Admin</p>
           </div>
         </Link>
-        {/* Close button — mobile only */}
+        {/* Close button - mobile only */}
         <button
           onClick={() => setSidebarOpen(false)}
           className="lg:hidden text-navy-400 hover:text-white p-1"

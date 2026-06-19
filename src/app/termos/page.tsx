@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso — AJS Turismo",
+  title: "Termos de Uso - AJS Turismo",
   description: "Termos e condições de uso do site e dos serviços da AJS Turismo.",
 };
 
@@ -40,7 +40,7 @@ export default function TermosDeUso() {
           <section>
             <h2 className="font-bold text-navy-800 text-lg mb-3">2. Sobre a AJS Turismo</h2>
             <p>
-              A AJS Turismo (CNPJ 28.702.277/0001-85) é uma agência de viagens sediada em Curitiba – PR, especializada
+              A AJS Turismo (CNPJ 28.702.277/0001-85) é uma agência de viagens sediada em Curitiba - PR, especializada
               em pacotes de turismo com saída de Curitiba e região. Nossos serviços incluem organização de viagens em
               grupo, reserva de hospedagem, transporte e roteiros turísticos.
             </p>
@@ -140,7 +140,7 @@ export default function TermosDeUso() {
           <section>
             <h2 className="font-bold text-navy-800 text-lg mb-3">8. Propriedade intelectual</h2>
             <p>
-              Todo o conteúdo do site — incluindo textos, imagens, logotipos e código — é de propriedade da AJS Turismo
+              Todo o conteúdo do site - incluindo textos, imagens, logotipos e código - é de propriedade da AJS Turismo
               ou de seus fornecedores, protegido pelas leis de propriedade intelectual. É proibida a reprodução sem
               autorização prévia e por escrito.
             </p>
@@ -157,13 +157,13 @@ export default function TermosDeUso() {
           <section>
             <h2 className="font-bold text-navy-800 text-lg mb-3">10. Foro e legislação</h2>
             <p>
-              Estes termos são regidos pelas leis brasileiras. Fica eleito o foro da Comarca de Curitiba – PR para
+              Estes termos são regidos pelas leis brasileiras. Fica eleito o foro da Comarca de Curitiba - PR para
               dirimir quaisquer controvérsias decorrentes deste instrumento.
             </p>
           </section>
 
           <div className="pt-4 border-t border-gray-100 text-sm text-gray-400">
-            AJS Turismo · Curitiba – PR · CNPJ: 28.702.277/0001-85 ·{" "}
+            AJS Turismo · Curitiba - PR · CNPJ: 28.702.277/0001-85 ·{" "}
             <a href="mailto:admin@ajsturismo.com.br" className="hover:text-gold-600 transition-colors">
               admin@ajsturismo.com.br
             </a>{" "}

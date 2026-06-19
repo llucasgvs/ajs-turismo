@@ -43,7 +43,7 @@ function RetornoInner() {
             return;
           }
         }
-      } catch { /* ignora — mostra estado atual */ }
+      } catch { /* ignora - mostra estado atual */ }
       setLoading(false);
     };
     poll();
@@ -70,7 +70,7 @@ function RetornoInner() {
             <p className="text-gray-600 text-sm mb-1">Sua vaga está garantida.</p>
             {booking?.trip_title && (
               <p className="text-gray-500 text-sm mb-4">
-                {booking.trip_title}{booking.trip_destination ? ` — ${booking.trip_destination}` : ""}
+                {booking.trip_title}{booking.trip_destination ? ` - ${booking.trip_destination}` : ""}
               </p>
             )}
             <div className="bg-navy-50 rounded-xl p-3 mb-5 text-sm">

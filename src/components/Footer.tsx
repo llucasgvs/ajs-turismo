@@ -95,7 +95,7 @@ export default function Footer() {
               <li className="flex items-start gap-2.5">
                 <MapPin size={15} className="text-gold-400 flex-shrink-0 mt-0.5" />
                 <span className="text-white/50 text-sm">
-                  Rua Pedro Spisla Filho, 215 — Santa Cândida<br />
+                  Rua Pedro Spisla Filho, 215 - Santa Cândida<br />
                   Curitiba, PR
                 </span>
               </li>
@@ -115,7 +115,7 @@ export default function Footer() {
 
             <div className="mt-5 p-3 bg-white/5 rounded-xl">
               <p className="text-xs text-white/40 mb-0.5">Horário de atendimento</p>
-              <p className="text-sm text-white/70 font-medium">Seg–Sáb: 8h às 20h</p>
+              <p className="text-sm text-white/70 font-medium">Seg-Sáb: 8h às 20h</p>
             </div>
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function Footer() {
             © {new Date().getFullYear()} AJS Turismo. Todos os direitos reservados.
             CNPJ: 28.702.277/0001-85
             <br className="hidden md:block" />
-            Fotos, textos e roteiros são conteúdo exclusivo da AJS Turismo — reprodução proibida.
+            Fotos, textos e roteiros são conteúdo exclusivo da AJS Turismo - reprodução proibida.
           </p>
           <div className="flex items-center gap-4 text-white/30 text-xs">
             <span>Cadastur: 28.702.277/0001-85</span>

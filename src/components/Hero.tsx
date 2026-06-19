@@ -164,7 +164,7 @@ export default function Hero() {
         ))}
       </div>
 
-      {/* Scroll indicator — só desktop (no mobile sobrepunha as estatísticas) */}
+      {/* Scroll indicator - só desktop (no mobile sobrepunha as estatísticas) */}
       <div className="hidden md:block absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => document.querySelector("#destinos")?.scrollIntoView({ behavior: "smooth" })}

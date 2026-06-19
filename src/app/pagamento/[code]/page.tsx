@@ -87,7 +87,7 @@ export default function CheckoutPage({ params }: { params: { code: string } }) {
             <div className="bg-navy-700 px-6 py-5 text-white">
               <h1 className="font-display font-black text-xl">Pagamento seguro</h1>
               <p className="text-navy-100 text-sm flex items-center gap-1.5 mt-1">
-                <Lock size={13} /> Ambiente protegido — AJS Turismo
+                <Lock size={13} /> Ambiente protegido - AJS Turismo
               </p>
             </div>
 

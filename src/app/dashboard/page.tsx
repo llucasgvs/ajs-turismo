@@ -33,7 +33,7 @@ const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00
 const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
 const countdownLabel = (days: number) => days <= 0 ? "É hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias`;
-const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* — ${b.trip_title ?? "viagem"}.`);
+const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* - ${b.trip_title ?? "viagem"}.`);
 const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");
 
 /* ─── Voucher / cartão de embarque ─── */
@@ -130,7 +130,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         )}
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
-          <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "—"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
+          <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
@@ -178,7 +178,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         {/* Pagamento */}
         <VBlock icon={<Wallet size={13} className="text-gold-500" />} title="Pagamento">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "—"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
+            <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "-"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
             <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(b.final_amount)}</span>
           </div>
         </VBlock>
@@ -249,12 +249,12 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
         </div>
         {variant === "pending" && (
           <div className="mt-3">
-            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">As vagas são limitadas e só ficam garantidas após o pagamento — não deixe sua escolha esgotar.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam só ${days} dias.`}</span></> : ""}</div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">As vagas são limitadas e só ficam garantidas após o pagamento - não deixe sua escolha esgotar.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam só ${days} dias.`}</span></> : ""}</div>
             <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Concluir reserva <ArrowRight size={14} /></Link>
           </div>
         )}
         {variant === "interesse" && <p className="mt-3 text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2">Você demonstrou interesse nesta viagem. A equipe da AJS vai te chamar no WhatsApp para combinar os detalhes e o pagamento.</p>}
-        {variant === "past" && <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada — esperamos que tenha sido incrível! ✨</p>}
+        {variant === "past" && <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada - esperamos que tenha sido incrível! ✨</p>}
         <div className="flex items-center justify-between gap-2 flex-wrap mt-3 pt-3 border-t border-gray-50">
           <span className="text-[11px] font-mono text-gray-400">{b.booking_code}</span>
           <div className="flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function Dashboard() {
                   {pending.length > 0 && (
                     <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-white rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-gold">
                       <Clock size={20} className="flex-shrink-0" />
-                      <p className="text-sm font-semibold leading-snug">{pending.length === 1 ? "Você tem uma reserva quase pronta." : `Você tem ${pending.length} reservas quase prontas.`} As vagas são limitadas — conclua antes que esgotem.</p>
+                      <p className="text-sm font-semibold leading-snug">{pending.length === 1 ? "Você tem uma reserva quase pronta." : `Você tem ${pending.length} reservas quase prontas.`} As vagas são limitadas - conclua antes que esgotem.</p>
                     </div>
                   )}
                   {pending.length > 0 && <section><SectionTitle dot="bg-amber-400" sub="As vagas são limitadas e só ficam garantidas após o pagamento.">Aguardando pagamento</SectionTitle><div className="space-y-3">{pending.map(b => <TripCard key={b.id} b={b} variant="pending" />)}</div></section>}
@@ -424,7 +424,7 @@ export default function Dashboard() {
                     <Sparkles size={80} className="absolute -right-3 -top-3 text-gold-400/20" />
                     <p className="text-gold-300 text-xs font-bold uppercase tracking-wide mb-1">Suas recordações</p>
                     <p className="font-display font-black text-2xl leading-tight">Você já viveu {realizadas.length} {realizadas.length === 1 ? "viagem" : "viagens"} com a AJS 💛</p>
-                    {destinosVisitados > 1 && <p className="text-white/70 text-sm mt-1">{destinosVisitados} destinos diferentes — e a próxima já pode estar te esperando.</p>}
+                    {destinosVisitados > 1 && <p className="text-white/70 text-sm mt-1">{destinosVisitados} destinos diferentes - e a próxima já pode estar te esperando.</p>}
                   </div>
                   <div className="space-y-3">{realizadas.map(b => <TripCard key={b.id} b={b} variant="past" />)}</div>
                   <div className="text-center pt-1">

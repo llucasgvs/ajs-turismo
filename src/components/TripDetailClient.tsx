@@ -122,7 +122,7 @@ function buildWhatsAppMessage(
   return msg;
 }
 
-/* ─── destination highlights — derived from trip.includes ─── */
+/* ─── destination highlights - derived from trip.includes ─── */
 type HL = { icon: React.ElementType; label: string; sub: string };
 
 const DESC_RULES: { keys: string[]; icon: React.ElementType; label: string; sub: string }[] = [
@@ -256,7 +256,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img loading="lazy" decoding="async" src={images[0]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         </div>
-        {/* 4 small right — fill with placeholders if < 5 images */}
+        {/* 4 small right - fill with placeholders if < 5 images */}
         {[1, 2, 3, 4].map((pos) => {
           const img = images[pos];
           const isLast = pos === 4 && images.length > 5;
@@ -530,7 +530,7 @@ function InfoStat({ icon, label, value, valueClass = "text-navy-800" }: {
 function parseAgeRange(s?: string): { min: number; max: number } | null {
   if (!s) return null;
   const txt = s.toLowerCase().replace(/anos?/g, "").trim();
-  let m = txt.match(/(\d+)\s*(?:a|à|-|–|até|ate)\s*(\d+)/);
+  let m = txt.match(/(\d+)\s*(?:a|à|-|-|até|ate)\s*(\d+)/);
   if (m) return { min: +m[1], max: +m[2] };
   m = txt.match(/(?:até|ate|menor que|abaixo de|<=?)\s*(\d+)/);
   if (m) return { min: 0, max: +m[1] };
@@ -750,7 +750,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals, hasTiers ? baseTotal : undefined, tierSummary);
       const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
       onClose();
-      // Redireciona para o WhatsApp direto na mesma aba — evita bloqueio de popup após async
+      // Redireciona para o WhatsApp direto na mesma aba - evita bloqueio de popup após async
       window.location.href = waUrl;
     } catch { setError("Erro de conexão. Tente novamente."); }
     finally { setLoading(false); }
@@ -810,7 +810,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 className="w-10 h-10 flex items-center justify-center border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold text-lg">+</button>
             </div>
             {hasTiers && (
-              <p className="text-xs text-gray-400 mt-1.5">Escolha a categoria de cada viajante abaixo — a idade será conferida pela data de nascimento.</p>
+              <p className="text-xs text-gray-400 mt-1.5">Escolha a categoria de cada viajante abaixo - a idade será conferida pela data de nascimento.</p>
             )}
           </div>
 
@@ -878,7 +878,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 <select value={travelerCats[0] ?? ADULT} onChange={e => setTravelerCat(0, e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
                   {[ADULT, ...tiers.map(t => tierLabel(t))].map(l => (
-                    <option key={l} value={l}>{`${l} — R$ ${fmtBRL(priceForLabel(l))}`}</option>
+                    <option key={l} value={l}>{`${l} - R$ ${fmtBRL(priceForLabel(l))}`}</option>
                   ))}
                 </select>
               </div>
@@ -924,7 +924,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                   <select value={travelerCats[i + 1] ?? ADULT} onChange={e => setTravelerCat(i + 1, e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white">
                     {[ADULT, ...tiers.map(t => tierLabel(t))].map(l => (
-                      <option key={l} value={l}>{`${l} — R$ ${fmtBRL(priceForLabel(l))}`}</option>
+                      <option key={l} value={l}>{`${l} - R$ ${fmtBRL(priceForLabel(l))}`}</option>
                     ))}
                   </select>
                 </div>
@@ -970,7 +970,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
 
           <button type="button" onClick={handlePayOnline} disabled={loading || payLoading}
             className="w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-base disabled:opacity-60">
-            {payLoading ? "Abrindo pagamento..." : `Pagar agora — R$ ${fmtBRL(grandTotal)}`}
+            {payLoading ? "Abrindo pagamento..." : `Pagar agora - R$ ${fmtBRL(grandTotal)}`}
           </button>
           <p className="text-center text-xs text-gray-400 -mt-2">
             PIX, cartão (parcelado) ou boleto. Sua vaga é confirmada na hora do pagamento.
@@ -999,7 +999,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
    11. Date Selector
 ═══════════════════════════════════════════ */
 function fmtDate(d: string) {
-  // Always show full date as dd/MM/yyyy — compact and unambiguous
+  // Always show full date as dd/MM/yyyy - compact and unambiguous
   const [y, m, day] = d.slice(0, 10).split("-");
   return `${day}/${m}/${y}`;
 }
@@ -1007,7 +1007,7 @@ function fmtDate(d: string) {
 /* ═══════════════════════════════════════════
    Description Block (collapsible on mobile)
 ═══════════════════════════════════════════ */
-const DESC_THRESHOLD = 220; // chars — abaixo disso não precisa de "ver mais"
+const DESC_THRESHOLD = 220; // chars - abaixo disso não precisa de "ver mais"
 
 function DescriptionBlock({ description }: { description: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -1176,7 +1176,7 @@ function DateSelector({
 }
 
 /* ═══════════════════════════════════════════
-   11b. Compact Date Selector (many dates — grouped by month)
+   11b. Compact Date Selector (many dates - grouped by month)
 ═══════════════════════════════════════════ */
 const COMPACT_THRESHOLD = 20; // acima disso usa o modo compacto
 
@@ -1337,7 +1337,7 @@ function OpenDateCalendar({
                 .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             </p>
           ) : (
-            <p className="text-xs text-gray-400 mt-0.5">Saídas todos os dias — escolha o dia que deseja ir</p>
+            <p className="text-xs text-gray-400 mt-0.5">Saídas todos os dias - escolha o dia que deseja ir</p>
           )}
         </div>
         {hasError && (
@@ -1500,7 +1500,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     : null;
 
   const allImages = [...(trip.image_url ? [trip.image_url] : []), ...(trip.gallery || [])].filter(Boolean);
-  const whatsappFallback = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no pacote *${trip.title}* — ${trip.destination}.`)}`;
+  const whatsappFallback = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no pacote *${trip.title}* - ${trip.destination}.`)}`;
 
   useEffect(() => {
     setNavUser(getStoredUser());
@@ -1530,7 +1530,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   }, []);
 
   // Vai para o checkout (estilo Airbnb). Login/cadastro acontece lá dentro (modal),
-  // então não checamos login aqui nem criamos a reserva — a seleção vai na URL.
+  // então não checamos login aqui nem criamos a reserva - a seleção vai na URL.
   const handleOpenBooking = useCallback(() => {
     if (!selectedTrip) {
       setDateError(true);
@@ -1555,7 +1555,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
 
-      {/* ── Desktop Header — fixed, always visible ── */}
+      {/* ── Desktop Header - fixed, always visible ── */}
       <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white border-b border-gray-100 shadow-sm items-center px-6">
         {/* Left: Logo + Back */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1647,7 +1647,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             <PhotoGrid images={allImages} onOpen={openGallery} />
           </div>
 
-          {/* Date Selector — mobile: before key info; desktop: in right sidebar */}
+          {/* Date Selector - mobile: before key info; desktop: in right sidebar */}
           {siblingTrips.length > 0 && (
             <div className="mb-6 lg:hidden">
               {trip.is_open_date ? (
@@ -1688,18 +1688,18 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* ── Left column ── */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Key info — uses activeTrip so it updates with date selection */}
+              {/* Key info - uses activeTrip so it updates with date selection */}
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 {trip.is_open_date ? (
-                  /* Open date: 3 colunas — Saída (hora), Retorno (hora), Duração */
+                  /* Open date: 3 colunas - Saída (hora), Retorno (hora), Duração */
                   <div className="grid grid-cols-3 divide-x divide-gray-100">
                     <div className="p-5">
                       <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Saída"
-                        value={selectedTrip ? fmtTimeSP(activeTrip.departure_date) : "—"} />
+                        value={selectedTrip ? fmtTimeSP(activeTrip.departure_date) : "-"} />
                     </div>
                     <div className="p-5">
                       <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Retorno"
-                        value={selectedTrip ? fmtTimeSP(activeTrip.return_date) : "—"} />
+                        value={selectedTrip ? fmtTimeSP(activeTrip.return_date) : "-"} />
                     </div>
                     <div className="p-5">
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Duração"
@@ -1713,13 +1713,13 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
                         value={selectedTrip
                           ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                          : "—"} />
+                          : "-"} />
                     </div>
                     <div className="p-5">
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
                         value={selectedTrip
                           ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-                          : "—"} />
+                          : "-"} />
                     </div>
                     <div className="p-5">
                       <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
@@ -1746,7 +1746,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               {/* Description */}
               {trip.description && <DescriptionBlock description={trip.description} />}
 
-              {/* Destination Highlights — hidden on mobile */}
+              {/* Destination Highlights - hidden on mobile */}
               <div className="hidden sm:block">
                 <DestinationHighlights trip={trip} />
               </div>
@@ -2001,7 +2001,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                 </div>
               )}
 
-              {/* Trust Block — hidden on mobile */}
+              {/* Trust Block - hidden on mobile */}
               <div className="hidden sm:block">
                 <TrustBlock maxInstallments={activeTrip.max_installments} />
               </div>
@@ -2042,7 +2042,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
                   <div className="border-t border-gray-100 divide-y divide-gray-100">
 
-                    {/* Selected date row — dropdown trigger */}
+                    {/* Selected date row - dropdown trigger */}
                     <div ref={dateRowRef}>
                       <button
                         type="button"
@@ -2075,7 +2075,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                         )}
                       </button>
 
-                      {/* Fixed-position dropdown — not clipped by overflow:hidden */}
+                      {/* Fixed-position dropdown - not clipped by overflow:hidden */}
                       {showDatePicker && siblingTrips.length > 1 && dropdownPos && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />

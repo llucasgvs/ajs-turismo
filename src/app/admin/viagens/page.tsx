@@ -6,7 +6,7 @@ import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera } f
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
-// Cache em nível de módulo — sobrevive a navegações dentro da SPA, reset no F5
+// Cache em nível de módulo - sobrevive a navegações dentro da SPA, reset no F5
 const _cache: { data: TemplateSummary[] | null; ts: number } = { data: null, ts: 0 };
 const CACHE_TTL = 30_000; // 30 segundos
 
@@ -160,7 +160,7 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
       href={`/admin/viagens/${tmpl.id}`}
       className={`group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-[color,background-color,border-color,box-shadow,transform,opacity] overflow-hidden flex flex-col border border-gray-100 ${!tmpl.is_active ? "opacity-50" : ""}`}
     >
-      {/* Imagem — menor no mobile (h-28), maior no desktop (h-40) */}
+      {/* Imagem - menor no mobile (h-28), maior no desktop (h-40) */}
       <div className="relative h-28 sm:h-40 bg-gray-200 flex-shrink-0">
         {tmpl.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -174,7 +174,7 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
         {/* Aviso discreto: faltam fotos (ideal são 5) */}
         {tmpl.photos_count < 5 && (
           <span
-            title={`${tmpl.photos_count} de 5 fotos — adicione mais`}
+            title={`${tmpl.photos_count} de 5 fotos - adicione mais`}
             className="absolute top-2 right-2 z-10 bg-amber-400/95 text-navy-900 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"
           >
             <Camera size={9} /> {tmpl.photos_count}/5

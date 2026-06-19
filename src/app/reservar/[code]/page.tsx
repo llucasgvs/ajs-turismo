@@ -18,7 +18,7 @@ import { tierLabel } from "@/lib/tiers";
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WA_NUMBER = "5541998348766";
 const ADULT = "Adulto";
-const PIX_MINUTES = 15; // janela de pagamento do PIX (padrão de mercado: 10–30 min)
+const PIX_MINUTES = 15; // janela de pagamento do PIX (padrão de mercado: 10-30 min)
 const PLACEHOLDER = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=60";
 
 interface Trip {
@@ -112,7 +112,7 @@ function ageError(label: string | undefined, birth: string, who: string): string
     return `A data de nascimento de ${who} não corresponde à faixa ${label}. Revise a data ou ajuste a categoria no resumo.`;
   return null;
 }
-/* Campo com rótulo — padrão consistente e profissional para os formulários */
+/* Campo com rótulo - padrão consistente e profissional para os formulários */
 function Field({ label, hint, req, children }: { label: string; hint?: string; req?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -197,7 +197,7 @@ function InstallmentField({ options, value, onChange }: { options: InstallmentOp
   );
 }
 
-/* Aviso de erro padronizado — com ícone e destaque sutil */
+/* Aviso de erro padronizado - com ícone e destaque sutil */
 function ErrorMsg({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-3.5 py-3 reveal-soft">
@@ -207,7 +207,7 @@ function ErrorMsg({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Aviso neutro (âmbar) — para estados que não são erro (ex.: em análise) */
+/* Aviso neutro (âmbar) - para estados que não são erro (ex.: em análise) */
 function InfoMsg({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-xl px-3.5 py-3 reveal-soft">
@@ -217,19 +217,19 @@ function InfoMsg({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Intervalo de datas compacto: "11 – 14 jul 2026" ou "30 jul – 2 ago 2026" */
+/* Intervalo de datas compacto: "11 - 14 jul 2026" ou "30 jul - 2 ago 2026" */
 function fmtDateRange(dep?: string, ret?: string) {
   if (!dep) return "";
   const d1 = new Date(dep.slice(0, 10) + "T12:00:00");
   const mon = (x: Date) => x.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   if (!ret) return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   const d2 = new Date(ret.slice(0, 10) + "T12:00:00");
-  // Bate-e-volta (mesmo dia): mostra só a data, sem intervalo "5 – 5".
+  // Bate-e-volta (mesmo dia): mostra só a data, sem intervalo "5 - 5".
   if (dep.slice(0, 10) === ret.slice(0, 10))
     return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
-    return `${d1.getDate()} – ${d2.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
-  return `${d1.getDate()} ${mon(d1)} – ${d2.getDate()} ${mon(d2)} ${d2.getFullYear()}`;
+    return `${d1.getDate()} - ${d2.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
+  return `${d1.getDate()} ${mon(d1)} - ${d2.getDate()} ${mon(d2)} ${d2.getFullYear()}`;
 }
 /* Versão por extenso (telas maiores): "11 a 14 de julho de 2026" */
 function fmtDateRangeFull(dep?: string, ret?: string) {
@@ -358,7 +358,7 @@ function BookingCheckout({ code }: { code: string }) {
       <div className="text-center"><p className="text-gray-600 mb-4">Não encontramos esta reserva.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div>
     </main>
   );
-  // Reserva em estado que não pode ser paga — mostra mensagem clara (nunca o checkout).
+  // Reserva em estado que não pode ser paga - mostra mensagem clara (nunca o checkout).
   if (["cancelled", "refunded", "completed"].includes(booking.status))
     return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status={booking.status} /></div><Footer /></div>;
 
@@ -432,7 +432,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       tier_breakdown: tier_breakdown.map(t => ({ label: t.label, qty: t.qty, price: priceOf(t.label) })),
     });
 
-    // Pré-login (sem code): edição local, sem servidor — o preço é recalculado
+    // Pré-login (sem code): edição local, sem servidor - o preço é recalculado
     // de forma autoritativa quando a reserva for criada.
     if (!code) { if (my === seq.current) setBusy(false); return; }
 
@@ -468,7 +468,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     const selected_optionals = trip.optionals.filter(o => opts.has(o.name));
     const total = hasTiers ? Object.values(tierCounts).reduce((a, b) => a + b, 0) : people;
 
-    // Otimista: a data (e o preço, quando não há faixas) muda na hora — sem isso
+    // Otimista: a data (e o preço, quando não há faixas) muda na hora - sem isso
     // a lista fecha e nada parece acontecer por 1-2s até o PATCH responder.
     const target = dates.find(d => d.id === tid);
     if (target) {
@@ -821,7 +821,7 @@ function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amo
   const [remaining, setRemaining] = useState<number | null>(null);
   const [info, setInfo] = useState("");
 
-  // Segurança/UX: se o valor da reserva mudar, o QR antigo é inválido — descarta.
+  // Segurança/UX: se o valor da reserva mudar, o QR antigo é inválido - descarta.
   const lastAmount = useRef(amount);
   const hadQr = useRef(false);
   useEffect(() => { hadQr.current = !!qr; }, [qr]);
@@ -840,12 +840,12 @@ function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amo
       if (!r.ok) { const e = await r.json(); setError(typeof e.detail === "string" ? e.detail : "Erro ao gerar o PIX."); return; }
       const d = await r.json();
       // Janela de pagamento (urgência clara). O código real do Asaas dura mais,
-      // então se passar disso é só gerar outro — a confirmação continua valendo.
+      // então se passar disso é só gerar outro - a confirmação continua valendo.
       setQr({ image: d.qr_image, payload: d.qr_payload, expiresAt: Date.now() + PIX_MINUTES * 60 * 1000 });
     } catch { setError("Erro de conexão."); } finally { setLoading(false); }
   };
 
-  // Polling de confirmação — segue mesmo após expirar a janela (pagamento tardio ainda confirma)
+  // Polling de confirmação - segue mesmo após expirar a janela (pagamento tardio ainda confirma)
   const expired = remaining !== null && remaining <= 0;
   useEffect(() => {
     if (!qr) return;
@@ -921,7 +921,7 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
       if (j.erro) { setCepInfo({ text: "CEP não encontrado", ok: false }); return; }
       const parts = [j.logradouro, j.bairro].filter(Boolean).join(", ");
       setCepInfo({ text: `${parts ? parts + " · " : ""}${j.localidade}/${j.uf}`, ok: true });
-    } catch { /* offline — não bloqueia */ }
+    } catch { /* offline - não bloqueia */ }
   };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); setInfo("");
@@ -987,7 +987,7 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
         )}
       </div>
 
-      {/* Valor a pagar, logo antes do botão — só no mobile (no desktop já está no resumo à direita) */}
+      {/* Valor a pagar, logo antes do botão - só no mobile (no desktop já está no resumo à direita) */}
       {(() => {
         const sel = options.find(o => o.n === installments);
         const com = sel && !sel.interest_free;
@@ -1022,7 +1022,7 @@ function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
     const L: string[] = [];
     L.push("Olá! Quero reservar pela AJS Turismo.");
     L.push("");
-    L.push(`*${booking.trip_title || "Viagem"}*${booking.trip_destination ? ` — ${booking.trip_destination}` : ""}`);
+    L.push(`*${booking.trip_title || "Viagem"}*${booking.trip_destination ? ` - ${booking.trip_destination}` : ""}`);
     if (booking.trip_departure_date) {
       L.push(`Data: ${fmtDateRange(booking.trip_departure_date, booking.trip_return_date)}`);
     }
@@ -1066,7 +1066,7 @@ function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
           <p className="text-gray-500 text-sm mb-4">Não abriu? <a href={buildUrl()} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-semibold underline">Toque aqui</a> para abrir de novo.</p>
         </>
       ) : (
-        <p className="text-gray-500 text-sm mb-4">Abrimos o WhatsApp (em nova aba) com sua reserva preenchida. Nossa equipe confirma os detalhes e o pagamento com você — e a reserva continua aqui caso prefira pagar online.</p>
+        <p className="text-gray-500 text-sm mb-4">Abrimos o WhatsApp (em nova aba) com sua reserva preenchida. Nossa equipe confirma os detalhes e o pagamento com você - e a reserva continua aqui caso prefira pagar online.</p>
       )}
       <button onClick={go} disabled={loading} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-60 inline-flex items-center gap-2"><MessageCircle size={17} /> {loading ? "Abrindo..." : sent ? "Abrir novamente" : "Continuar no WhatsApp"}</button>
     </div>
@@ -1122,7 +1122,7 @@ function PreCheckout() {
       });
       if (!res.ok) { const e = await res.json(); setError(typeof e.detail === "string" ? e.detail : "Não foi possível iniciar a reserva."); setCreating(false); return; }
       const d = await res.json();
-      // Passa a viagem adiante p/ a tela [code] renderizar na hora — só se a data não mudou
+      // Passa a viagem adiante p/ a tela [code] renderizar na hora - só se a data não mudou
       // (se mudou, o trip_id difere; a tela [code] busca a viagem certa).
       try { if (trip && payload.trip_id === trip.id) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
       router.replace(`/reservar/${d.booking_code}`);
@@ -1181,7 +1181,7 @@ function PreCheckout() {
                 </div>
                 <div className="px-5 pb-5">
                   {error && <div className="mb-3"><ErrorMsg>{error}</ErrorMsg></div>}
-                  <p className="text-sm text-gray-500 mb-3">Para concluir sua reserva, entre na sua conta ou crie uma — leva menos de 1 minuto.</p>
+                  <p className="text-sm text-gray-500 mb-3">Para concluir sua reserva, entre na sua conta ou crie uma - leva menos de 1 minuto.</p>
                   <button onClick={() => { if (getToken()) createBooking(); else setShowAuth(true); }} disabled={creating}
                     className="w-full sm:w-auto bg-navy-700 hover:bg-navy-600 text-white font-bold py-3 px-8 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
                     {creating ? <><Loader2 size={17} className="animate-spin" /> Aguarde…</> : "Continuar"}

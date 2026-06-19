@@ -80,7 +80,7 @@ export default function LoginPage() {
             <blockquote className="text-white/90 text-2xl font-display font-bold leading-snug mb-4">
               &ldquo;Viajar é a única coisa que você compra que te torna mais rico.&rdquo;
             </blockquote>
-            <p className="text-white/50 text-sm">— Anônimo</p>
+            <p className="text-white/50 text-sm">- Anônimo</p>
           </div>
         </div>
       </div>

@@ -19,7 +19,7 @@ async function getTrip(id: string): Promise<Trip | null> {
 }
 
 // Pré-renderiza no build apenas as viagens que os cards realmente linkam
-// (first_trip_id de cada roteiro — ~1 por roteiro), evitando gerar centenas de
+// (first_trip_id de cada roteiro - ~1 por roteiro), evitando gerar centenas de
 // páginas para datas diárias (ex: Beto Carrero). As demais datas caem em render
 // sob demanda (dynamicParams), o que é raro.
 export async function generateStaticParams() {
@@ -69,7 +69,7 @@ export async function generateMetadata({
       canonical: pageUrl,
     },
     openGraph: {
-      title: `${trip.title} — AJS Turismo`,
+      title: `${trip.title} - AJS Turismo`,
       description,
       url: pageUrl,
       siteName: "AJS Turismo",
@@ -79,7 +79,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${trip.title} — AJS Turismo`,
+      title: `${trip.title} - AJS Turismo`,
       description,
       images: ogImage.map((i) => i.url),
     },

@@ -81,7 +81,7 @@ export default function RedefinirSenhaPage() {
             <blockquote className="text-white/90 text-2xl font-display font-bold leading-snug mb-4">
               &ldquo;A vida é curta demais para ficar no mesmo lugar.&rdquo;
             </blockquote>
-            <p className="text-white/50 text-sm">— Anônimo</p>
+            <p className="text-white/50 text-sm">- Anônimo</p>
           </div>
         </div>
       </div>

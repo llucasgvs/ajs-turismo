@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { MapPin, Home, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Página não encontrada — AJS Turismo",
+  title: "Página não encontrada - AJS Turismo",
 };
 
 export default function NotFound() {

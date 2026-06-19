@@ -2,7 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /**
  * fetch com timeout. Sem isso, um backend lento/travado deixa a tela girando
- * para sempre — o fetch padrão nunca desiste. No timeout, rejeita (AbortError),
+ * para sempre - o fetch padrão nunca desiste. No timeout, rejeita (AbortError),
  * o que faz o `finally` das páginas desligar o spinner em vez de pendurar.
  */
 export async function fetchWithTimeout(
