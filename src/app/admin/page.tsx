@@ -32,7 +32,7 @@ const daysSince = (d: string) => Math.floor((Date.now() - new Date(d).getTime())
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 const todayLabel = () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 const fmtR = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-const fmtRk = (n: number) => n >= 1000 ? `R$ ${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `R$ ${Math.round(n)}`;
+const fmtRk = (n: number) => n >= 1000 ? `R$ ${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".", ",")}k` : `R$ ${Math.round(n)}`;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
 /** plural: plw(2,"venda","vendas") → "2 vendas" */
@@ -263,7 +263,11 @@ export default function AdminDashboard() {
                     const last = i === series.length - 1;
                     const active = hoverIdx === i;
                     return <div key={p.month} className="flex-1 flex flex-col h-full min-w-0 cursor-default" onMouseEnter={() => setHoverIdx(i)}>
-                      <span className={`h-4 text-[9px] font-bold tabular-nums text-center truncate ${last ? "text-gold-600" : "text-navy-500"} ${p.revenue > 0 ? "" : "opacity-0"}`}>{p.revenue > 0 ? fmtRk(p.revenue) : "·"}</span>
+                      <div className="h-4 relative">
+                        {p.revenue > 0 && (
+                          <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums ${last ? "text-gold-600" : "text-navy-500"}`}>{fmtRk(p.revenue)}</span>
+                        )}
+                      </div>
                       <div className="flex-1 flex items-end justify-center px-px">
                         <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} />
                       </div>
