@@ -277,7 +277,21 @@ function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text
 const hasFullName = (v: string) => v.trim().split(/\s+/).filter(Boolean).length >= 2;
 const vName = (v: string) => hasFullName(v);
 const vCpf = (v: string) => validateCPF(v);
-const vPhone = (v: string) => onlyDigits(v).length >= 10;
+// Padroniza capitalização: "lucas gabriel da silva" -> "Lucas Gabriel da Silva".
+const NAME_LOWER = new Set(["de", "da", "do", "das", "dos", "e", "di", "du", "del", "von", "van"]);
+const titleName = (v: string) => v.trim().split(/\s+/).filter(Boolean)
+  .map((p, i) => { const l = p.toLowerCase(); return i > 0 && NAME_LOWER.has(l) ? l : l.charAt(0).toUpperCase() + l.slice(1); })
+  .join(" ");
+// Telefone BR igual ao servidor: 10/11 dígitos, DDD válido, celular com 9.
+const VALID_DDD = new Set([11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24, 27, 28, 31, 32, 33, 34, 35, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 53, 54, 55, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 73, 74, 75, 77, 79, 81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 92, 93, 94, 95, 96, 97, 98, 99]);
+const vPhone = (v: string) => {
+  let d = onlyDigits(v);
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  if (d.length !== 10 && d.length !== 11) return false;
+  if (!VALID_DDD.has(parseInt(d.slice(0, 2)))) return false;
+  if (d.length === 11 && d[2] !== "9") return false;
+  return true;
+};
 
 function cardBrand(num: string): string | null {
   const n = num.replace(/\D/g, "");
@@ -689,7 +703,7 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
     if (!hasFullName(fullName)) return setError("Informe seu nome e sobrenome.");
     if (!validateCPF(cpf)) return setError("CPF inválido.");
     if (!birth) return setError("Informe sua data de nascimento.");
-    if (onlyDigits(phone).length < 10) return setError("Telefone inválido (com DDD).");
+    if (!vPhone(phone)) return setError("Telefone inválido (com DDD; celular começa com 9).");
     const te = ageError(titularCat, birth, "Titular");
     if (te) return setError(te);
     for (const [i, c] of companions.entries()) {
@@ -699,9 +713,12 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
       const ce = ageError(compCat(i), c.birth_date, `Acompanhante ${i + 1}`);
       if (ce) return setError(ce);
     }
+    // Padroniza a capitalização dos nomes antes de salvar.
+    const fn = titleName(fullName);
+    const comps = companions.map(c => ({ ...c, full_name: titleName(c.full_name) }));
     setSaving(true);
     try {
-      const r = await apiFetch(`/payments/${code}/travelers`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ full_name: fullName, cpf, phone, birth_date: birth, companions }) });
+      const r = await apiFetch(`/payments/${code}/travelers`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ full_name: fn, cpf, phone, birth_date: birth, companions: comps }) });
       if (!r.ok) {
         const e = await r.json().catch(() => null);
         const msg = typeof e?.detail === "string"
@@ -711,7 +728,7 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
             : "Erro ao salvar dados.";
         setError(msg); return;
       }
-      localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, cpf, phone, birth_date: birth }));
+      localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fn, cpf, phone, birth_date: birth }));
       onDone();
     } catch { setError("Erro de conexão."); } finally { setSaving(false); }
   };
