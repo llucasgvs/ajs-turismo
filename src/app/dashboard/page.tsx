@@ -243,7 +243,7 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
                 {b.trip_departure_date ? (roundtrip ? `${fmtDate(b.trip_departure_date)} · bate e volta` : `${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "Data a definir"}
               </span>
               <span className="flex items-center gap-1"><Users size={11} className="text-gold-500" /> {pessoas(b.num_travelers)}</span>
-              {b.status !== "interesse" && b.final_amount > 0 && <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>}
+              {variant !== "interesse" && variant !== "past" && b.final_amount > 0 && <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>}
             </div>
           </div>
         </div>
