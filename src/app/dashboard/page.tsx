@@ -181,9 +181,6 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
             <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "—"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
             <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(b.final_amount)}</span>
           </div>
-          {b.base_amount != null && b.final_amount > b.base_amount + 0.01 && (
-            <p className="text-[11px] text-gray-400 mt-1">À vista R$ {fmtBRL(b.base_amount)} · inclui R$ {fmtBRL(b.final_amount - b.base_amount)} de juros do parcelamento</p>
-          )}
         </VBlock>
       </div>
 
