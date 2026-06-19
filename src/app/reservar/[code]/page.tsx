@@ -909,7 +909,7 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
   const DEV = API.includes("localhost");
   const [number, setNumber] = useState(DEV ? "5162 3062 1937 8829" : ""); const [holder, setHolder] = useState(DEV ? "CLIENTE TESTE" : (user?.full_name || "").toUpperCase());
   const [expiry, setExpiry] = useState(DEV ? "12/30" : ""); const [ccv, setCcv] = useState(DEV ? "318" : "");
-  const [cep, setCep] = useState(DEV ? "01310-930" : ""); const [addr, setAddr] = useState(DEV ? "100" : ""); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [info, setInfo] = useState("");
+  const [cep, setCep] = useState(DEV ? "01310-930" : (user?.postal_code ? maskCEP(user.postal_code) : "")); const [addr, setAddr] = useState(DEV ? "100" : (user?.address_number || "")); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [info, setInfo] = useState("");
   const [cepInfo, setCepInfo] = useState<{ text: string; ok: boolean } | null>(null);
   const onCep = async (v: string) => {
     const m = maskCEP(v); setCep(m); setCepInfo(null);
@@ -936,6 +936,8 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
       const r = await apiFetch(`/payments/${code}/card`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ holder_name: holder, number: num, expiry_month: mm, expiry_year: yy, ccv, cpf: onlyDigits(user?.cpf || ""), postal_code: onlyDigits(cep), address_number: addr, phone: onlyDigits(user?.phone || ""), installments }) });
       const d = await r.json();
       if (!r.ok) { setError(typeof d.detail === "string" ? d.detail : "Pagamento não autorizado. Confira os dados do cartão."); return; }
+      // Reaproveita o endereço de cobrança na próxima compra (sem re-login).
+      try { if (user) localStorage.setItem("ajs_user", JSON.stringify({ ...user, postal_code: onlyDigits(cep), address_number: addr })); } catch { /* ignore */ }
       if (d.status === "confirmed") onConfirmed();
       else setInfo(d.message || "Pagamento em análise. Você será avisado assim que for confirmado.");
     } catch { setError("Erro de conexão. Tente novamente."); } finally { setLoading(false); }

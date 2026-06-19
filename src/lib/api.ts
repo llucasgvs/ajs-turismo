@@ -28,6 +28,8 @@ export interface StoredUser {
   cpf?: string;
   phone?: string;
   birth_date?: string;
+  postal_code?: string;
+  address_number?: string;
 }
 
 export function getToken(): string | null {
