@@ -273,7 +273,9 @@ function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text
     </div>
   );
 }
-const vName = (v: string) => v.trim().length >= 3;
+// Nome completo = nome + sobrenome (mesma regra do servidor).
+const hasFullName = (v: string) => v.trim().split(/\s+/).filter(Boolean).length >= 2;
+const vName = (v: string) => hasFullName(v);
 const vCpf = (v: string) => validateCPF(v);
 const vPhone = (v: string) => onlyDigits(v).length >= 10;
 
@@ -684,14 +686,14 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 
   const save = async () => {
     setError("");
-    if (fullName.trim().length < 3) return setError("Informe seu nome completo.");
+    if (!hasFullName(fullName)) return setError("Informe seu nome e sobrenome.");
     if (!validateCPF(cpf)) return setError("CPF inválido.");
     if (!birth) return setError("Informe sua data de nascimento.");
     if (onlyDigits(phone).length < 10) return setError("Telefone inválido (com DDD).");
     const te = ageError(titularCat, birth, "Titular");
     if (te) return setError(te);
     for (const [i, c] of companions.entries()) {
-      if (c.full_name.trim().length < 3) return setError(`Nome do acompanhante ${i + 1} inválido.`);
+      if (!hasFullName(c.full_name)) return setError(`Informe nome e sobrenome do acompanhante ${i + 1}.`);
       if (!validateCPF(c.cpf)) return setError(`CPF do acompanhante ${i + 1} inválido.`);
       if (!c.birth_date) return setError(`Data de nascimento do acompanhante ${i + 1} obrigatória.`);
       const ce = ageError(compCat(i), c.birth_date, `Acompanhante ${i + 1}`);
@@ -700,7 +702,15 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
     setSaving(true);
     try {
       const r = await apiFetch(`/payments/${code}/travelers`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ full_name: fullName, cpf, phone, birth_date: birth, companions }) });
-      if (!r.ok) { const e = await r.json(); setError(typeof e.detail === "string" ? e.detail : "Erro ao salvar dados."); return; }
+      if (!r.ok) {
+        const e = await r.json().catch(() => null);
+        const msg = typeof e?.detail === "string"
+          ? e.detail
+          : Array.isArray(e?.detail)
+            ? "Confira os dados: nome e sobrenome, CPF e telefone válidos."
+            : "Erro ao salvar dados.";
+        setError(msg); return;
+      }
       localStorage.setItem("ajs_user", JSON.stringify({ ...user, full_name: fullName, cpf, phone, birth_date: birth }));
       onDone();
     } catch { setError("Erro de conexão."); } finally { setSaving(false); }
@@ -719,7 +729,7 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
           {/* Titular */}
           <div className="rounded-xl border border-gray-100 p-4 space-y-3">
             <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex items-center gap-1.5"><User size={13} /> Titular {titularCat && <span className="ml-1 normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{titularCat}</span>}</p>
-            <Field label="Nome completo" req><VInput value={fullName} onChange={setFullName} validate={vName} errorMsg="Informe o nome completo." placeholder="Seu nome completo" /></Field>
+            <Field label="Nome completo" req><VInput value={fullName} onChange={setFullName} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Seu nome completo" /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="CPF" req><VInput value={cpf} onChange={v => setCpf(maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
               <Field label="Telefone" req><VInput value={phone} onChange={v => setPhone(maskPhone(v))} validate={vPhone} errorMsg="Telefone incompleto." placeholder="(00) 00000-0000" inputMode="numeric" /></Field>
@@ -731,7 +741,7 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
           {companions.map((c, i) => (
             <div key={i} className="rounded-xl border border-gray-100 p-4 space-y-3">
               <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex items-center gap-1.5"><Users size={13} /> Acompanhante {i + 1} {compCat(i) && <span className="ml-1 normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{compCat(i)}</span>}</p>
-              <Field label="Nome completo" req><VInput value={c.full_name} onChange={v => setComp(i, "full_name", v)} validate={vName} errorMsg="Informe o nome completo." placeholder="Nome completo" /></Field>
+              <Field label="Nome completo" req><VInput value={c.full_name} onChange={v => setComp(i, "full_name", v)} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Nome completo" /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="CPF" req><VInput value={c.cpf} onChange={v => setComp(i, "cpf", maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
                 <Field label="Data de nascimento" req hint={compCat(i) || undefined}><VInput value={c.birth_date} onChange={v => setComp(i, "birth_date", v)} validate={v => !!v && !ageError(compCat(i), v, "")} errorMsg={compCat(i) ? `A idade não corresponde à faixa ${compCat(i)}.` : undefined} type="date" showIcon={false} /></Field>
