@@ -15,7 +15,7 @@ interface StoredUser { full_name: string; email: string; is_admin: boolean }
 interface Optional { name: string; price: number }
 interface Booking {
   id: number; booking_code: string; trip_id: number; num_travelers: number;
-  price_per_person: number; final_amount: number; status: string; created_at: string;
+  price_per_person: number; final_amount: number; base_amount?: number; status: string; created_at: string;
   traveler_name?: string | null; payment_method?: string | null; installments?: number;
   selected_optionals?: Optional[]; travelers_info?: string | null;
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
@@ -181,6 +181,9 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
             <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "—"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
             <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(b.final_amount)}</span>
           </div>
+          {b.base_amount != null && b.final_amount > b.base_amount + 0.01 && (
+            <p className="text-[11px] text-gray-400 mt-1">À vista R$ {fmtBRL(b.base_amount)} · inclui R$ {fmtBRL(b.final_amount - b.base_amount)} de juros do parcelamento</p>
+          )}
         </VBlock>
       </div>
 
