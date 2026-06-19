@@ -99,6 +99,9 @@ export default function AdminDashboard() {
   const [chartMode, setChartMode] = useState<"day" | "month">("day");
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [margin, setMargin] = useState(20); // margem presumida (%), só exibição
+  useEffect(() => { const m = Number(localStorage.getItem("ajs_admin_margin")); if (m >= 0 && m <= 100) setMargin(m); }, []);
+  const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
 
   const load = useCallback(async (silent = false) => {
     silent ? setRefreshing(true) : setLoading(true);
@@ -154,16 +157,7 @@ export default function AdminDashboard() {
   const maxRev = Math.max(1, ...series.map(s => s.revenue));
 
   const monthCount = stats?.month_confirmed ?? 0;
-  // Destaques do MÊS (derivados da série diária — nada acumulado).
-  const _today = new Date();
-  const dayOfMonth = _today.getDate();
-  const monthDays = sDay.slice(0, dayOfMonth);
-  const daysWithSales = monthDays.filter(d => d.count > 0).length;
-  const bestDay = monthDays.reduce<RevPoint | null>((a, b) => (b.revenue > (a?.revenue ?? -1) ? b : a), null);
-  let _lastSaleDay = 0;
-  monthDays.forEach(d => { if (d.count > 0) _lastSaleDay = parseInt(d.label); });
-  const lastSaleAgo = _lastSaleDay > 0 ? dayOfMonth - _lastSaleDay : -1;
-  const lastSaleLabel = lastSaleAgo < 0 ? "sem vendas" : lastSaleAgo === 0 ? "hoje" : lastSaleAgo === 1 ? "ontem" : `há ${lastSaleAgo} dias`;
+  const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
 
   const catTotal = (an?.by_category ?? []).reduce((s, c) => s + c.revenue, 0);
 
@@ -222,11 +216,26 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* destaques do mês */}
-          <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
-            <HeroStat label="Melhor dia" value={loading || !bestDay || bestDay.revenue <= 0 ? "-" : fmtRk(bestDay.revenue)} sub={bestDay && bestDay.revenue > 0 ? `dia ${bestDay.label}` : "sem vendas ainda"} />
-            <HeroStat label="Última venda" value={loading ? "-" : lastSaleLabel} sub={_lastSaleDay > 0 ? `dia ${_lastSaleDay}` : undefined} />
-            <HeroStat label="Dias com venda" value={loading ? "-" : `${daysWithSales} de ${dayOfMonth}`} sub="dias do mês" />
+          {/* lucro presumido (estimativa interativa) */}
+          <div className="border-t border-white/10 pt-4">
+            <div className="flex items-end justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Lucro presumido <span className="text-navy-400 normal-case">(estimativa)</span></p>
+                <p className="text-2xl sm:text-3xl font-display font-black tabular-nums mt-0.5 text-gold-300 leading-none">{loading ? "-" : fmtR(profit)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Margem</p>
+                <p className="text-xl font-display font-black tabular-nums leading-none mt-0.5">{margin}%</p>
+              </div>
+            </div>
+            <input
+              type="range" min={0} max={100} step={1} value={margin}
+              onChange={e => onMargin(Number(e.target.value))}
+              aria-label="Margem de lucro presumida"
+              className="mt-3 w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/15 accent-gold-400"
+              style={{ background: `linear-gradient(to right, rgb(212 175 90) ${margin}%, rgba(255,255,255,0.15) ${margin}%)` }}
+            />
+            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita do mês. Ajuste a margem para a sua realidade.</p>
           </div>
         </div>
         {/* KPIs de apoio */}
@@ -413,17 +422,6 @@ function MiniKpi({ icon, label, value, sub, href }: { icon: React.ReactNode; lab
     </div>
   );
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
-}
-
-/* ─── Stat dentro do card-herói (navy) ─── */
-function HeroStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold truncate">{label}</p>
-      <p className="text-lg sm:text-xl font-display font-black tabular-nums mt-0.5 leading-none">{value}</p>
-      {sub && <p className="text-navy-300 text-[10px] mt-1 truncate">{sub}</p>}
-    </div>
-  );
 }
 
 /* ─── Follow-up list ─── */
