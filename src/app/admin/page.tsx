@@ -154,6 +154,16 @@ export default function AdminDashboard() {
   const maxRev = Math.max(1, ...series.map(s => s.revenue));
   const sparkMax = Math.max(1, ...sMonth.map(s => s.revenue));
 
+  // Métricas do mês para o card-herói (tudo derivado de dados reais).
+  const monthCount = stats?.month_confirmed ?? 0;
+  const ticketMes = monthCount > 0 ? curRev / monthCount : 0;
+  const _now = new Date();
+  const dayOfMonth = _now.getDate();
+  const daysInMonth = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).getDate();
+  const projection = dayOfMonth > 0 ? (curRev / dayOfMonth) * daysInMonth : curRev;
+  const monthDays = sDay.slice(0, dayOfMonth);
+  const bestDay = monthDays.reduce<RevPoint | null>((a, b) => (b.revenue > (a?.revenue ?? -1) ? b : a), null);
+
   const catTotal = (an?.by_category ?? []).reduce((s, c) => s + c.revenue, 0);
 
   /* feed de ações priorizado */
@@ -196,30 +206,39 @@ export default function AdminDashboard() {
       <Eyebrow kicker="Visão geral" title="Como o mês está indo" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Hero */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-6 text-white shadow-card flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="flex-1">
-            <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
-            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "-" : fmtR(curRev)}</p>
-            <div className="flex items-center gap-3 mt-2 text-sm">
-              <span className="text-navy-100">{plw(stats?.month_confirmed ?? 0, "venda", "vendas")}</span>
-              {!loading && hasPrev && (
-                <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-                  {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mês anterior
-                </span>
-              )}
-              {!loading && !hasPrev && <span className="text-navy-300 text-xs">sem comparativo anterior</span>}
+        <div className="lg:col-span-2 bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-6 text-white shadow-card flex flex-col justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div className="flex-1">
+              <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
+              <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "-" : fmtR(curRev)}</p>
+              <div className="flex items-center gap-3 mt-2 text-sm">
+                <span className="text-navy-100">{plw(monthCount, "venda", "vendas")}</span>
+                {!loading && hasPrev && (
+                  <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mês anterior
+                  </span>
+                )}
+                {!loading && !hasPrev && monthCount > 0 && <span className="text-navy-300 text-xs">primeiro mês com vendas registradas</span>}
+              </div>
+            </div>
+            {/* sparkline 6 meses */}
+            <div className="flex items-end gap-1.5 h-20 sm:w-48 shrink-0">
+              {sMonth.map((p, i) => {
+                const h = Math.round((p.revenue / sparkMax) * 100);
+                const last = i === sMonth.length - 1;
+                return <div key={p.month} className="flex-1 flex flex-col items-center justify-end h-full" title={`${p.label}: ${fmtR(p.revenue)}`}>
+                  <div className={`w-full rounded-t transition-colors ${last ? "bg-gold-400" : "bg-white/25"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 6 : 2)}%` }} />
+                  <span className={`text-[9px] mt-1 ${last ? "text-gold-300 font-bold" : "text-navy-300"}`}>{p.label}</span>
+                </div>;
+              })}
             </div>
           </div>
-          {/* sparkline 6 meses */}
-          <div className="flex items-end gap-1.5 h-16 sm:w-44">
-            {sMonth.map((p, i) => {
-              const h = Math.round((p.revenue / sparkMax) * 100);
-              const last = i === sMonth.length - 1;
-              return <div key={p.month} className="flex-1 flex flex-col items-center justify-end h-full" title={`${p.label}: ${fmtR(p.revenue)}`}>
-                <div className={`w-full rounded-t ${last ? "bg-gold-400" : "bg-white/25"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 6 : 2)}%` }} />
-                <span className={`text-[9px] mt-1 ${last ? "text-gold-300 font-bold" : "text-navy-300"}`}>{p.label}</span>
-              </div>;
-            })}
+
+          {/* faixa de métricas do mês */}
+          <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
+            <HeroStat label="Ticket médio do mês" value={loading ? "-" : fmtR(ticketMes)} />
+            <HeroStat label="Projeção no ritmo" value={loading ? "-" : fmtR(projection)} sub={`até ${daysInMonth}/${String(_now.getMonth() + 1).padStart(2, "0")}`} />
+            <HeroStat label="Melhor dia" value={loading || !bestDay || bestDay.revenue <= 0 ? "-" : fmtRk(bestDay.revenue)} sub={bestDay && bestDay.revenue > 0 ? `dia ${bestDay.label}` : undefined} />
           </div>
         </div>
         {/* KPIs de apoio */}
@@ -406,6 +425,17 @@ function MiniKpi({ icon, label, value, sub, href }: { icon: React.ReactNode; lab
     </div>
   );
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
+}
+
+/* ─── Stat dentro do card-herói (navy) ─── */
+function HeroStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold truncate">{label}</p>
+      <p className="text-lg sm:text-xl font-display font-black tabular-nums mt-0.5 leading-none">{value}</p>
+      {sub && <p className="text-navy-300 text-[10px] mt-1 truncate">{sub}</p>}
+    </div>
+  );
 }
 
 /* ─── Follow-up list ─── */
