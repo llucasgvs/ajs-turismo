@@ -122,13 +122,16 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
       {/* Faixa principal: contagem (pílula) + Data e Código empilhados */}
       <div className="px-5 py-4 border-b border-dashed border-gray-200 flex items-stretch gap-4">
         {days !== null && (
-          <div className="print:hidden shrink-0 flex flex-col items-center justify-center bg-navy-50 rounded-xl px-3.5 min-w-[64px]">
+          <div className="print:hidden shrink-0 flex flex-col items-center justify-center bg-navy-50 rounded-xl px-4 min-w-[72px]">
             {days <= 0 ? (
               <p className="font-display font-black text-lg leading-none text-navy-800">Hoje</p>
+            ) : days === 1 ? (
+              <p className="font-display font-black text-lg leading-none text-navy-800">Amanhã</p>
             ) : (
               <>
-                <p className="font-display font-black text-2xl leading-none text-navy-800">{days}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{days === 1 ? "dia" : "dias"}</p>
+                <p className="text-[9px] uppercase tracking-wide text-gray-400 font-semibold">faltam</p>
+                <p className="font-display font-black text-2xl leading-none text-navy-800 mt-0.5">{days}</p>
+                <p className="text-[10px] text-gray-400">dias</p>
               </>
             )}
           </div>
