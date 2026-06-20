@@ -191,6 +191,18 @@ body {
 @keyframes reveal-soft { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .reveal-soft { animation: reveal-soft 200ms var(--ease-out) both; }
 
+/* Troca de voucher: entra suave com leve subida + blur que mascara o crossfade */
+@keyframes voucher-swap {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.voucher-swap { animation: voucher-swap 240ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  /* movimento sai; mantém só o fade pra não perder a noção de troca */
+  @keyframes voucher-swap { from { opacity: 0; } to { opacity: 1; } }
+  .voucher-swap { animation: voucher-swap 160ms ease both; }
+}
+
 /* Stagger em cascata para grades de cards */
 .stagger-in > * {
   opacity: 0;

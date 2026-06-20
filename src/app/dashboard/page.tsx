@@ -380,17 +380,17 @@ export default function Dashboard() {
               hasUpcoming ? (
                 <div className="space-y-3">
                   {upcomingConfirmed.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
+                    <div className="flex gap-2 print:hidden">
                       {upcomingConfirmed.map((b, i) => (
-                        <button key={b.id} onClick={() => setVIdx(i)} className={`flex-shrink-0 text-left rounded-xl border px-3 py-2 transition-colors ${i === vIdx ? "bg-navy-800 border-navy-800 text-white" : "bg-white border-gray-200 text-navy-700 hover:border-navy-300"}`}>
-                          <p className="text-[10px] uppercase tracking-wide font-semibold opacity-70">{i === 0 ? "Próxima" : `Viagem ${i + 1}`}</p>
-                          <p className="text-xs font-bold leading-tight max-w-[160px] truncate">{b.trip_title ?? "Viagem"}</p>
-                          {b.trip_departure_date && <p className="text-[11px] opacity-80">{fmtDate(b.trip_departure_date)}</p>}
+                        <button key={b.id} onClick={() => setVIdx(i)} className={`flex-1 min-w-0 text-left rounded-xl border px-3 py-2 transition-[transform,background-color,border-color,box-shadow] duration-150 ease-out active:scale-[.98] ${i === vIdx ? "bg-navy-800 border-navy-800 text-white shadow-sm" : "bg-white border-gray-200 text-navy-700 hover:border-navy-300"}`}>
+                          <p className="text-[10px] uppercase tracking-wide font-semibold opacity-70 truncate">{i === 0 ? "Próxima" : `Viagem ${i + 1}`}</p>
+                          <p className="text-xs font-bold leading-tight truncate">{b.trip_title ?? "Viagem"}</p>
+                          {b.trip_departure_date && <p className="text-[11px] opacity-80 truncate">{fmtDate(b.trip_departure_date)}</p>}
                         </button>
                       ))}
                     </div>
                   )}
-                  {voucher && <Voucher b={voucher} userName={user.full_name} />}
+                  {voucher && <div key={vIdx} className="voucher-swap"><Voucher b={voucher} userName={user.full_name} /></div>}
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-12 px-6">
