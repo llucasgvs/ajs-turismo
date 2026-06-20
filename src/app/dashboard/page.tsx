@@ -121,7 +121,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
       </div>
 
       {/* Faixa principal: contagem + datas + código */}
-      <div className="px-5 py-4 border-b border-dashed border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-3 justify-between">
+      <div className="px-5 py-4 border-b border-dashed border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-3 justify-between">
         {days !== null && (
           <div className="print:hidden">
             <p className="font-display font-black text-2xl leading-none text-navy-800">{days <= 0 ? "🎉" : days}</p>
@@ -157,7 +157,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         {/* Extras comprados */}
         {opts.length > 0 && (
           <VBlock icon={<Sparkles size={13} className="text-gold-500" />} title="Extras comprados">
-            <ul className="space-y-1">{opts.map((o, i) => <li key={i} className="flex items-center justify-between text-sm"><span className="text-gray-600">{o.name}</span><span className="text-gray-400">R$ {fmtBRL(o.price * b.num_travelers)}</span></li>)}</ul>
+            <ul className="space-y-1">{opts.map((o, i) => <li key={i} className="flex items-start justify-between gap-3 text-sm"><span className="text-gray-600 min-w-0">{o.name}</span><span className="text-gray-400 shrink-0 whitespace-nowrap">R$ {fmtBRL(o.price * b.num_travelers)}</span></li>)}</ul>
           </VBlock>
         )}
 
@@ -370,7 +370,7 @@ export default function Dashboard() {
           <>
             {/* Abas: Minhas viagens (destaque) · Em andamento · Histórico */}
             <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 print:hidden">
-              <button onClick={() => setTab("viagens")} className={`flex-[1.4] flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "viagens" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} className="flex-shrink-0" /> <span className="sm:hidden">Viagens</span><span className="hidden sm:inline">Minhas viagens</span> {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "viagens" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
+              <button onClick={() => setTab("viagens")} className={`flex-1 sm:flex-[1.4] flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "viagens" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}><Ticket size={14} className="flex-shrink-0" /> <span className="sm:hidden">Viagens</span><span className="hidden sm:inline">Minhas viagens</span> {upcomingConfirmed.length > 1 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "viagens" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{upcomingConfirmed.length}</span>}</button>
               <button onClick={() => setTab("andamento")} className={`flex-1 flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "andamento" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Andamento {andamentoCount > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${pending.length > 0 ? "bg-amber-400 text-white" : tab === "andamento" ? "bg-navy-100 text-navy-700" : "bg-gray-200 text-gray-500"}`}>{andamentoCount}</span>}</button>
               <button onClick={() => setTab("historico")} className={`flex-1 flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-bold py-2.5 rounded-lg transition-colors ${tab === "historico" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>Histórico {realizadas.length > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${tab === "historico" ? "bg-gold-100 text-gold-700" : "bg-gray-200 text-gray-500"}`}>{realizadas.length}</span>}</button>
             </div>
