@@ -19,7 +19,7 @@ interface Booking {
   traveler_name?: string | null; payment_method?: string | null; installments?: number;
   selected_optionals?: Optional[]; travelers_info?: string | null;
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
-  trip_return_date?: string; trip_image_url?: string;
+  trip_return_date?: string; trip_departure_at?: string; trip_return_at?: string; trip_image_url?: string;
   trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
 }
 
@@ -29,6 +29,7 @@ const PLACEHOLDER = "https://images.unsplash.com/photo-1506905925346-21bda4d32df
 const PAY: Record<string, string> = { whatsapp: "Presencial / WhatsApp", pix: "PIX", credit_card: "Cartão de crédito", transfer: "Transferência" };
 
 const fmtDate = (d: string) => { const [y, m, day] = d.slice(0, 10).split("-"); return `${day}/${m}/${y}`; };
+const fmtTime = (iso?: string | null) => { if (!iso) return ""; const t = new Date(iso); return isNaN(t.getTime()) ? "" : t.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }); };
 const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
 const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
@@ -139,7 +140,20 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
-            <p className="text-sm sm:text-base font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
+            {(() => {
+              const dt = fmtTime(b.trip_departure_at);
+              const rt = fmtTime(b.trip_return_at);
+              if (roundtrip) {
+                return <>
+                  <p className="text-sm sm:text-base font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"} · bate e volta</p>
+                  {(dt || rt) && <p className="text-xs text-gray-500 mt-0.5">{dt && `Saída ${dt}`}{dt && rt ? " · " : ""}{rt && `Retorno ${rt}`}</p>}
+                </>;
+              }
+              return <>
+                <p className="text-sm sm:text-base font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{dt && <span className="font-normal text-gray-500"> às {dt}</span>}</p>
+                {b.trip_return_date && <p className="text-sm font-bold text-navy-800">→ {fmtDate(b.trip_return_date)}{rt && <span className="font-normal text-gray-500"> às {rt}</span>}</p>}
+              </>;
+            })()}
           </div>
           <div className="sm:text-right">
             <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
