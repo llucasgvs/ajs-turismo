@@ -136,14 +136,14 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
             )}
           </div>
         )}
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
-            <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
+            <p className="text-sm sm:text-base font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
           </div>
-          <div>
+          <div className="sm:text-right">
             <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
-            <p className="font-mono font-black text-navy-800 tracking-wider text-sm">{b.booking_code}</p>
+            <p className="font-mono font-black text-navy-800 tracking-wider text-sm sm:text-base">{b.booking_code}</p>
           </div>
         </div>
       </div>
