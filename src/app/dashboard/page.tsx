@@ -305,7 +305,8 @@ export default function Dashboard() {
   const dleft = (b: Booking) => b.trip_departure_date ? daysUntil(b.trip_departure_date) : 99999;
   const upcomingConfirmed = bookings.filter(b => b.status === "confirmed" && dleft(b) >= 0).sort((a, b) => dleft(a) - dleft(b));
   const pending = bookings.filter(b => b.status === "pending").sort((a, b) => dleft(a) - dleft(b));
-  const interesse = bookings.filter(b => b.status === "interesse");
+  // Interesse só fica no "Em andamento" enquanto a viagem é futura (passou = lead morto p/ o cliente).
+  const interesse = bookings.filter(b => b.status === "interesse" && dleft(b) >= 0);
   const realizadas = bookings.filter(b => b.status === "completed" || (b.status === "confirmed" && dleft(b) < 0));
   const hasUpcoming = upcomingConfirmed.length > 0;
   const voucher = upcomingConfirmed[Math.min(vIdx, upcomingConfirmed.length - 1)];
