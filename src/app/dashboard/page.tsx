@@ -32,7 +32,6 @@ const fmtDate = (d: string) => { const [y, m, day] = d.slice(0, 10).split("-"); 
 const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
 const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
-const countdownLabel = (days: number) => days <= 0 ? "É hoje!" : days === 1 ? "É amanhã!" : `Faltam ${days} dias`;
 const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* - ${b.trip_title ?? "viagem"}.`);
 const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");
 
@@ -120,21 +119,29 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         </div>
       </div>
 
-      {/* Faixa principal: contagem + datas + código */}
-      <div className="px-5 py-4 border-b border-dashed border-gray-200 flex flex-wrap items-center gap-x-4 gap-y-3 justify-between">
+      {/* Faixa principal: contagem (pílula) + Data e Código empilhados */}
+      <div className="px-5 py-4 border-b border-dashed border-gray-200 flex items-stretch gap-4">
         {days !== null && (
-          <div className="print:hidden">
-            <p className="font-display font-black text-2xl leading-none text-navy-800">{days <= 0 ? "🎉" : days}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{countdownLabel(days)}</p>
+          <div className="print:hidden shrink-0 flex flex-col items-center justify-center bg-navy-50 rounded-xl px-3.5 min-w-[64px]">
+            {days <= 0 ? (
+              <p className="font-display font-black text-lg leading-none text-navy-800">Hoje</p>
+            ) : (
+              <>
+                <p className="font-display font-black text-2xl leading-none text-navy-800">{days}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{days === 1 ? "dia" : "dias"}</p>
+              </>
+            )}
           </div>
         )}
-        <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
-          <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
-          <p className="font-mono font-black text-navy-800 tracking-wider">{b.booking_code}</p>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{roundtrip ? "Data" : "Saída → Retorno"}</p>
+            <p className="text-sm font-bold text-navy-800">{b.trip_departure_date ? fmtDate(b.trip_departure_date) : "-"}{roundtrip ? " · bate e volta" : b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Código</p>
+            <p className="font-mono font-black text-navy-800 tracking-wider text-sm">{b.booking_code}</p>
+          </div>
         </div>
       </div>
 
