@@ -23,3 +23,15 @@ export function spotsLabel(n: number): string {
 export function isUnlimitedSpots(n: number): boolean {
   return n >= UNLIMITED_SPOTS;
 }
+
+/**
+ * Prazo de encerramento das vendas: N dias antes da saída (deve bater com o
+ * BOOKING_CUTOFF_DAYS do backend, que é a regra autoritativa).
+ */
+export const BOOKING_CUTOFF_DAYS = 4;
+export function salesClosed(departureISO?: string | null): boolean {
+  if (!departureISO) return false;
+  const dep = new Date(departureISO).getTime();
+  if (isNaN(dep)) return false;
+  return dep <= Date.now() + BOOKING_CUTOFF_DAYS * 86400000;
+}

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
-import { fmtBRL, spotsLabel } from "@/lib/format";
+import { fmtBRL, spotsLabel, salesClosed } from "@/lib/format";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel } from "@/lib/tiers";
 
@@ -377,6 +377,9 @@ function BookingCheckout({ code }: { code: string }) {
   // Reserva em estado que não pode ser paga - mostra mensagem clara (nunca o checkout).
   if (["cancelled", "refunded", "completed"].includes(booking.status))
     return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status={booking.status} /></div><Footer /></div>;
+  // Prazo de vendas encerrado (saída próxima): não deixa tentar pagar e cair em erro.
+  if (salesClosed(booking.trip_departure_date))
+    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status="closed" /></div><Footer /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
@@ -1238,14 +1241,19 @@ function BlockedScreen({ status }: { status: string }) {
     cancelled: { title: "Reserva cancelada", msg: "Esta reserva foi cancelada e não pode mais ser paga." },
     refunded: { title: "Reserva reembolsada", msg: "Esta reserva foi reembolsada." },
     completed: { title: "Viagem já realizada", msg: "Esta reserva já foi concluída." },
+    closed: { title: "Vendas encerradas", msg: "As vendas para esta data já encerraram (fechamos alguns dias antes da saída). Fale com a nossa equipe para verificar disponibilidade." },
   };
   const m = map[status] || { title: "Reserva indisponível", msg: "Esta reserva não está disponível para pagamento." };
+  const wa = "https://wa.me/5541998348766?text=" + encodeURIComponent("Olá! Quero verificar disponibilidade para uma viagem com a saída próxima.");
   return (
     <main className="flex items-center justify-center px-4 py-16">
       <div className="bg-white rounded-2xl shadow-sm max-w-md w-full p-8 text-center">
         <AlertCircle className="w-14 h-14 text-gray-400 mx-auto mb-4" />
         <h1 className="font-display font-black text-2xl text-navy-800 mb-2">{m.title}</h1>
         <p className="text-gray-600 text-sm mb-6">{m.msg}</p>
+        {status === "closed" && (
+          <a href={wa} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#25D366] hover:brightness-95 text-white font-bold py-3 rounded-xl transition-all mb-2">Falar no WhatsApp</a>
+        )}
         <Link href="/viagens" className="block w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-3 rounded-xl transition-colors mb-2">Ver outras viagens</Link>
         <Link href="/dashboard" className="block text-sm text-gray-500 hover:text-navy-700">Minhas reservas</Link>
       </div>

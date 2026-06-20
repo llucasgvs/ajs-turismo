@@ -8,7 +8,7 @@ import {
   Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
-import { fmtBRL } from "@/lib/format";
+import { fmtBRL, salesClosed } from "@/lib/format";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
 interface StoredUser { full_name: string; email: string; is_admin: boolean }
@@ -248,10 +248,17 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
           </div>
         </div>
         {variant === "pending" && (
+          salesClosed(b.trip_departure_date) ? (
+            <div className="mt-3">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-600 mb-2.5">As vendas para esta data já encerraram (fechamos alguns dias antes da saída). Fale com a nossa equipe para verificar.</div>
+              <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:brightness-95 text-white font-bold text-sm py-2.5 rounded-xl transition-all"><MessageCircle size={14} /> Falar no WhatsApp</a>
+            </div>
+          ) : (
           <div className="mt-3">
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-700 mb-2.5">As vagas são limitadas e só ficam garantidas após o pagamento - não deixe sua escolha esgotar.{days !== null && days >= 0 && days <= 30 ? <> <span className="font-bold">{days === 0 ? "A viagem é hoje!" : days === 1 ? "É amanhã!" : `Faltam só ${days} dias.`}</span></> : ""}</div>
             <Link href={`/reservar/${b.booking_code}`} className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 text-white font-bold text-sm py-2.5 rounded-xl transition-colors">Concluir reserva <ArrowRight size={14} /></Link>
           </div>
+          )
         )}
         {variant === "interesse" && <p className="mt-3 text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2">Você demonstrou interesse nesta viagem. A equipe da AJS vai te chamar no WhatsApp para combinar os detalhes e o pagamento.</p>}
         {variant === "past" && <p className="mt-3 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">Viagem realizada - esperamos que tenha sido incrível! ✨</p>}

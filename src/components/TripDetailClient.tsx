@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots } from "@/lib/format";
+import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel } from "@/lib/tiers";
 
@@ -1075,7 +1075,9 @@ function DateSelector({
         <div className={`grid gap-3 ${sidebar ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
         {visible.map((t) => {
           const isSold = t.available_spots === 0 || t.status === "sold_out";
-          const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
+          const isClosed = !isSold && salesClosed(t.departure_date);
+          const blocked = isSold || isClosed;
+          const isLow = !blocked && t.available_spots > 0 && t.available_spots <= 5;
           const isSelected = selected?.id === t.id;
           const disc = t.original_price
             ? Math.round((1 - t.price_per_person / t.original_price) * 100)
@@ -1084,12 +1086,12 @@ function DateSelector({
           return (
             <button
               key={t.id}
-              disabled={isSold}
-              onClick={() => !isSold && onSelect(t)}
+              disabled={blocked}
+              onClick={() => !blocked && onSelect(t)}
               className={`relative text-left rounded-xl border-2 p-4 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150 w-full ${
                 isSelected
                   ? "border-navy-700 bg-navy-50 shadow-md"
-                  : isSold
+                  : blocked
                   ? "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
                   : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
               }`}
@@ -1100,7 +1102,7 @@ function DateSelector({
                   <span className="w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center">
                     <Check size={11} className="text-white" />
                   </span>
-                ) : disc && disc > 0 && !isSold ? (
+                ) : disc && disc > 0 && !blocked ? (
                   <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     -{disc}%
                   </span>
@@ -1129,6 +1131,8 @@ function DateSelector({
                   )}
                   {isSold ? (
                     <span className="text-sm font-bold text-gray-400">Esgotado</span>
+                  ) : isClosed ? (
+                    <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
                   ) : (
                     <span className={`text-base font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
                       R$ {fmtBRL(t.price_per_person)}
@@ -1138,7 +1142,7 @@ function DateSelector({
                 </div>
 
                 {/* Spots */}
-                {!isSold && (
+                {!blocked && (
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                     isLow
                       ? "bg-orange-100 text-orange-600"
@@ -1228,17 +1232,19 @@ function CompactDateSelector({
             <div className="space-y-1.5">
               {grouped[monthKey].map(t => {
                 const isSold = t.available_spots === 0 || t.status === "sold_out";
+                const isClosed = !isSold && salesClosed(t.departure_date);
+                const blocked = isSold || isClosed;
                 const isSelected = selected?.id === t.id;
-                const isLow = !isSold && t.available_spots > 0 && t.available_spots <= 5;
+                const isLow = !blocked && t.available_spots > 0 && t.available_spots <= 5;
                 return (
                   <button
                     key={t.id}
-                    disabled={isSold}
-                    onClick={() => !isSold && onSelect(t)}
+                    disabled={blocked}
+                    onClick={() => !blocked && onSelect(t)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left ${
                       isSelected
                         ? "border-navy-700 bg-navy-50"
-                        : isSold
+                        : blocked
                         ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
                         : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
                     }`}
@@ -1249,6 +1255,8 @@ function CompactDateSelector({
                     </span>
                     {isSold ? (
                       <span className="text-xs text-gray-400 font-semibold">Esgotado</span>
+                    ) : isClosed ? (
+                      <span className="text-xs text-gray-400 font-semibold">Vendas encerradas</span>
                     ) : (
                       <>
                         <span className={`text-sm font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
@@ -1517,8 +1525,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
           (a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime()
         );
         setSiblingTrips(sorted);
-        // Auto-seleciona a data mais próxima disponível
-        const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out") || sorted[0];
+        // Auto-seleciona a data mais próxima disponível (com vaga e dentro do prazo de vendas)
+        const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out" && !salesClosed(t.departure_date)) || sorted[0];
         if (nearest) setSelectedTrip(nearest);
       })
       .catch(() => {});
@@ -1532,7 +1540,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   // Vai para o checkout (estilo Airbnb). Login/cadastro acontece lá dentro (modal),
   // então não checamos login aqui nem criamos a reserva - a seleção vai na URL.
   const handleOpenBooking = useCallback(() => {
-    if (!selectedTrip) {
+    if (!selectedTrip || salesClosed(selectedTrip.departure_date)) {
       setDateError(true);
       document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
