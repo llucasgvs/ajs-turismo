@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  LogOut, MapPin, Calendar, ChevronRight, Search, MessageCircle, Menu, X, Users,
+  LogOut, MapPin, Calendar, ChevronRight, ChevronLeft, Search, MessageCircle, Menu, X, Users,
   Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
@@ -379,7 +379,8 @@ export default function Dashboard() {
             {tab === "viagens" && (
               hasUpcoming ? (
                 <div className="space-y-3">
-                  {upcomingConfirmed.length > 1 && (
+                  {/* Poucas viagens: pílulas. Muitas: navegador ‹ N de T › (escala pra qualquer quantidade). */}
+                  {upcomingConfirmed.length > 1 && upcomingConfirmed.length <= 3 && (
                     <div className="flex gap-2 print:hidden">
                       {upcomingConfirmed.map((b, i) => (
                         <button key={b.id} onClick={() => setVIdx(i)} className={`flex-1 min-w-0 text-left rounded-xl border px-3 py-2 transition-[transform,background-color,border-color,box-shadow] duration-150 ease-out active:scale-[.98] ${i === vIdx ? "bg-navy-800 border-navy-800 text-white shadow-sm" : "bg-white border-gray-200 text-navy-700 hover:border-navy-300"}`}>
@@ -388,6 +389,16 @@ export default function Dashboard() {
                           {b.trip_departure_date && <p className="text-[11px] opacity-80 truncate">{fmtDate(b.trip_departure_date)}</p>}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {upcomingConfirmed.length > 3 && (
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1.5 print:hidden">
+                      <button onClick={() => setVIdx(v => Math.max(0, v - 1))} disabled={vIdx === 0} aria-label="Viagem anterior" className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-navy-600 transition-[transform,background-color] duration-150 ease-out hover:bg-gray-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none"><ChevronLeft size={18} /></button>
+                      <div className="flex-1 min-w-0 text-center">
+                        <p className="text-[10px] uppercase tracking-wide font-semibold text-gray-400">{vIdx === 0 ? "Próxima viagem" : `Viagem ${vIdx + 1}`} · {vIdx + 1} de {upcomingConfirmed.length}</p>
+                        <p className="text-sm font-bold text-navy-800 leading-tight truncate">{voucher?.trip_title ?? "Viagem"}{voucher?.trip_departure_date ? ` · ${fmtDate(voucher.trip_departure_date)}` : ""}</p>
+                      </div>
+                      <button onClick={() => setVIdx(v => Math.min(upcomingConfirmed.length - 1, v + 1))} disabled={vIdx >= upcomingConfirmed.length - 1} aria-label="Próxima viagem" className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-navy-600 transition-[transform,background-color] duration-150 ease-out hover:bg-gray-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none"><ChevronRight size={18} /></button>
                     </div>
                   )}
                   {voucher && <div key={vIdx} className="voucher-swap"><Voucher b={voucher} userName={user.full_name} /></div>}
