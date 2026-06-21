@@ -371,12 +371,8 @@ function BookingCheckout({ code }: { code: string }) {
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
 
   if (loading) return <BrandedLoader label="Abrindo sua reserva..." />;
-  if (confirmed || booking?.status === "confirmed") {
-    // Valor realmente cobrado (com juros do parcelamento, se houver).
-    const paidOpt = booking?.installment_options?.find(o => o.n === installments);
-    const paidTotal = method === "card" && paidOpt ? paidOpt.total : booking?.final_amount;
-    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><SuccessScreen code={code} amount={paidTotal} /></div><Footer /></div>;
-  }
+  if (confirmed || booking?.status === "confirmed")
+    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><SuccessScreen code={code} /></div><Footer /></div>;
   if (!booking) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="text-center"><p className="text-gray-600 mb-4">Não encontramos esta reserva.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div>
@@ -1271,15 +1267,16 @@ function BlockedScreen({ status }: { status: string }) {
   );
 }
 
-function SuccessScreen({ code, amount }: { code: string; amount?: number }) {
+function SuccessScreen({ code }: { code: string }) {
   return (
     <main className="flex items-center justify-center px-4 py-16">
       <div className="bg-white rounded-2xl shadow-sm max-w-md w-full p-8 text-center">
         <span className="inline-block animate-pop" style={{ transformOrigin: "center" }}><CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" /></span>
         <h1 className="font-display font-black text-2xl text-navy-800 mb-2">Pagamento confirmado! 🎉</h1>
-        <p className="text-gray-600 text-sm mb-5">Sua vaga está garantida. Enviaremos os detalhes em breve.</p>
-        <div className="bg-navy-50 rounded-xl p-4 mb-6"><p className="text-navy-600 text-sm">Código da reserva</p><p className="font-black text-navy-800 text-lg">{code}</p>{amount != null && <p className="text-navy-600 text-sm mt-1">Valor: R$ {fmtBRL(amount)}</p>}</div>
-        <Link href="/dashboard" className="block w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-3 rounded-xl transition-colors">Ver minhas reservas</Link>
+        <p className="text-gray-600 text-sm mb-5">Sua vaga está garantida! O <span className="font-semibold text-navy-700">voucher da sua viagem</span> já está na sua conta — é só abrir e conferir todos os detalhes (datas, embarque, documentos) ou baixar em PDF.</p>
+        <div className="bg-navy-50 rounded-xl p-4 mb-6"><p className="text-navy-600 text-xs uppercase tracking-wide font-semibold">Código da reserva</p><p className="font-black text-navy-800 text-lg tracking-wider">{code}</p></div>
+        <Link href="/dashboard" className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 active:scale-[.99] text-white font-bold py-3.5 rounded-xl transition-all">Ver minha viagem <ArrowRight size={16} /></Link>
+        <p className="text-xs text-gray-400 mt-3">Qualquer dúvida, fale com a gente no WhatsApp.</p>
       </div>
     </main>
   );
