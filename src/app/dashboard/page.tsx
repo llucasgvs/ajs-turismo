@@ -164,8 +164,17 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
 
         {/* Embarque */}
         {locs.length > 0 && (
-          <VBlock icon={<Bus size={13} className="text-gold-500" />} title="Local de embarque">
-            <ul className="space-y-1">{locs.map((l, i) => <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5"><MapPin size={12} className="text-gray-300 mt-0.5 flex-shrink-0" /> {l}</li>)}</ul>
+          <VBlock icon={<Bus size={13} className="text-gold-500" />} title={locs.length > 1 ? "Pontos de embarque" : "Local de embarque"}>
+            {locs.length > 1 && <p className="text-xs text-gray-500 mb-2">O ônibus passa por estes pontos, nesta ordem. Embarque no mais próximo de você.</p>}
+            <ol className="space-y-1.5">{locs.map((l, i) => {
+              const ft = i === 0 ? fmtTime(b.trip_departure_at) : "";
+              return <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                {locs.length > 1
+                  ? <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gold-100 text-gold-700 text-[11px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                  : <MapPin size={12} className="text-gray-300 mt-0.5 flex-shrink-0" />}
+                <span className="min-w-0">{l}{ft && <span className="text-gray-400"> · saída {ft}</span>}</span>
+              </li>;
+            })}</ol>
           </VBlock>
         )}
 
