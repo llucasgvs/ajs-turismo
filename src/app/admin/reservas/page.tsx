@@ -1505,7 +1505,7 @@ export default function AdminReservasPage() {
                           <div className="flex items-center gap-1.5">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                             {b.status === "interesse" && !isPastTrip(b) && <WaitingBadge createdAt={b.created_at} />}
-                            {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou — contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
+                            {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou - contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
                           </div>
                         </td>
                         <td className="px-4 py-3 align-top">
@@ -1553,7 +1553,7 @@ export default function AdminReservasPage() {
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                         {b.status === "interesse" && !isPastTrip(b) && <WaitingBadge createdAt={b.created_at} />}
-                        {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou — contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
+                        {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou - contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
                       </div>
                     </div>
                     {showActions && <RowActions b={b} />}

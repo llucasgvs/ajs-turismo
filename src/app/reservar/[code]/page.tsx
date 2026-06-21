@@ -1273,7 +1273,7 @@ function SuccessScreen({ code }: { code: string }) {
       <div className="bg-white rounded-2xl shadow-sm max-w-md w-full p-8 text-center">
         <span className="inline-block animate-pop" style={{ transformOrigin: "center" }}><CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" /></span>
         <h1 className="font-display font-black text-2xl text-navy-800 mb-2">Pagamento confirmado! 🎉</h1>
-        <p className="text-gray-600 text-sm mb-5">Sua vaga está garantida! O <span className="font-semibold text-navy-700">voucher da sua viagem</span> já está na sua conta — é só abrir e conferir todos os detalhes (datas, embarque, documentos) ou baixar em PDF.</p>
+        <p className="text-gray-600 text-sm mb-5">Sua vaga está garantida! O <span className="font-semibold text-navy-700">voucher da sua viagem</span> já está na sua conta. É só abrir e conferir todos os detalhes (datas, embarque, documentos) ou baixar em PDF.</p>
         <div className="bg-navy-50 rounded-xl p-4 mb-6"><p className="text-navy-600 text-xs uppercase tracking-wide font-semibold">Código da reserva</p><p className="font-black text-navy-800 text-lg tracking-wider">{code}</p></div>
         <Link href="/dashboard" className="flex items-center justify-center gap-2 w-full bg-navy-700 hover:bg-navy-600 active:scale-[.99] text-white font-bold py-3.5 rounded-xl transition-all">Ver minha viagem <ChevronRight size={16} /></Link>
         <p className="text-xs text-gray-400 mt-3">Qualquer dúvida, fale com a gente no WhatsApp.</p>
