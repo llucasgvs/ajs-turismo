@@ -179,7 +179,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         {/* Inclui */}
         {includes.length > 0 && (
           <VBlock icon={<CheckCircle2 size={13} className="text-emerald-500" />} title="O que inclui">
-            <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1">{includes.map((it, i) => <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5"><CheckCircle2 size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" /> {it}</li>)}</ul>
+            <ul className="sm:columns-2 sm:gap-x-5">{includes.map((it, i) => <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5 break-inside-avoid mb-1.5"><CheckCircle2 size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" /> <span className="min-w-0">{it}</span></li>)}</ul>
           </VBlock>
         )}
 
