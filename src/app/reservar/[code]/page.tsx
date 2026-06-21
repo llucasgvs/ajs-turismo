@@ -367,8 +367,16 @@ function BookingCheckout({ code }: { code: string }) {
     })();
   }, [code]);
 
+  // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
+  useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
+
   if (loading) return <BrandedLoader label="Abrindo sua reserva..." />;
-  if (confirmed || booking?.status === "confirmed") return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><SuccessScreen code={code} amount={booking?.final_amount} /></div><Footer /></div>;
+  if (confirmed || booking?.status === "confirmed") {
+    // Valor realmente cobrado (com juros do parcelamento, se houver).
+    const paidOpt = booking?.installment_options?.find(o => o.n === installments);
+    const paidTotal = method === "card" && paidOpt ? paidOpt.total : booking?.final_amount;
+    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><SuccessScreen code={code} amount={paidTotal} /></div><Footer /></div>;
+  }
   if (!booking) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="text-center"><p className="text-gray-600 mb-4">Não encontramos esta reserva.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div>
@@ -630,23 +638,25 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           );
         })()}
 
-        <div className="border-t border-gray-100 pt-3 flex items-end justify-between">
-          <span className="text-sm text-gray-500">Total</span>
-          <span className="font-display font-black text-2xl text-navy-800">R$ {fmtBRL(booking.final_amount)}</span>
-        </div>
-
-        {/* Detalhe do parcelamento no cartão (quando com juros) */}
-        {method === "card" && (() => {
+        {/* Total reflete o método e o parcelamento selecionados */}
+        {(() => {
           const opt = booking.installment_options?.find(o => o.n === installments);
-          if (!opt || opt.interest_free) return null;
+          const isCard = method === "card";
+          const chargeTotal = isCard && opt ? opt.total : booking.final_amount;
+          const hasInterest = isCard && opt && !opt.interest_free;
           return (
-            <div className="mt-3 rounded-xl border border-navy-100 bg-navy-50/40 px-3.5 py-3 reveal-soft">
-              <p className="text-[11px] font-semibold text-navy-600 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><CreditCard size={12} /> No cartão parcelado</p>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm text-navy-700 min-w-0 truncate">{opt.n}× de R$ {fmtBRL(opt.installment)}</span>
-                <span className="font-bold text-navy-800 shrink-0 whitespace-nowrap">R$ {fmtBRL(opt.total)}</span>
+            <div className="border-t border-gray-100 pt-3">
+              <div className="flex items-end justify-between">
+                <span className="text-sm text-gray-500">Total</span>
+                <span className="font-display font-black text-2xl text-navy-800">R$ {fmtBRL(chargeTotal)}</span>
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">Inclui juros do parcelamento. À vista ou no PIX: R$ {fmtBRL(booking.final_amount)}.</p>
+              {isCard && opt && opt.n > 1 && (
+                <p className="text-xs text-right mt-0.5">
+                  <span className="text-navy-700 font-semibold">{opt.n}× de R$ {fmtBRL(opt.installment)}</span>
+                  <span className={hasInterest ? "text-gray-400" : "text-emerald-600 font-semibold"}> {hasInterest ? "com juros" : "sem juros"}</span>
+                </p>
+              )}
+              {hasInterest && <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista ou no PIX: R$ {fmtBRL(booking.final_amount)}</p>}
             </div>
           );
         })()}
