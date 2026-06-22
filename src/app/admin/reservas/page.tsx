@@ -296,6 +296,15 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <span>− R$ {fmtBRL(booking.discount_amount)}</span>
                 </div>
               )}
+              {(() => {
+                const juros = booking.final_amount - (booking.total_amount + (booking.optionals_amount || 0) - (booking.discount_amount || 0));
+                return juros > 0.01 ? (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Juros do parcelamento{booking.installments > 1 ? ` (${booking.installments}x)` : ""}</span>
+                    <span>+ R$ {fmtBRL(juros)}</span>
+                  </div>
+                ) : null;
+              })()}
               <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
                 <span>Total</span>
                 <span>R$ {fmtBRL(booking.final_amount)}</span>
