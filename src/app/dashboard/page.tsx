@@ -171,7 +171,7 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
               const ft = i === 0 ? fmtTime(b.trip_departure_at) : "";
               return <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
                 {locs.length > 1
-                  ? <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gold-100 text-gold-700 text-[11px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                  ? <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center mt-0.5 tabular-nums">{i + 1}</span>
                   : <MapPin size={12} className="text-gray-300 mt-0.5 flex-shrink-0" />}
                 <span className="min-w-0">{l}{ft && <span className="text-gray-400"> · saída {ft}</span>}</span>
               </li>;
