@@ -1,4 +1,5 @@
 "use client";
+// Painel do cliente (voucher, andamento, histórico). Deploy refresh.
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
