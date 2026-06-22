@@ -35,6 +35,7 @@ interface Booking {
   tier_breakdown: { label: string; price: number; qty: number }[];
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
   trip_return_date?: string; trip_image_url?: string; trip_max_installments?: number;
+  trip_whatsapp_only?: boolean;
   installments_max?: number;
   installment_options?: { n: number; installment: number; total: number; interest_free: boolean }[];
 }
@@ -369,6 +370,8 @@ function BookingCheckout({ code }: { code: string }) {
 
   // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
+  // Roteiro só por WhatsApp: já abre o passo de pagamento nessa opção.
+  useEffect(() => { if (booking?.trip_whatsapp_only) setMethod("whatsapp"); }, [booking?.trip_whatsapp_only]);
 
   if (loading) return <BrandedLoader label="Abrindo sua reserva..." />;
   if (confirmed || booking?.status === "confirmed")
@@ -803,12 +806,14 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
       {active && (
         <div className="px-5 pb-5">
           <div className="space-y-2">
-            <MethodRadio icon={<QrCode size={18} />} label="PIX" hint="Aprovação na hora" selected={method === "pix"} onClick={() => setMethod("pix")} />
-            <MethodRadio icon={<CreditCard size={18} />} label="Cartão de crédito" hint={(() => {
-              const ni = (booking.installment_options || []).filter(o => o.interest_free).length || booking.trip_max_installments || 1;
-              return ni > 1 ? `até ${ni}x sem juros` : "à vista ou parcelado";
-            })()} selected={method === "card"} onClick={() => setMethod("card")} />
-            <MethodRadio icon={<MessageCircle size={18} />} label="Combinar pelo WhatsApp" hint="Fale com a equipe" selected={method === "whatsapp"} onClick={() => setMethod("whatsapp")} />
+            {!booking.trip_whatsapp_only && <>
+              <MethodRadio icon={<QrCode size={18} />} label="PIX" hint="Aprovação na hora" selected={method === "pix"} onClick={() => setMethod("pix")} />
+              <MethodRadio icon={<CreditCard size={18} />} label="Cartão de crédito" hint={(() => {
+                const ni = (booking.installment_options || []).filter(o => o.interest_free).length || booking.trip_max_installments || 1;
+                return ni > 1 ? `até ${ni}x sem juros` : "à vista ou parcelado";
+              })()} selected={method === "card"} onClick={() => setMethod("card")} />
+            </>}
+            <MethodRadio icon={<MessageCircle size={18} />} label="Combinar pelo WhatsApp" hint={booking.trip_whatsapp_only ? "Reserva desta viagem é pelo WhatsApp" : "Fale com a equipe"} selected={method === "whatsapp"} onClick={() => setMethod("whatsapp")} />
           </div>
           <div key={method} className="mt-5 animate-pop">
             {method === "pix" && <PixPanel code={code} amount={booking.final_amount} onConfirmed={onConfirmed} pollStatus={pollStatus} />}

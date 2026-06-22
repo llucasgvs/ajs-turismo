@@ -48,6 +48,7 @@ interface TemplateFormData {
   gallery: string[];
   is_featured: boolean;
   is_active: boolean;
+  whatsapp_only: boolean;
   // Saídas diárias
   is_open_date: boolean;
   open_date_price: string;
@@ -88,7 +89,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true,
+  is_featured: false, is_active: true, whatsapp_only: false,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -372,6 +373,23 @@ export default function TemplateForm({
                   <p className="text-xs text-gray-400 mt-0.5">
                     Ideal para Beto Carrero, parques temáticos, city tours. O sistema gera datas automaticamente.
                     O cliente escolhe qualquer data disponível no calendário.
+                  </p>
+                </div>
+              </label>
+
+              {/* Toggle: reserva só pelo WhatsApp */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5">
+                  <input type="checkbox" className="sr-only peer"
+                    checked={form.whatsapp_only}
+                    onChange={e => set("whatsapp_only", e.target.checked)} />
+                  <div className="w-11 h-6 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-navy-800 text-sm">Reserva só pelo WhatsApp</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui pelo WhatsApp com a equipe.
                   </p>
                 </div>
               </label>
