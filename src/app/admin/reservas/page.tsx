@@ -1268,7 +1268,7 @@ export default function AdminReservasPage() {
   ];
 
   const summary = [
-    { label: "Receita confirmada", value: `R$ ${fmtBRL(counts.stats.confirmed_revenue)}`, sub: `${counts.confirmed} reserva${counts.confirmed !== 1 ? "s" : ""}`, accent: "text-emerald-600", icon: DollarSign },
+    { label: "Receita confirmada", value: `R$ ${fmtBRL(counts.stats.confirmed_revenue)}`, sub: `${counts.confirmed + counts.completed} venda${(counts.confirmed + counts.completed) !== 1 ? "s" : ""} paga${(counts.confirmed + counts.completed) !== 1 ? "s" : ""}`, accent: "text-emerald-600", icon: DollarSign },
     { label: "Aguardando pagamento", value: `R$ ${fmtBRL(counts.stats.pending_value)}`, sub: `${counts.pending} reserva${counts.pending !== 1 ? "s" : ""}`, accent: "text-blue-600", icon: Clock },
     { label: "Interesses a seguir", value: String(counts.interesse), sub: "contatos a fechar", accent: "text-amber-600", icon: MessageSquare },
     { label: "Vendas do mês", value: `R$ ${fmtBRL(counts.stats.month_value)}`, sub: `${counts.stats.month_count} confirmada${counts.stats.month_count !== 1 ? "s" : ""}`, accent: "text-navy-700", icon: CheckCheck },
