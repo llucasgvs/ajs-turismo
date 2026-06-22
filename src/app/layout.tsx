@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE),
 
   title: {
-    default: "AJS Turismo - Pacotes de Viagem Saindo de Curitiba",
+    default: "AJS Turismo - Viagens e excursões saindo de Curitiba",
     template: "%s - AJS Turismo",
   },
   description:
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "AJS Turismo - Pacotes de Viagem Saindo de Curitiba",
+    title: "AJS Turismo - Viagens e excursões saindo de Curitiba",
     description:
       "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes completos, preços acessíveis, parcelamento no cartão ou PIX.",
     url: SITE,
@@ -59,14 +59,14 @@ export const metadata: Metadata = {
         url: "/og-image-1.jpg",
         width: 1200,
         height: 630,
-        alt: "AJS Turismo - Pacotes de Viagem Saindo de Curitiba",
+        alt: "AJS Turismo - Viagens e excursões saindo de Curitiba",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "AJS Turismo - Pacotes de Viagem Saindo de Curitiba",
+    title: "AJS Turismo - Viagens e excursões saindo de Curitiba",
     description:
       "Pacotes completos para os melhores destinos nacionais e internacionais. Saindo de Curitiba com preço justo e atendimento personalizado.",
     images: ["/og-image-1.jpg"],
