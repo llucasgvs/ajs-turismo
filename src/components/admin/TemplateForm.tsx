@@ -377,23 +377,6 @@ export default function TemplateForm({
                 </div>
               </label>
 
-              {/* Toggle: reserva só pelo WhatsApp */}
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <div className="relative mt-0.5">
-                  <input type="checkbox" className="sr-only peer"
-                    checked={form.whatsapp_only}
-                    onChange={e => set("whatsapp_only", e.target.checked)} />
-                  <div className="w-11 h-6 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
-                </div>
-                <div>
-                  <p className="font-semibold text-navy-800 text-sm">Reserva só pelo WhatsApp</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui pelo WhatsApp com a equipe.
-                  </p>
-                </div>
-              </label>
-
               {/* Campos open_date */}
               {form.is_open_date && (
                 <div className="bg-navy-50 rounded-2xl p-4 space-y-3 border border-navy-100">
@@ -635,6 +618,13 @@ export default function TemplateForm({
 
         {/* Sidebar */}
         <div className="space-y-6">
+          <Section title="Reserva e pagamento">
+            <div className="space-y-4">
+              <Toggle label="Reserva só pelo WhatsApp" description="Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui a reserva pelo WhatsApp com a equipe."
+                checked={form.whatsapp_only} onChange={(v) => set("whatsapp_only", v)} />
+            </div>
+          </Section>
+
           <Section title="Publicação">
             <div className="space-y-4">
               <Toggle label="Em Destaque" description="Aparece na seção de destaques da home"
