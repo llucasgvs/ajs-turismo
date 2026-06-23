@@ -23,6 +23,8 @@ export interface Trip {
   itinerary: { day?: number; title: string; description?: string; items?: string[] }[];
   departure_locations: string[];
   required_documents: string | null;
+  whatsapp_only?: boolean;
+  group_key?: string | null;
   is_open_date: boolean;
   open_date_price: number | null;
   open_date_spots_per_day: number;

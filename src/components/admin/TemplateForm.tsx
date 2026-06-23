@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check } from "lucide-react";
@@ -49,6 +49,7 @@ interface TemplateFormData {
   is_featured: boolean;
   is_active: boolean;
   whatsapp_only: boolean;
+  group_key: string;
   // Saídas diárias
   is_open_date: boolean;
   open_date_price: string;
@@ -89,7 +90,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true, whatsapp_only: false,
+  is_featured: false, is_active: true, whatsapp_only: false, group_key: "",
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -114,6 +115,7 @@ export default function TemplateForm({
     // normaliza itinerário: suporta formato antigo {day,title,description} e novo {title,items}
     itinerary: normalizeItinerary((initialData?.itinerary as unknown[]) ?? []),
     departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
+    group_key: String((initialData as Record<string, unknown>)?.group_key ?? ""),
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
     open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
@@ -145,6 +147,12 @@ export default function TemplateForm({
   const [newDepartureLocation, setNewDepartureLocation] = useState("");
   const [newOptName, setNewOptName] = useState("");
   const [newOptPrice, setNewOptPrice] = useState("");
+  const [existingGroups, setExistingGroups] = useState<string[]>([]);
+  useEffect(() => {
+    apiFetch("/templates/admin-list").then(r => r.ok ? r.json() : []).then((list: { group_key?: string | null }[]) => {
+      setExistingGroups(Array.from(new Set((list || []).map(t => t.group_key).filter((g): g is string => !!g))));
+    }).catch(() => {});
+  }, []);
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -208,6 +216,7 @@ export default function TemplateForm({
         templateId ? `/templates/${templateId}` : "/templates/",
         { method: templateId ? "PUT" : "POST", body: JSON.stringify({
           ...form,
+          group_key: form.group_key.trim() || null,
           // converte price de string para number antes de enviar
           optionals: form.optionals
             .filter(o => o.name.trim())
@@ -283,6 +292,15 @@ export default function TemplateForm({
                 <input className="input-field" required value={form.title}
                   onChange={(e) => set("title", e.target.value)}
                   placeholder="Ex: Ilha do Mel · Final de Semana" />
+              </Field>
+              <Field label="Grupo de destino (opcional)">
+                <input className="input-field" list="group-key-list" value={form.group_key}
+                  onChange={(e) => set("group_key", e.target.value)}
+                  placeholder="Ex: Beto Carrero" />
+                <datalist id="group-key-list">
+                  {existingGroups.map((g) => <option key={g} value={g} />)}
+                </datalist>
+                <p className="text-xs text-gray-400 mt-1">Use o mesmo grupo em roteiros do mesmo destino (ex.: bate-volta e 2 dias) para que apareçam como &quot;outras opções&quot; na página da viagem.</p>
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Destino *">

@@ -446,6 +446,39 @@ function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: n
   );
 }
 
+/* Outras vertentes do mesmo destino (mesmo group_key) */
+type PubTemplate = { id: number; first_trip_id: number; title: string; image_url: string | null; group_key?: string | null; price_from: number };
+function DestinationOptions({ templateId, groupKey }: { templateId: number | null; groupKey?: string | null }) {
+  const [items, setItems] = useState<PubTemplate[]>([]);
+  const group = (groupKey || "").trim().toLowerCase();
+  useEffect(() => {
+    if (!group) return;
+    fetch(`${API}/templates/public`).then(r => r.ok ? r.json() : []).then((list: PubTemplate[]) => {
+      setItems((list || []).filter(t => t.id !== templateId && (t.group_key || "").trim().toLowerCase() === group));
+    }).catch(() => {});
+  }, [group, templateId]);
+  if (!group || !items.length) return null;
+  return (
+    <div className="py-8">
+      <h2 className="font-display font-black text-2xl text-navy-800 mb-6">Outras opções deste destino</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {items.map(t => (
+          <Link key={t.id} href={`/viagens/${t.first_trip_id}`} className="group block rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="relative h-32 bg-navy-100 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {t.image_url && <img src={t.image_url} alt={t.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />}
+            </div>
+            <div className="p-3">
+              <p className="font-bold text-navy-800 text-sm leading-tight line-clamp-2">{t.title}</p>
+              <p className="text-xs text-gray-400 mt-1">a partir de <span className="font-bold text-navy-700">R$ {fmtBRL(t.price_from)}</span></p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════
    7. Share Button
 ═══════════════════════════════════════════ */
@@ -2015,6 +2048,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               </div>
 
               {/* Related Trips */}
+              <DestinationOptions templateId={trip.template_id} groupKey={trip.group_key} />
               <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />
             </div>
 
