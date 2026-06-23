@@ -278,17 +278,17 @@ export default function AdminDashboard() {
                 })()}
                 <div className="flex items-end justify-between gap-[3px] sm:gap-1.5 h-48">
                   {series.map((p, i) => {
-                    const h = Math.round((p.revenue / maxRev) * 100);
+                    // cap em 88% pra o número caber logo acima da barra
+                    const h = Math.round((p.revenue / maxRev) * 88);
+                    const barH = Math.max(h, p.revenue > 0 ? 4 : 1);
                     const last = i === series.length - 1;
                     const active = hoverIdx === i;
                     return <div key={p.month} className="flex-1 flex flex-col h-full min-w-0 cursor-default" onMouseEnter={() => setHoverIdx(i)}>
-                      <div className="h-4 relative">
+                      <div className="relative flex-1">
                         {p.revenue > 0 && (
-                          <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums ${last ? "text-gold-600" : "text-navy-500"}`}>{fmtRk(p.revenue)}</span>
+                          <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums ${last ? "text-gold-600" : "text-navy-500"}`} style={{ bottom: `calc(${barH}% + 3px)` }}>{fmtRk(p.revenue)}</span>
                         )}
-                      </div>
-                      <div className="flex-1 flex items-end justify-center px-px">
-                        <div className={`w-full ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${Math.max(h, p.revenue > 0 ? 4 : 1)}%` }} />
+                        <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${barH}%` }} />
                       </div>
                       <span className={`mt-1 ${chartMode === "day" ? "text-[8px]" : "text-[10px]"} font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"}`}>{p.label}</span>
                     </div>;
