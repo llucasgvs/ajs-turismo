@@ -148,6 +148,7 @@ export default function TemplateForm({
   const [newOptName, setNewOptName] = useState("");
   const [newOptPrice, setNewOptPrice] = useState("");
   const [existingGroups, setExistingGroups] = useState<string[]>([]);
+  const [isNewGroup, setIsNewGroup] = useState(false);
   useEffect(() => {
     apiFetch("/templates/admin-list").then(r => r.ok ? r.json() : []).then((list: { group_key?: string | null }[]) => {
       setExistingGroups(Array.from(new Set((list || []).map(t => t.group_key).filter((g): g is string => !!g))));
@@ -294,13 +295,23 @@ export default function TemplateForm({
                   placeholder="Ex: Ilha do Mel · Final de Semana" />
               </Field>
               <Field label="Grupo de destino (opcional)">
-                <input className="input-field" list="group-key-list" value={form.group_key}
-                  onChange={(e) => set("group_key", e.target.value)}
-                  placeholder="Ex: Beto Carrero" />
-                <datalist id="group-key-list">
-                  {existingGroups.map((g) => <option key={g} value={g} />)}
-                </datalist>
-                <p className="text-xs text-gray-400 mt-1">Use o mesmo grupo em roteiros do mesmo destino (ex.: bate-volta e 2 dias) para que apareçam como &quot;outras opções&quot; na página da viagem.</p>
+                <select className="input-field" value={isNewGroup ? "__new__" : form.group_key}
+                  onChange={(e) => {
+                    if (e.target.value === "__new__") { setIsNewGroup(true); set("group_key", ""); }
+                    else { setIsNewGroup(false); set("group_key", e.target.value); }
+                  }}>
+                  <option value="">Sem grupo</option>
+                  {Array.from(new Set([...existingGroups, form.group_key].filter(Boolean))).map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                  <option value="__new__">➕ Criar novo grupo…</option>
+                </select>
+                {isNewGroup && (
+                  <input className="input-field mt-2" autoFocus value={form.group_key}
+                    onChange={(e) => set("group_key", e.target.value)}
+                    placeholder="Ex: Beto Carrero" />
+                )}
+                <p className="text-xs text-gray-400 mt-1">Agrupa vertentes do mesmo destino (ex.: bate-volta e 2 dias) para aparecerem como &quot;outras opções&quot; na página da viagem.</p>
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Destino *">
