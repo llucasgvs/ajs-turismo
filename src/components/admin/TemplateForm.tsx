@@ -50,6 +50,7 @@ interface TemplateFormData {
   is_active: boolean;
   whatsapp_only: boolean;
   group_key: string;
+  parent_id: number | null;
   // Saídas diárias
   is_open_date: boolean;
   open_date_price: string;
@@ -90,7 +91,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true, whatsapp_only: false, group_key: "",
+  is_featured: false, is_active: true, whatsapp_only: false, group_key: "", parent_id: null,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -147,13 +148,13 @@ export default function TemplateForm({
   const [newDepartureLocation, setNewDepartureLocation] = useState("");
   const [newOptName, setNewOptName] = useState("");
   const [newOptPrice, setNewOptPrice] = useState("");
-  const [existingGroups, setExistingGroups] = useState<string[]>([]);
-  const [isNewGroup, setIsNewGroup] = useState(false);
+  // Roteiros principais (não-variações), para o seletor "Variação de".
+  const [principals, setPrincipals] = useState<{ id: number; title: string }[]>([]);
   useEffect(() => {
-    apiFetch("/templates/admin-list").then(r => r.ok ? r.json() : []).then((list: { group_key?: string | null }[]) => {
-      setExistingGroups(Array.from(new Set((list || []).map(t => t.group_key).filter((g): g is string => !!g))));
+    apiFetch("/templates/admin-list").then(r => r.ok ? r.json() : []).then((list: { id: number; title: string; parent_id?: number | null }[]) => {
+      setPrincipals((list || []).filter(t => !t.parent_id && t.id !== templateId).map(t => ({ id: t.id, title: t.title })));
     }).catch(() => {});
-  }, []);
+  }, [templateId]);
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -293,25 +294,6 @@ export default function TemplateForm({
                 <input className="input-field" required value={form.title}
                   onChange={(e) => set("title", e.target.value)}
                   placeholder="Ex: Ilha do Mel · Final de Semana" />
-              </Field>
-              <Field label="Grupo de destino (opcional)">
-                <select className="input-field" value={isNewGroup ? "__new__" : form.group_key}
-                  onChange={(e) => {
-                    if (e.target.value === "__new__") { setIsNewGroup(true); set("group_key", ""); }
-                    else { setIsNewGroup(false); set("group_key", e.target.value); }
-                  }}>
-                  <option value="">Sem grupo</option>
-                  {Array.from(new Set([...existingGroups, form.group_key].filter(Boolean))).map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                  <option value="__new__">➕ Criar novo grupo…</option>
-                </select>
-                {isNewGroup && (
-                  <input className="input-field mt-2" autoFocus value={form.group_key}
-                    onChange={(e) => set("group_key", e.target.value)}
-                    placeholder="Ex: Beto Carrero" />
-                )}
-                <p className="text-xs text-gray-400 mt-1">Agrupa vertentes do mesmo destino (ex.: bate-volta e 2 dias) para aparecerem como &quot;outras opções&quot; na página da viagem.</p>
               </Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Destino *">
@@ -651,6 +633,18 @@ export default function TemplateForm({
             <div className="space-y-4">
               <Toggle label="Reserva só pelo WhatsApp" description="Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui a reserva pelo WhatsApp com a equipe."
                 checked={form.whatsapp_only} onChange={(v) => set("whatsapp_only", v)} />
+            </div>
+          </Section>
+
+          <Section title="Variação">
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400">Variação de (opcional)</label>
+              <select className="input-field" value={form.parent_id ?? ""}
+                onChange={(e) => set("parent_id", e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Não é variação (roteiro principal)</option>
+                {principals.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </select>
+              <p className="text-[11px] text-gray-400">Marque se este roteiro é uma variação de outro (ex.: &quot;Beto Carrero - 2 dias&quot;). Aparece como &quot;outra opção&quot; na página do principal. O título precisa ser diferente.</p>
             </div>
           </Section>
 

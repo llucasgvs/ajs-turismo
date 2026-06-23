@@ -446,18 +446,19 @@ function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: n
   );
 }
 
-/* Outras vertentes do mesmo destino (mesmo group_key) */
-type PubTemplate = { id: number; first_trip_id: number; title: string; image_url: string | null; group_key?: string | null; price_from: number };
-function DestinationOptions({ templateId, groupKey }: { templateId: number | null; groupKey?: string | null }) {
+/* Outras vertentes do mesmo destino (família principal + variações via parent_id) */
+type PubTemplate = { id: number; first_trip_id: number; title: string; image_url: string | null; parent_id?: number | null; price_from: number };
+function DestinationOptions({ templateId, parentId }: { templateId: number | null; parentId?: number | null }) {
   const [items, setItems] = useState<PubTemplate[]>([]);
-  const group = (groupKey || "").trim().toLowerCase();
+  // raiz da família: se este é variação, o principal; senão, ele mesmo.
+  const root = parentId || templateId;
   useEffect(() => {
-    if (!group) return;
+    if (!root) return;
     fetch(`${API}/templates/public`).then(r => r.ok ? r.json() : []).then((list: PubTemplate[]) => {
-      setItems((list || []).filter(t => t.id !== templateId && (t.group_key || "").trim().toLowerCase() === group));
+      setItems((list || []).filter(t => t.id !== templateId && (t.id === root || t.parent_id === root)));
     }).catch(() => {});
-  }, [group, templateId]);
-  if (!group || !items.length) return null;
+  }, [root, templateId]);
+  if (!root || !items.length) return null;
   return (
     <div className="py-8">
       <h2 className="font-display font-black text-2xl text-navy-800 mb-6">Outras opções deste destino</h2>
@@ -2048,7 +2049,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               </div>
 
               {/* Related Trips */}
-              <DestinationOptions templateId={trip.template_id} groupKey={trip.group_key} />
+              <DestinationOptions templateId={trip.template_id} parentId={trip.parent_id} />
               <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />
             </div>
 

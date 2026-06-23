@@ -24,6 +24,7 @@ interface TripTemplate {
   tag: string | null;
   is_featured: boolean;
   is_active: boolean;
+  parent_id: number | null;
   includes: string[];
   excludes: string[];
   itinerary: { day: number; title: string; description: string }[];
@@ -1041,6 +1042,14 @@ export default function TemplateDetailPage() {
           <Pencil size={15} />
           <span>Editar roteiro</span>
         </Link>
+        {!template.parent_id && (
+          <Link href={`/admin/viagens/novo-roteiro?variacao_de=${templateId}`}
+            title="Cria um roteiro copiando este como base (ex.: versão de 2 dias, + outro destino)"
+            className="flex items-center justify-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+            <Copy size={15} />
+            <span>Criar variação</span>
+          </Link>
+        )}
       </div>
 
       {/* Card de info do roteiro - clicável */}
