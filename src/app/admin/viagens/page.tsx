@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera, Calendar, MessageCircle, AlertTriangle } from "lucide-react";
+import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera, Calendar, MessageCircle, AlertTriangle, Tag, Layers, ArrowUpDown, ChevronDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
@@ -173,65 +173,76 @@ export default function ViagensPage() {
         </Link>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="w-full pl-9 pr-9 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-navy-400 bg-white"
-          placeholder="Buscar por nome ou destino..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search && (
-          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-            <X size={14} />
-          </button>
-        )}
-      </div>
+      {/* Busca + filtros - painel unificado */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 space-y-3">
+        {/* Busca */}
+        <div className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none" />
+          <input
+            className="w-full h-11 pl-10 pr-10 border border-gray-200 rounded-xl text-sm bg-white text-navy-800 placeholder:text-gray-400 transition-colors focus:outline-none focus:border-navy-500 focus:ring-2 focus:ring-navy-500/10"
+            placeholder="Buscar por nome ou destino..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} aria-label="Limpar busca"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-navy-700 hover:bg-gray-100 transition-colors">
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
-      {/* Filtros */}
-      <div className="space-y-3">
-        {/* Linha 1: selects */}
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={category} onChange={(e) => setCategory(e.target.value)}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+        {/* Selects */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <FilterSelect icon={<Tag size={14} />} value={category} onChange={setCategory}>
             <option value="all">Todas as categorias</option>
             {categoriesPresent.map((c) => (
               <option key={c} value={c}>{CATEGORY_LABEL[c] ?? c}</option>
             ))}
-          </select>
+          </FilterSelect>
 
-          <select value={type} onChange={(e) => setType(e.target.value as TypeFilter)}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+          <FilterSelect icon={<Layers size={14} />} value={type} onChange={(v) => setType(v as TypeFilter)}>
             <option value="all">Todos os tipos</option>
             <option value="dated">Com datas</option>
             <option value="daily">Saídas diárias</option>
             <option value="quote">Sob cotação</option>
-          </select>
+          </FilterSelect>
 
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
-            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+          <FilterSelect icon={<ArrowUpDown size={14} />} value={sort} onChange={(v) => setSort(v as SortKey)}>
             {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
               <option key={k} value={k}>{SORT_LABEL[k]}</option>
             ))}
-          </select>
+          </FilterSelect>
         </div>
 
-        {/* Linha 2: chips de status e atalhos */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Chip active={status === "all"} onClick={() => setStatus("all")}>Todos</Chip>
-          <Chip active={status === "active"} onClick={() => setStatus("active")}>Ativos</Chip>
-          <Chip active={status === "hidden"} onClick={() => setStatus("hidden")}>Ocultos</Chip>
-          <span className="w-px h-5 bg-gray-200 mx-1" />
-          <Chip active={onlyFeatured} onClick={() => setOnlyFeatured((v) => !v)}>
-            <Star size={11} className={onlyFeatured ? "fill-current" : ""} /> Destaques
+        {/* Status (segmentado) + atalhos */}
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <div className="inline-flex bg-navy-50 rounded-xl p-1 gap-0.5">
+            {([["all", "Todos"], ["active", "Ativos"], ["hidden", "Ocultos"]] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setStatus(k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  status === k ? "bg-white text-navy-800 shadow-sm" : "text-navy-400 hover:text-navy-700"
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <span className="hidden sm:block w-px h-6 bg-gray-200 mx-0.5" />
+
+          <Chip active={onlyFeatured} onClick={() => setOnlyFeatured((v) => !v)} tone="gold">
+            <Star size={12} className={onlyFeatured ? "fill-current" : ""} /> Destaques
           </Chip>
           <Chip active={onlyNeedsDate} onClick={() => setOnlyNeedsDate((v) => !v)} tone="warn">
-            <AlertTriangle size={11} /> Sem data ativa{needsDateCount > 0 ? ` (${needsDateCount})` : ""}
+            <AlertTriangle size={12} /> Sem data ativa
+            {needsDateCount > 0 && (
+              <span className={`ml-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${onlyNeedsDate ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700"}`}>{needsDateCount}</span>
+            )}
           </Chip>
+
           {filtersActive && (
-            <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-navy-700 font-medium flex items-center gap-1 ml-auto">
-              <X size={12} /> Limpar filtros
+            <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-navy-700 font-semibold flex items-center gap-1 ml-auto transition-colors">
+              <X size={13} /> Limpar
             </button>
           )}
         </div>
@@ -266,14 +277,32 @@ export default function ViagensPage() {
   );
 }
 
-function Chip({ active, onClick, children, tone = "default" }: {
-  active: boolean; onClick: () => void; children: React.ReactNode; tone?: "default" | "warn";
+function FilterSelect({ icon, value, onChange, children }: {
+  icon: React.ReactNode; value: string; onChange: (v: string) => void; children: React.ReactNode;
 }) {
-  const activeCls = tone === "warn" ? "bg-amber-500 text-white border-amber-500" : "bg-navy-800 text-white border-navy-800";
+  return (
+    <div className="group relative flex items-center h-11 rounded-xl border border-gray-200 bg-white transition-colors focus-within:border-navy-500 focus-within:ring-2 focus-within:ring-navy-500/10 hover:border-navy-300">
+      <span className="absolute left-3 text-navy-400 pointer-events-none">{icon}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full h-full bg-transparent text-sm font-medium text-navy-800 pl-9 pr-9 rounded-xl appearance-none cursor-pointer focus:outline-none">
+        {children}
+      </select>
+      <ChevronDown size={15} className="absolute right-3 text-gray-400 pointer-events-none" />
+    </div>
+  );
+}
+
+function Chip({ active, onClick, children, tone = "default" }: {
+  active: boolean; onClick: () => void; children: React.ReactNode; tone?: "default" | "warn" | "gold";
+}) {
+  const activeCls =
+    tone === "warn" ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+    : tone === "gold" ? "bg-gold-500 text-white border-gold-500 shadow-sm"
+    : "bg-navy-800 text-white border-navy-800 shadow-sm";
   return (
     <button onClick={onClick}
-      className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-        active ? activeCls : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+      className={`flex items-center gap-1.5 text-xs font-semibold h-9 px-3.5 rounded-full border transition-colors ${
+        active ? activeCls : "bg-white text-gray-600 border-gray-200 hover:border-navy-300 hover:text-navy-700"
       }`}>
       {children}
     </button>
