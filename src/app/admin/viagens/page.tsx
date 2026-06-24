@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera } from "lucide-react";
+import { Plus, Search, X, MapPin, Star, Users, Loader2, ChevronRight, Camera, Calendar, MessageCircle, AlertTriangle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
@@ -20,11 +20,25 @@ interface TemplateSummary {
   tag: string | null;
   is_featured: boolean;
   is_active: boolean;
+  is_open_date: boolean;
+  quote_only?: boolean;
+  parent_id?: number | null;
   active_dates_count: number;
   hidden_dates_count: number;
   total_dates_count: number;
   sold_spots: number;
 }
+
+type StatusFilter = "all" | "active" | "hidden";
+type TypeFilter = "all" | "dated" | "daily" | "quote";
+type SortKey = "recent" | "az" | "sold" | "active_dates";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  recent: "Mais recentes",
+  az: "Nome (A-Z)",
+  sold: "Mais vendidos",
+  active_dates: "Mais datas ativas",
+};
 
 const CATEGORY_LABEL: Record<string, string> = {
   praia: "Praia",
@@ -51,6 +65,14 @@ export default function ViagensPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchActive = useRef(false);
+
+  // Filtros (client-side: a lista de roteiros vem inteira do backend)
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [type, setType] = useState<TypeFilter>("all");
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
+  const [onlyNeedsDate, setOnlyNeedsDate] = useState(false);
+  const [sort, setSort] = useState<SortKey>("recent");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -93,6 +115,40 @@ export default function ViagensPage() {
     fetchTemplates(!!debouncedSearch);
   }, [fetchTemplates, debouncedSearch]);
 
+  const tripType = (t: TemplateSummary): TypeFilter =>
+    t.quote_only ? "quote" : t.is_open_date ? "daily" : "dated";
+  const needsDate = (t: TemplateSummary) => !t.quote_only && t.active_dates_count === 0;
+
+  // Categorias presentes nos dados (para o dropdown não listar opções vazias)
+  const categoriesPresent = useMemo(() => {
+    const set = new Set(templates.map((t) => t.category));
+    return Array.from(set).sort((a, b) =>
+      (CATEGORY_LABEL[a] ?? a).localeCompare(CATEGORY_LABEL[b] ?? b)
+    );
+  }, [templates]);
+
+  const filtered = useMemo(() => {
+    let list = templates.filter((t) => {
+      if (category !== "all" && t.category !== category) return false;
+      if (status === "active" && !t.is_active) return false;
+      if (status === "hidden" && t.is_active) return false;
+      if (type !== "all" && tripType(t) !== type) return false;
+      if (onlyFeatured && !t.is_featured) return false;
+      if (onlyNeedsDate && !needsDate(t)) return false;
+      return true;
+    });
+    list = [...list];
+    if (sort === "az") list.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sort === "sold") list.sort((a, b) => b.sold_spots - a.sold_spots);
+    else if (sort === "active_dates") list.sort((a, b) => b.active_dates_count - a.active_dates_count);
+    // "recent" mantém a ordem do backend (created_at desc)
+    return list;
+  }, [templates, category, status, type, onlyFeatured, onlyNeedsDate, sort]);
+
+  const needsDateCount = useMemo(() => templates.filter(needsDate).length, [templates]);
+  const filtersActive = category !== "all" || status !== "all" || type !== "all" || onlyFeatured || onlyNeedsDate || sort !== "recent";
+  const clearFilters = () => { setCategory("all"); setStatus("all"); setType("all"); setOnlyFeatured(false); setOnlyNeedsDate(false); setSort("recent"); };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -102,7 +158,11 @@ export default function ViagensPage() {
             Roteiros
             {refreshing && <Loader2 size={14} className="text-navy-400 animate-spin" />}
           </h1>
-          <p className="text-gray-500 text-sm">{templates.length} roteiro{templates.length !== 1 ? "s" : ""} cadastrado{templates.length !== 1 ? "s" : ""}</p>
+          <p className="text-gray-500 text-sm">
+            {filtersActive || debouncedSearch
+              ? `${filtered.length} de ${templates.length} roteiro${templates.length !== 1 ? "s" : ""}`
+              : `${templates.length} roteiro${templates.length !== 1 ? "s" : ""} cadastrado${templates.length !== 1 ? "s" : ""}`}
+          </p>
         </div>
         <Link
           href="/admin/viagens/novo-roteiro"
@@ -129,15 +189,67 @@ export default function ViagensPage() {
         )}
       </div>
 
+      {/* Filtros */}
+      <div className="space-y-3">
+        {/* Linha 1: selects */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={category} onChange={(e) => setCategory(e.target.value)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+            <option value="all">Todas as categorias</option>
+            {categoriesPresent.map((c) => (
+              <option key={c} value={c}>{CATEGORY_LABEL[c] ?? c}</option>
+            ))}
+          </select>
+
+          <select value={type} onChange={(e) => setType(e.target.value as TypeFilter)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+            <option value="all">Todos os tipos</option>
+            <option value="dated">Com datas</option>
+            <option value="daily">Saídas diárias</option>
+            <option value="quote">Sob cotação</option>
+          </select>
+
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-navy-400">
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              <option key={k} value={k}>{SORT_LABEL[k]}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Linha 2: chips de status e atalhos */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip active={status === "all"} onClick={() => setStatus("all")}>Todos</Chip>
+          <Chip active={status === "active"} onClick={() => setStatus("active")}>Ativos</Chip>
+          <Chip active={status === "hidden"} onClick={() => setStatus("hidden")}>Ocultos</Chip>
+          <span className="w-px h-5 bg-gray-200 mx-1" />
+          <Chip active={onlyFeatured} onClick={() => setOnlyFeatured((v) => !v)}>
+            <Star size={11} className={onlyFeatured ? "fill-current" : ""} /> Destaques
+          </Chip>
+          <Chip active={onlyNeedsDate} onClick={() => setOnlyNeedsDate((v) => !v)} tone="warn">
+            <AlertTriangle size={11} /> Sem data ativa{needsDateCount > 0 ? ` (${needsDateCount})` : ""}
+          </Chip>
+          {filtersActive && (
+            <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-navy-700 font-medium flex items-center gap-1 ml-auto">
+              <X size={12} /> Limpar filtros
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Lista */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={28} className="text-navy-400 animate-spin" />
         </div>
-      ) : templates.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-lg font-medium">Nenhum roteiro encontrado</p>
-          {!search && (
+          {filtersActive || search ? (
+            <button onClick={() => { setSearch(""); clearFilters(); }} className="mt-3 inline-block text-sm text-navy-600 underline">
+              Limpar busca e filtros
+            </button>
+          ) : (
             <Link href="/admin/viagens/novo-roteiro" className="mt-3 inline-block text-sm text-navy-600 underline">
               Criar primeiro roteiro
             </Link>
@@ -145,12 +257,26 @@ export default function ViagensPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {templates.map((tmpl) => (
+          {filtered.map((tmpl) => (
             <TemplateCard key={tmpl.id} tmpl={tmpl} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function Chip({ active, onClick, children, tone = "default" }: {
+  active: boolean; onClick: () => void; children: React.ReactNode; tone?: "default" | "warn";
+}) {
+  const activeCls = tone === "warn" ? "bg-amber-500 text-white border-amber-500" : "bg-navy-800 text-white border-navy-800";
+  return (
+    <button onClick={onClick}
+      className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+        active ? activeCls : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+      }`}>
+      {children}
+    </button>
   );
 }
 
@@ -194,6 +320,15 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
               <Star size={8} fill="currentColor" /> Destaque
             </span>
           )}
+          {tmpl.quote_only ? (
+            <span className="bg-navy-600/95 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+              <MessageCircle size={8} /> Sob cotação
+            </span>
+          ) : tmpl.is_open_date ? (
+            <span className="bg-emerald-600/95 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+              <Calendar size={8} /> Diária
+            </span>
+          ) : null}
           {tmpl.tag && (
             <span className="bg-navy-800/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
               {tmpl.tag}
@@ -219,6 +354,13 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
       {/* Corpo do card */}
       <div className="p-3 sm:p-3.5 flex flex-col gap-2 flex-1">
 
+        {/* Cotação: sem datas. Mostra um aviso no lugar dos stats. */}
+        {tmpl.quote_only ? (
+          <div className="rounded-lg bg-navy-50 px-2.5 py-2 text-[11px] text-navy-600 flex items-center gap-1.5">
+            <MessageCircle size={12} className="text-navy-400 flex-shrink-0" /> Roteiro sob cotação (sem datas)
+          </div>
+        ) : (
+        <>
         {/* Stats de datas */}
         <div className="grid grid-cols-3 gap-1.5">
           <div className={`rounded-lg px-2 py-1.5 text-center ${tmpl.active_dates_count > 0 ? "bg-green-50" : "bg-red-50"}`}>
@@ -252,10 +394,12 @@ function TemplateCard({ tmpl }: { tmpl: TemplateSummary }) {
             <Plus size={11} /> Adicionar data
           </Link>
         )}
+        </>
+        )}
 
         {/* CTA */}
         <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between text-xs font-semibold text-navy-600 group-hover:text-gold-600 transition-colors">
-          <span>Ver datas</span>
+          <span>{tmpl.quote_only ? "Ver roteiro" : "Ver datas"}</span>
           <ChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
