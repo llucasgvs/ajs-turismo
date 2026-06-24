@@ -1762,7 +1762,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     </span>
                     <div>
                       <p className="font-semibold text-navy-800 text-sm">Roteiro sob cotação</p>
-                      <p className="text-xs text-gray-500">Valor e datas combinados pela nossa equipe no WhatsApp.</p>
+                      <p className="text-xs text-gray-500">Valor e datas montados sob medida. Solicite a sua cotação.</p>
                     </div>
                   </div>
                 ) : trip.is_open_date ? (
@@ -2097,7 +2097,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                       <p className="text-xs text-gray-400 mb-0.5">Valor</p>
                       <p className="font-display font-black text-3xl text-navy-700 leading-tight mb-1">Sob consulta</p>
                       <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                        Este roteiro é montado sob medida. Faça seu cadastro e solicite a cotação: nossa equipe responde pelo WhatsApp com o valor e as condições.
+                        Este roteiro é montado sob medida. Faça seu cadastro e solicite a cotação para receber o valor e as condições.
                       </p>
                       <button onClick={handleQuote}
                         className="w-full font-bold py-4 rounded-xl text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20">

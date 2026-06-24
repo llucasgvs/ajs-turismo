@@ -108,7 +108,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                     {pkg.quote_only ? (
                       <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-xl px-3 py-2">
                         <span className="w-2 h-2 rounded-full bg-navy-400 flex-shrink-0" />
-                        <span className="text-xs font-semibold text-navy-700">Sob consulta · cotação pelo WhatsApp</span>
+                        <span className="text-xs font-semibold text-navy-700">Sob consulta · roteiro sob medida</span>
                       </div>
                     ) : pkg.is_open_date ? (
                       <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
