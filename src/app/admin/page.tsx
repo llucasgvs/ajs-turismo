@@ -79,8 +79,8 @@ function CardHead({ title, icon, action }: { title: string; icon: React.ReactNod
 }
 
 /* ─── Cache ─── */
-type Cache = { stats: Stats | null; counts: Counts | null; analytics: Analytics | null; sMonth: RevPoint[]; sDay: RevPoint[]; interests: Booking[]; pendings: Booking[]; trips: TripInstance[]; templates: Template[]; ts: number };
-const _c: Cache = { stats: null, counts: null, analytics: null, sMonth: [], sDay: [], interests: [], pendings: [], trips: [], templates: [], ts: 0 };
+type Cache = { stats: Stats | null; counts: Counts | null; analytics: Analytics | null; sMonth: RevPoint[]; sDay: RevPoint[]; sYear: RevPoint[]; interests: Booking[]; pendings: Booking[]; trips: TripInstance[]; templates: Template[]; ts: number };
+const _c: Cache = { stats: null, counts: null, analytics: null, sMonth: [], sDay: [], sYear: [], interests: [], pendings: [], trips: [], templates: [], ts: 0 };
 const TTL = 60_000;
 
 export default function AdminDashboard() {
@@ -90,13 +90,14 @@ export default function AdminDashboard() {
   const [an, setAn] = useState<Analytics | null>(_c.analytics);
   const [sMonth, setSMonth] = useState<RevPoint[]>(_c.sMonth);
   const [sDay, setSDay] = useState<RevPoint[]>(_c.sDay);
+  const [sYear, setSYear] = useState<RevPoint[]>(_c.sYear);
   const [interests, setInterests] = useState<Booking[]>(_c.interests);
   const [pendings, setPendings] = useState<Booking[]>(_c.pendings);
   const [trips, setTrips] = useState<TripInstance[]>(_c.trips);
   const [templates, setTemplates] = useState<Template[]>(_c.templates);
   const [loading, setLoading] = useState(!fresh);
   const [refreshing, setRefreshing] = useState(false);
-  const [chartMode, setChartMode] = useState<"day" | "month">("day");
+  const [chartMode, setChartMode] = useState<"day" | "month" | "year">("day");
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [margin, setMargin] = useState(20); // margem presumida (%), só exibição
@@ -112,24 +113,26 @@ export default function AdminDashboard() {
         fetchWithTimeout(`${API}/bookings/admin/analytics`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/bookings/admin/revenue-series?months=6`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/bookings/admin/revenue-series?granularity=day`, { headers: authHeaders() }),
+        fetchWithTimeout(`${API}/bookings/admin/revenue-series?granularity=year`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/bookings/admin/all?booking_status=interesse&limit=6`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/bookings/admin/all?booking_status=pending&limit=6`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: authHeaders() }),
         fetchWithTimeout(`${API}/templates/admin-list`, { headers: authHeaders() }),
       ]);
-      const [sD, cD, aD, mD, dD, iD, pD, tD, tmD] = await Promise.all(R.map(r => r.json().catch(() => null)));
+      const [sD, cD, aD, mD, dD, yD, iD, pD, tD, tmD] = await Promise.all(R.map(r => r.json().catch(() => null)));
       const statsV = sD && typeof sD.total_revenue === "number" ? sD : null;
       const countsV = cD && typeof cD.interesse === "number" ? cD : null;
       const anV = aD && Array.isArray(aD.top_revenue) ? aD : null;
       const monthV = Array.isArray(mD) ? mD : [];
       const dayV = Array.isArray(dD) ? dD : [];
+      const yearV = Array.isArray(yD) ? yD : [];
       const intV = Array.isArray(iD?.items) ? iD.items : [];
       const penV = Array.isArray(pD?.items) ? pD.items : [];
       const tripsV = Array.isArray(tD?.items) ? tD.items : [];
       const tmplV = Array.isArray(tmD) ? tmD : [];
-      setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV);
+      setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV); setSYear(yearV);
       setInterests(intV); setPendings(penV); setTrips(tripsV); setTemplates(tmplV);
-      Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
+      Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -153,7 +156,7 @@ export default function AdminDashboard() {
   const noDates = templates.filter(t => t.active_dates_count === 0 && t.is_active).length;
   const noPhotos = templates.filter(t => t.is_active && t.photos_count < 5).length;
 
-  const series = chartMode === "day" ? sDay.slice(0, new Date().getDate()) : sMonth;
+  const series = chartMode === "day" ? sDay.slice(0, new Date().getDate()) : chartMode === "year" ? sYear : sMonth;
   const maxRev = Math.max(1, ...series.map(s => s.revenue));
 
   const monthCount = stats?.month_confirmed ?? 0;
@@ -254,7 +257,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 overflow-hidden">
           <CardHead title="Receita confirmada" icon={<TrendingUp size={14} className="text-emerald-500" />}
-            action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
+            action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["year", "month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "year" ? "Anual" : m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
           {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : (
             <div className="px-5 py-5">
               <div className="relative pt-12" onMouseLeave={() => setHoverIdx(null)}>
@@ -268,7 +271,7 @@ export default function AdminDashboard() {
                     <div className="absolute top-0 z-20 pointer-events-none transition-[left] duration-100" style={{ left: `${leftPct}%`, transform: `translateX(${tx})` }}>
                       <div className="bg-navy-800 text-white rounded-xl shadow-xl px-3.5 py-2 whitespace-nowrap">
                         <p className="text-[11px] font-bold leading-tight">
-                          {chartMode === "day" ? `${weekdayFull(p.month)}, ${dayMonth(p.month)}` : MES_FULL[parseInt(p.month.split("-")[1]) - 1]}
+                          {chartMode === "day" ? `${weekdayFull(p.month)}, ${dayMonth(p.month)}` : chartMode === "year" ? p.label : MES_FULL[parseInt(p.month.split("-")[1]) - 1]}
                         </p>
                         <p className="text-[12px] font-black text-gold-300 leading-tight mt-0.5">{fmtR(p.revenue)}</p>
                         <p className="text-[10px] text-navy-200 leading-tight">{plw(p.count, "venda", "vendas")}</p>
@@ -288,7 +291,7 @@ export default function AdminDashboard() {
                         {p.revenue > 0 && (
                           <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums ${last ? "text-gold-600" : "text-navy-500"}`} style={{ bottom: `calc(${barH}% + 3px)` }}>{fmtRk(p.revenue)}</span>
                         )}
-                        <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode === "month" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${barH}%` }} />
+                        <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode !== "day" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${barH}%` }} />
                       </div>
                       <span className={`mt-1 ${chartMode === "day" ? "text-[8px]" : "text-[10px]"} font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"}`}>{p.label}</span>
                     </div>;
