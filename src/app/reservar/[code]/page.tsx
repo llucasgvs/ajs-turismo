@@ -534,8 +534,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       </div>
 
       <div className="px-4 pb-4 space-y-4">
-        {/* Data */}
-        {booking.trip_departure_date && (
+        {/* Data - oculta em roteiro sob cotação (sem data fixa) */}
+        {booking.trip_departure_date && !booking.trip_quote_only && (
           <div className="border-t border-gray-100 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 flex items-center gap-1.5"><Calendar size={13} /> Data</span>
