@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check } from "lucide-react";
+import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check, Copy } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 
@@ -155,6 +155,14 @@ export default function TemplateForm({
       setPrincipals((list || []).filter(t => !t.parent_id && t.id !== templateId).map(t => ({ id: t.id, title: t.title })));
     }).catch(() => {});
   }, [templateId]);
+
+  // Dados do roteiro principal selecionado, para "puxar" campos bloco a bloco.
+  const [parent, setParent] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    if (!form.parent_id) { setParent(null); return; }
+    apiFetch(`/templates/${form.parent_id}`).then(r => r.ok ? r.json() : null)
+      .then((data) => setParent(data?.id ? data : null)).catch(() => setParent(null));
+  }, [form.parent_id]);
 
   const set = <K extends keyof TemplateFormData>(key: K, value: TemplateFormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -336,11 +344,21 @@ export default function TemplateForm({
                 <input className="input-field" value={form.short_description}
                   onChange={(e) => set("short_description", e.target.value)}
                   placeholder="Ex: 2 dias e 1 noite com transfer incluso" maxLength={500} />
+                {parent && (
+                  <div className="flex justify-end mt-1">
+                    <PullBtn onClick={() => set("short_description", String(parent.short_description ?? ""))} />
+                  </div>
+                )}
               </Field>
               <Field label="Descrição Completa *">
                 <textarea className="input-field min-h-[120px] resize-y" required value={form.description}
                   onChange={(e) => set("description", e.target.value)}
                   placeholder="Descreva os detalhes do roteiro..." />
+                {parent && (
+                  <div className="flex justify-end mt-1">
+                    <PullBtn onClick={() => set("description", String(parent.description ?? ""))} />
+                  </div>
+                )}
               </Field>
               <Field label="Documentos necessários para embarque">
                 <textarea
@@ -351,19 +369,27 @@ export default function TemplateForm({
                 />
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-xs text-gray-400">Use • para marcar itens. Cada linha vira um parágrafo no site.</p>
-                  <button
-                    type="button"
-                    onClick={() => set("required_documents", PRESET_DOCUMENTS)}
-                    className="text-xs text-navy-500 hover:text-gold-600 hover:underline underline-offset-2 transition-colors flex-shrink-0 ml-3"
-                  >
-                    usar modelo padrão
-                  </button>
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                    {parent && <PullBtn onClick={() => set("required_documents", String(parent.required_documents ?? ""))} />}
+                    <button
+                      type="button"
+                      onClick={() => set("required_documents", PRESET_DOCUMENTS)}
+                      className="text-xs text-navy-500 hover:text-gold-600 hover:underline underline-offset-2 transition-colors"
+                    >
+                      usar modelo padrão
+                    </button>
+                  </div>
                 </div>
               </Field>
               <Field label="Tag (opcional)">
                 <input className="input-field" value={form.tag}
                   onChange={(e) => set("tag", e.target.value)}
                   placeholder="Ex: Mais Vendido, Promoção" />
+                {parent && (
+                  <div className="flex justify-end mt-1">
+                    <PullBtn onClick={() => set("tag", String(parent.tag ?? ""))} />
+                  </div>
+                )}
               </Field>
             </div>
           </Section>
@@ -440,28 +466,28 @@ export default function TemplateForm({
             </div>
           </Section>
 
-          <Section title="Imagens">
+          <Section title="Imagens" action={parent && <PullBtn label="Puxar fotos" onClick={() => setForm(f => ({ ...f, image_url: String(parent.image_url ?? ""), gallery: (parent.gallery as string[]) ?? [] }))} />}>
             <p className="text-xs text-gray-400 mb-3">
               A <span className="font-semibold text-gold-600">primeira imagem</span> é a principal (capa do roteiro). Passe o mouse nas demais para definir outra como principal.
             </p>
             <UnifiedGallery images={allImages} onChange={setAllImages} />
           </Section>
 
-          <Section title="O que inclui">
+          <Section title="O que inclui" action={parent && <PullBtn onClick={() => set("includes", (parent.includes as string[]) ?? [])} />}>
             <ListEditor items={form.includes} value={newInclude} onChange={setNewInclude}
               onAdd={() => addToList("includes", newInclude, () => setNewInclude(""))}
               onRemove={(i) => removeFromList("includes", i)}
               placeholder="Ex: Transfer aeroporto, Café da manhã..." />
           </Section>
 
-          <Section title="O que NÃO inclui">
+          <Section title="O que NÃO inclui" action={parent && <PullBtn onClick={() => set("excludes", (parent.excludes as string[]) ?? [])} />}>
             <ListEditor items={form.excludes} value={newExclude} onChange={setNewExclude}
               onAdd={() => addToList("excludes", newExclude, () => setNewExclude(""))}
               onRemove={(i) => removeFromList("excludes", i)}
               placeholder="Ex: Passagem aérea, Almoços..." />
           </Section>
 
-          <Section title="Locais de Saída">
+          <Section title="Locais de Saída" action={parent && <PullBtn onClick={() => set("departure_locations", (parent.departure_locations as string[]) ?? [])} />}>
             <p className="text-xs text-gray-400 mb-3">
               Selecione os pontos de embarque padrão ou adicione um personalizado.
             </p>
@@ -545,7 +571,7 @@ export default function TemplateForm({
             })()}
           </Section>
 
-          <Section title="Opcionais (cliente escolhe)">
+          <Section title="Opcionais (cliente escolhe)" action={parent && <PullBtn onClick={() => set("optionals", ((parent.optionals as { name: string; price: number | string }[]) ?? []).map(o => ({ name: String(o.name ?? ""), price: String(o.price ?? "") })))} />}>
             <p className="text-xs text-gray-400 mb-3">
               O cliente poderá selecionar esses itens ao fazer a reserva. O valor é por pessoa.
             </p>
@@ -584,7 +610,7 @@ export default function TemplateForm({
             </div>
           </Section>
 
-          <Section title="Roteiro">
+          <Section title="Roteiro" action={parent && <PullBtn onClick={() => set("itinerary", normalizeItinerary((parent.itinerary as unknown[]) ?? []))} />}>
             <p className="text-xs text-gray-400 mb-4">
               Organize o roteiro em seções com título livre - pode ser o dia da semana, um tema ou qualquer nome que faça sentido para esta viagem.
             </p>
@@ -644,7 +670,7 @@ export default function TemplateForm({
                 <option value="">Não é variação (roteiro principal)</option>
                 {principals.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
-              <p className="text-[11px] text-gray-400">Marque se este roteiro é uma variação de outro (ex.: &quot;Beto Carrero - 2 dias&quot;). Aparece como &quot;outra opção&quot; na página do principal. O título precisa ser diferente.</p>
+              <p className="text-[11px] text-gray-400">Marque se este roteiro é uma variação de outro (ex.: &quot;Beto Carrero - 2 dias&quot;). Aparece como &quot;outra opção&quot; na página do principal. O título precisa ser diferente. Ao escolher um principal, aparece um botão &quot;Puxar do principal&quot; em cada bloco (fotos, descrição, inclui, roteiro...) para copiar só o que quiser.</p>
             </div>
           </Section>
 
@@ -689,12 +715,26 @@ export default function TemplateForm({
 
 /* ── Sub-componentes ────────────────────────────────────── */
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <h2 className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-4">{title}</h2>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h2 className="text-xs font-bold text-navy-500 uppercase tracking-wider">{title}</h2>
+        {action}
+      </div>
       {children}
     </div>
+  );
+}
+
+// Botão discreto para copiar um bloco do roteiro principal. Só aparece quando
+// há um principal selecionado (form.parent_id) e seus dados foram carregados.
+function PullBtn({ onClick, label = "Puxar do principal" }: { onClick: () => void; label?: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="flex items-center gap-1 text-[11px] font-semibold text-navy-500 hover:text-gold-600 transition-colors flex-shrink-0">
+      <Copy size={12} /> {label}
+    </button>
   );
 }
 
