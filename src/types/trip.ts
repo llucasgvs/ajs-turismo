@@ -25,7 +25,6 @@ export interface Trip {
   required_documents: string | null;
   whatsapp_only?: boolean;
   quote_only?: boolean;
-  group_key?: string | null;
   parent_id?: number | null;
   is_open_date: boolean;
   open_date_price: number | null;

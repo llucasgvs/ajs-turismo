@@ -50,7 +50,6 @@ interface TemplateFormData {
   is_active: boolean;
   whatsapp_only: boolean;
   quote_only: boolean;
-  group_key: string;
   parent_id: number | null;
   // Saídas diárias
   is_open_date: boolean;
@@ -92,7 +91,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true, whatsapp_only: false, quote_only: false, group_key: "", parent_id: null,
+  is_featured: false, is_active: true, whatsapp_only: false, quote_only: false, parent_id: null,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -117,7 +116,6 @@ export default function TemplateForm({
     // normaliza itinerário: suporta formato antigo {day,title,description} e novo {title,items}
     itinerary: normalizeItinerary((initialData?.itinerary as unknown[]) ?? []),
     departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
-    group_key: String((initialData as Record<string, unknown>)?.group_key ?? ""),
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
     open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
@@ -227,7 +225,6 @@ export default function TemplateForm({
         templateId ? `/templates/${templateId}` : "/templates/",
         { method: templateId ? "PUT" : "POST", body: JSON.stringify({
           ...form,
-          group_key: form.group_key.trim() || null,
           // converte price de string para number antes de enviar
           optionals: form.optionals
             .filter(o => o.name.trim())
