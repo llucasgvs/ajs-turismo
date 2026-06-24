@@ -1079,7 +1079,7 @@ function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
     L.push("Olá! Quero reservar pela AJS Turismo.");
     L.push("");
     L.push(`*${booking.trip_title || "Viagem"}*${booking.trip_destination ? ` - ${booking.trip_destination}` : ""}`);
-    if (booking.trip_departure_date) {
+    if (booking.trip_departure_date && !booking.trip_quote_only) {
       L.push(`Data: ${fmtDateRange(booking.trip_departure_date, booking.trip_return_date)}`);
     }
     // Viajantes (com faixas, se houver)

@@ -22,6 +22,7 @@ interface Booking {
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
   trip_return_date?: string; trip_departure_at?: string; trip_return_at?: string; trip_image_url?: string;
   trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
+  trip_quote_only?: boolean;
 }
 
 const WA_BASE = "https://wa.me/5541998348766?text=";
@@ -265,7 +266,7 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
             {b.trip_destination && <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5"><MapPin size={10} /> {b.trip_destination}</p>}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-2">
               <span className="flex items-center gap-1"><Calendar size={11} className="text-gold-500" />
-                {b.trip_departure_date ? (roundtrip ? `${fmtDate(b.trip_departure_date)} · bate e volta` : `${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "Data a definir"}
+                {b.trip_quote_only ? "Sob consulta" : b.trip_departure_date ? (roundtrip ? `${fmtDate(b.trip_departure_date)} · bate e volta` : `${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "Data a definir"}
               </span>
               <span className="flex items-center gap-1"><Users size={11} className="text-gold-500" /> {pessoas(b.num_travelers)}</span>
               {variant !== "interesse" && variant !== "past" && b.final_amount > 0 && <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>}
