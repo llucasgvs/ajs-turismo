@@ -10,6 +10,7 @@ interface PublicTemplate {
   image_url: string | null;
   tag: string | null;
   is_featured: boolean;
+  quote_only?: boolean;
   short_description: string | null;
   price_from: number;
 }
@@ -72,11 +73,20 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">A partir de</p>
-                    <p className="text-navy-600 font-black text-xl">
-                      R$ {fmtBRL(tmpl.price_from)}
-                      <span className="text-gray-400 font-normal text-xs">/pessoa</span>
-                    </p>
+                    {tmpl.quote_only ? (
+                      <>
+                        <p className="text-xs text-gray-400 mb-0.5">Valor</p>
+                        <p className="text-navy-600 font-black text-xl">Sob consulta</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-400 mb-0.5">A partir de</p>
+                        <p className="text-navy-600 font-black text-xl">
+                          R$ {fmtBRL(tmpl.price_from)}
+                          <span className="text-gray-400 font-normal text-xs">/pessoa</span>
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <span className="flex items-center gap-1.5 text-navy-600 group-hover:text-gold-500 font-semibold text-sm transition-colors">

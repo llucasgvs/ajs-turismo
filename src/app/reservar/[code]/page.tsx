@@ -27,6 +27,7 @@ interface Trip {
   price_per_person: number; original_price?: number | null; available_spots: number; max_installments: number;
   price_tiers: { name?: string; age_range?: string; price: number; label?: string }[];
   optionals: { name: string; price: number }[];
+  quote_only?: boolean;
 }
 interface Booking {
   booking_code: string; trip_id: number; final_amount: number; total_amount: number;
@@ -36,6 +37,7 @@ interface Booking {
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
   trip_return_date?: string; trip_image_url?: string; trip_max_installments?: number;
   trip_whatsapp_only?: boolean;
+  trip_quote_only?: boolean;
   installments_max?: number;
   installment_options?: { n: number; installment: number; total: number; interest_free: boolean }[];
 }
@@ -582,7 +584,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-400">R$ {fmtBRL(trip?.price_per_person ?? booking.total_amount / booking.num_travelers)} / pessoa</p>
+              <p className="text-xs text-gray-400">{booking.trip_quote_only ? "Valor sob consulta" : `R$ ${fmtBRL(trip?.price_per_person ?? booking.total_amount / booking.num_travelers)} / pessoa`}</p>
               <Counter value={people} onMinus={() => changePeople(-1)} onPlus={() => changePeople(1)} />
             </div>
           )}
@@ -606,6 +608,17 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           </div>
         )}
 
+        {/* Sob cotação: sem detalhamento/total. Valor combinado pelo WhatsApp. */}
+        {booking.trip_quote_only ? (
+          <div className="border-t border-gray-100 pt-3">
+            <div className="flex items-end justify-between">
+              <span className="text-sm text-gray-500">Valor</span>
+              <span className="font-display font-black text-2xl text-navy-800">Sob consulta</span>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Nossa equipe envia o orçamento e as condições pelo WhatsApp.</p>
+          </div>
+        ) : (
+        <>
         {/* Detalhamento de preço */}
         {(() => {
           const price = trip?.price_per_person || 0;
@@ -659,6 +672,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             </div>
           );
         })()}
+        </>
+        )}
 
         <p className="text-xs text-gray-400 mt-3">Código: {booking.booking_code}</p>
       </div>
@@ -1076,7 +1091,11 @@ function WhatsappPanel({ code, booking }: { code: string; booking: Booking }) {
     if (booking.selected_optionals?.length) {
       L.push(`Opcionais: ${booking.selected_optionals.map(o => o.name).join(", ")}`);
     }
-    L.push(`Total: R$ ${fmtBRL(booking.final_amount)}`);
+    if (booking.trip_quote_only) {
+      L.push("Gostaria de receber a cotação deste roteiro.");
+    } else {
+      L.push(`Total: R$ ${fmtBRL(booking.final_amount)}`);
+    }
     L.push("");
     L.push("*Meus dados:*");
     if (u?.full_name) L.push(`Nome: ${u.full_name}`);
@@ -1156,8 +1175,11 @@ function PreCheckout() {
           tier_breakdown: (book.tier_breakdown || []).map(t => ({ label: t.label, qty: t.qty })),
         }
       : { trip_id: Number(tripId), num_travelers: people, selected_optionals: selOptionals, tier_breakdown: selTiers };
+    // Sob cotação: cria "interesse" (sem valor) em /bookings/. Os demais roteiros
+    // (inclusive whatsapp_only com preço) seguem pelo checkout pago.
+    const endpoint = trip?.quote_only ? `/bookings/` : `/payments/checkout`;
     try {
-      const res = await apiFetch(`/payments/checkout`, {
+      const res = await apiFetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -1191,6 +1213,7 @@ function PreCheckout() {
       trip_title: trip.title || undefined, trip_destination: trip.destination || undefined,
       trip_departure_date: trip.departure_date, trip_return_date: trip.return_date,
       trip_image_url: trip.image_url || undefined,
+      trip_quote_only: trip.quote_only || undefined,
       trip_max_installments: trip.max_installments, installments_max: trip.max_installments, installment_options: [],
     };
   }, [trip, hasTiers, people, selOptionals, selTiers]);

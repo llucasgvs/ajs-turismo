@@ -46,7 +46,9 @@ export async function generateMetadata({
 
   const description =
     trip.short_description ||
-    `Pacote para ${trip.destination}. A partir de R$ ${fmtBRL(trip.price_per_person)} por pessoa. ${trip.duration_nights + 1} dias / ${trip.duration_nights} noites saindo de Curitiba.`;
+    (trip.quote_only
+      ? `Pacote para ${trip.destination} sob consulta. Solicite sua cotação com a AJS Turismo, saindo de Curitiba.`
+      : `Pacote para ${trip.destination}. A partir de R$ ${fmtBRL(trip.price_per_person)} por pessoa. ${trip.duration_nights + 1} dias / ${trip.duration_nights} noites saindo de Curitiba.`);
 
   const ogImage = trip.image_url
     ? [{ url: trip.image_url, width: 1200, height: 630, alt: trip.title }]

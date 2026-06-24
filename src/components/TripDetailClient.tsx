@@ -514,8 +514,22 @@ function ShareButton({ title }: { title: string }) {
    8. Sticky Mobile CTA
 ═══════════════════════════════════════════ */
 function StickyMobileCTA({
-  trip, sold, onBook, whatsappFallback,
-}: { trip: Trip; sold: boolean; onBook: () => void; whatsappFallback: string }) {
+  trip, sold, onBook, whatsappFallback, isQuote = false, onQuote,
+}: { trip: Trip; sold: boolean; onBook: () => void; whatsappFallback: string; isQuote?: boolean; onQuote?: () => void }) {
+  if (isQuote) {
+    return (
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] text-gray-400 leading-none">valor</p>
+          <p className="font-display font-black text-xl text-navy-700 leading-tight">Sob consulta</p>
+        </div>
+        <button onClick={onQuote}
+          className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-[color,background-color,border-color,box-shadow,transform,opacity]">
+          Solicitar cotação
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
       <div className="flex-1 min-w-0">
@@ -1589,6 +1603,15 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     router.push(`/reservar/novo?trip=${selectedTrip.id}&sel=${sel}`);
   }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals, showLoading]);
 
+  // Roteiro sob cotação: sem data/preço. CTA leva direto ao checkout (cadastro
+  // + solicitar cotação pelo WhatsApp), usando o placeholder como alvo.
+  const isQuote = !!trip.quote_only;
+  const handleQuote = useCallback(() => {
+    const sel = encodeURIComponent(JSON.stringify({ people: 1, optionals: [], tiers: [] }));
+    showLoading();
+    router.push(`/reservar/novo?trip=${trip.id}&sel=${sel}`);
+  }, [router, trip.id, showLoading]);
+
   const openGallery = useCallback((idx: number) => {
     setGalleryStart(idx);
     setGalleryOpen(true);
@@ -1648,7 +1671,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
 
       {/* Sticky Mobile CTA */}
-      <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} />
+      <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} isQuote={isQuote} onQuote={handleQuote} />
 
       <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
         {/* ── Mobile top bar: back + share only ── */}
@@ -1732,7 +1755,17 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             <div className="lg:col-span-2 space-y-6">
               {/* Key info - uses activeTrip so it updates with date selection */}
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                {trip.is_open_date ? (
+                {isQuote ? (
+                  <div className="p-5 flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-full bg-navy-50 flex items-center justify-center flex-shrink-0">
+                      <Calendar size={16} className="text-navy-500" />
+                    </span>
+                    <div>
+                      <p className="font-semibold text-navy-800 text-sm">Roteiro sob cotação</p>
+                      <p className="text-xs text-gray-500">Valor e datas combinados pela nossa equipe no WhatsApp.</p>
+                    </div>
+                  </div>
+                ) : trip.is_open_date ? (
                   /* Open date: 3 colunas - Saída (hora), Retorno (hora), Duração */
                   <div className="grid grid-cols-3 divide-x divide-gray-100">
                     <div className="p-5">
@@ -2059,6 +2092,20 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
                 {/* Main booking card */}
                 <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                  {isQuote ? (
+                    <div className="p-5">
+                      <p className="text-xs text-gray-400 mb-0.5">Valor</p>
+                      <p className="font-display font-black text-3xl text-navy-700 leading-tight mb-1">Sob consulta</p>
+                      <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                        Este roteiro é montado sob medida. Faça seu cadastro e solicite a cotação: nossa equipe responde pelo WhatsApp com o valor e as condições.
+                      </p>
+                      <button onClick={handleQuote}
+                        className="w-full font-bold py-4 rounded-xl text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20">
+                        Solicitar cotação
+                      </button>
+                    </div>
+                  ) : (
+                  <>
 
                   {/* Price header */}
                   <div className="p-5 pb-4">
@@ -2248,6 +2295,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
                     )}
 
                   </div>
+                  </>
+                  )}
                 </div>
 
                 {/* WhatsApp help card */}
@@ -2276,7 +2325,12 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-lg font-bold mb-2">Pronto para embarcar?</p>
           <p className="text-navy-300 text-sm mb-6">Fale com nossa equipe agora e garanta sua vaga</p>
-          {sold ? (
+          {isQuote ? (
+            <button onClick={handleQuote}
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
+              Solicitar cotação
+            </button>
+          ) : sold ? (
             <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-colors text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
               Entrar na lista de espera

@@ -57,6 +57,7 @@ interface PublicTemplate {
   tag: string | null;
   is_featured: boolean;
   is_open_date: boolean;
+  quote_only?: boolean;
   short_description: string | null;
   includes: string[];
   price_from: number;
@@ -74,11 +75,13 @@ function fmtDate(d: string) {
 
 function sortTemplates(templates: PublicTemplate[], sort: string): PublicTemplate[] {
   const arr = [...templates];
-  if (sort === "price_asc") return arr.sort((a, b) => a.price_from - b.price_from);
-  if (sort === "price_desc") return arr.sort((a, b) => b.price_from - a.price_from);
-  return arr.sort((a, b) =>
-    new Date(a.dates[0].departure_date).getTime() - new Date(b.dates[0].departure_date).getTime()
-  );
+  // "Sob consulta" (sem preço/data) vai sempre para o fim de qualquer ordenação.
+  const priceKey = (t: PublicTemplate) => (t.quote_only ? Infinity : t.price_from);
+  const dateKey = (t: PublicTemplate) =>
+    t.quote_only || !t.dates.length ? Infinity : new Date(t.dates[0].departure_date).getTime();
+  if (sort === "price_asc") return arr.sort((a, b) => priceKey(a) - priceKey(b));
+  if (sort === "price_desc") return arr.sort((a, b) => (b.quote_only ? -1 : b.price_from) - (a.quote_only ? -1 : a.price_from));
+  return arr.sort((a, b) => dateKey(a) - dateKey(b));
 }
 
 export default function ViagensClient({ initialTemplates }: { initialTemplates: PublicTemplate[] }) {
@@ -552,7 +555,12 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
 
         {/* Datas disponíveis */}
         <div className="mb-3">
-          {tmpl.is_open_date ? (
+          {tmpl.quote_only ? (
+            <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-xl px-3 py-2">
+              <span className="w-2 h-2 rounded-full bg-navy-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-navy-700">Sob consulta · cotação pelo WhatsApp</span>
+            </div>
+          ) : tmpl.is_open_date ? (
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
               <span className="text-xs font-semibold text-emerald-700">Saídas todos os dias</span>
@@ -592,19 +600,31 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
         {/* Footer: price + CTA */}
         <div className="mt-auto flex items-end justify-between pt-3 border-t border-gray-100">
           <div>
-            {tmpl.original_price_from && (
-              <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
-                R$ {fmtBRL(tmpl.original_price_from)}
-              </p>
+            {tmpl.quote_only ? (
+              <>
+                <p className="text-[10px] text-gray-400 leading-none">valor</p>
+                <p className="font-display font-black text-xl text-navy-700 leading-tight">
+                  Sob consulta
+                </p>
+                <p className="text-[10px] text-navy-500 font-semibold">orçamento personalizado</p>
+              </>
+            ) : (
+              <>
+                {tmpl.original_price_from && (
+                  <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
+                    R$ {fmtBRL(tmpl.original_price_from)}
+                  </p>
+                )}
+                <p className="text-[10px] text-gray-400 leading-none">a partir de</p>
+                <p className="font-display font-black text-xl text-navy-700 leading-tight">
+                  R$ {fmtBRL(tmpl.price_from)}
+                </p>
+                <p className="text-[10px] text-emerald-600 font-semibold">
+                  {tmpl.max_installments}x de R${" "}
+                  {fmtInstallment(tmpl.price_from, tmpl.max_installments)} s/ juros
+                </p>
+              </>
             )}
-            <p className="text-[10px] text-gray-400 leading-none">a partir de</p>
-            <p className="font-display font-black text-xl text-navy-700 leading-tight">
-              R$ {fmtBRL(tmpl.price_from)}
-            </p>
-            <p className="text-[10px] text-emerald-600 font-semibold">
-              {tmpl.max_installments}x de R${" "}
-              {fmtInstallment(tmpl.price_from, tmpl.max_installments)} s/ juros
-            </p>
           </div>
           <div className="w-9 h-9 rounded-xl bg-navy-800 text-white group-hover:bg-gold-500 flex items-center justify-center flex-shrink-0 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 group-hover:scale-110">
             <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />

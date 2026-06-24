@@ -19,6 +19,7 @@ interface PublicTemplate {
   tag: string | null;
   is_featured: boolean;
   is_open_date: boolean;
+  quote_only?: boolean;
   short_description: string | null;
   includes: string[];
   price_from: number;
@@ -104,7 +105,12 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
 
                   {/* Próximas datas / saídas */}
                   <div className="mb-4">
-                    {pkg.is_open_date ? (
+                    {pkg.quote_only ? (
+                      <div className="flex items-center gap-2 bg-navy-50 border border-navy-100 rounded-xl px-3 py-2">
+                        <span className="w-2 h-2 rounded-full bg-navy-400 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-navy-700">Sob consulta · cotação pelo WhatsApp</span>
+                      </div>
+                    ) : pkg.is_open_date ? (
                       <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
                         <span className="text-xs font-semibold text-emerald-700">Saídas todos os dias</span>
@@ -132,21 +138,31 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                   <div className="border-t border-gray-100 pt-4">
                     <div className="flex items-end justify-between mb-3">
                       <div>
-                        {pkg.original_price_from && (
-                          <p className="text-xs text-gray-400 line-through">
-                            R$ {fmtBRL(pkg.original_price_from)}
-                          </p>
+                        {pkg.quote_only ? (
+                          <>
+                            <span className="text-xs text-gray-500">valor</span>
+                            <div className="font-display font-black text-2xl text-navy-700">Sob consulta</div>
+                            <p className="text-xs text-navy-500 font-medium">orçamento personalizado</p>
+                          </>
+                        ) : (
+                          <>
+                            {pkg.original_price_from && (
+                              <p className="text-xs text-gray-400 line-through">
+                                R$ {fmtBRL(pkg.original_price_from)}
+                              </p>
+                            )}
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-xs text-gray-500">a partir de</span>
+                              <span className="font-display font-black text-2xl text-navy-700">
+                                R$ {fmtBRL(pkg.price_from)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-emerald-600 font-medium">
+                              ou {pkg.max_installments}x de R${" "}
+                              {fmtInstallment(pkg.price_from, pkg.max_installments)} sem juros
+                            </p>
+                          </>
                         )}
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs text-gray-500">a partir de</span>
-                          <span className="font-display font-black text-2xl text-navy-700">
-                            R$ {fmtBRL(pkg.price_from)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-emerald-600 font-medium">
-                          ou {pkg.max_installments}x de R${" "}
-                          {fmtInstallment(pkg.price_from, pkg.max_installments)} sem juros
-                        </p>
                       </div>
                       {discount && discount > 0 && (
                         <div className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-lg">

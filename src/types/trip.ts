@@ -24,6 +24,7 @@ export interface Trip {
   departure_locations: string[];
   required_documents: string | null;
   whatsapp_only?: boolean;
+  quote_only?: boolean;
   group_key?: string | null;
   parent_id?: number | null;
   is_open_date: boolean;

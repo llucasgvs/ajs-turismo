@@ -49,6 +49,7 @@ interface TemplateFormData {
   is_featured: boolean;
   is_active: boolean;
   whatsapp_only: boolean;
+  quote_only: boolean;
   group_key: string;
   parent_id: number | null;
   // Saídas diárias
@@ -91,7 +92,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true, whatsapp_only: false, group_key: "", parent_id: null,
+  is_featured: false, is_active: true, whatsapp_only: false, quote_only: false, group_key: "", parent_id: null,
   is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -394,6 +395,7 @@ export default function TemplateForm({
             </div>
           </Section>
 
+          {!form.quote_only && (
           <Section title="Tipo de saída">
             <div className="space-y-4">
               {/* Toggle */}
@@ -465,6 +467,7 @@ export default function TemplateForm({
               )}
             </div>
           </Section>
+          )}
 
           <Section title="Imagens" action={parent && <PullBtn label="Puxar fotos" onClick={() => setForm(f => ({ ...f, image_url: String(parent.image_url ?? ""), gallery: (parent.gallery as string[]) ?? [] }))} />}>
             <p className="text-xs text-gray-400 mb-3">
@@ -658,7 +661,13 @@ export default function TemplateForm({
           <Section title="Reserva e pagamento">
             <div className="space-y-4">
               <Toggle label="Reserva só pelo WhatsApp" description="Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui a reserva pelo WhatsApp com a equipe."
-                checked={form.whatsapp_only} onChange={(v) => set("whatsapp_only", v)} />
+                checked={form.whatsapp_only || form.quote_only} onChange={(v) => set("whatsapp_only", v)} disabled={form.quote_only} />
+              {!templateId ? (
+                <Toggle label="Sob cotação (sem data/preço)" description="Para roteiros que precisam de orçamento (ex.: cruzeiro). Some preço e datas; mostra 'Sob consulta'. Cliente faz cadastro e solicita a cotação pelo WhatsApp. Definido na criação e não muda depois."
+                  checked={form.quote_only} onChange={(v) => set("quote_only", v)} />
+              ) : form.quote_only ? (
+                <p className="text-[11px] text-gray-400">Este roteiro é <strong>sob cotação</strong> (sem data/preço, só WhatsApp). Esse modo é definido na criação e não pode ser alterado.</p>
+              ) : null}
             </div>
           </Section>
 
@@ -747,17 +756,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Toggle({ label, description, checked, onChange }: {
-  label: string; description: string; checked: boolean; onChange: (v: boolean) => void;
+function Toggle({ label, description, checked, onChange, disabled = false }: {
+  label: string; description: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className={`flex items-start justify-between gap-3 ${disabled ? "opacity-60" : ""}`}>
       <div>
         <p className="text-sm font-medium text-navy-700">{label}</p>
         <p className="text-xs text-gray-400 mt-0.5">{description}</p>
       </div>
-      <button type="button" onClick={() => onChange(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5 ${checked ? "bg-gold-500" : "bg-gray-200"}`}>
+      <button type="button" onClick={() => !disabled && onChange(!checked)} disabled={disabled}
+        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5 ${checked ? "bg-gold-500" : "bg-gray-200"} ${disabled ? "cursor-not-allowed" : ""}`}>
         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`} />
       </button>
     </div>
