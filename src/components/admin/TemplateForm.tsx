@@ -687,7 +687,7 @@ export default function TemplateForm({
             <div className="space-y-4">
               <Toggle label="Em Destaque" description="Aparece na seção de destaques da home"
                 checked={form.is_featured} onChange={(v) => set("is_featured", v)} />
-              <Toggle label="Roteiro Ativo" description="Permite criar novas datas para este roteiro"
+              <Toggle label="Roteiro Ativo" description={form.quote_only ? "Quando desligado, o roteiro fica oculto no site (clientes não veem)." : "Quando desligado, o roteiro fica oculto no site e não permite criar novas datas."}
                 checked={form.is_active} onChange={(v) => set("is_active", v)} />
             </div>
           </Section>

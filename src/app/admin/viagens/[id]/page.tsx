@@ -25,6 +25,7 @@ interface TripTemplate {
   is_featured: boolean;
   is_active: boolean;
   parent_id: number | null;
+  quote_only?: boolean;
   includes: string[];
   excludes: string[];
   itinerary: { day: number; title: string; description: string }[];
@@ -1023,7 +1024,7 @@ export default function TemplateDetailPage() {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-2">
-        {!template.is_open_date && (
+        {!template.is_open_date && !template.quote_only && (
           <>
             <Link href={`/admin/viagens/${templateId}/datas/nova`}
               className="flex items-center justify-center gap-1.5 bg-navy-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors">
@@ -1160,6 +1161,15 @@ export default function TemplateDetailPage() {
       )}
 
       {/* Seção de datas */}
+      {template.quote_only ? (
+        <div className="rounded-2xl border border-navy-100 bg-navy-50 p-5 text-sm flex items-start gap-3">
+          <Calendar size={16} className="text-navy-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-navy-700">Roteiro sob cotação</p>
+            <p className="text-navy-500 text-xs mt-0.5">Sem datas ou preço fixos: o cliente solicita o orçamento e o atendimento é pelo WhatsApp. Use o toggle &quot;Roteiro Ativo&quot; (em Editar roteiro) para exibir ou ocultar este roteiro no site.</p>
+          </div>
+        </div>
+      ) : (
       <div className="space-y-3">
         <h2 className="text-sm font-bold text-navy-700 uppercase tracking-wider flex items-center gap-2">
           <Calendar size={14} /> {template.is_open_date ? "Datas geradas automaticamente" : "Datas"}
@@ -1224,6 +1234,7 @@ export default function TemplateDetailPage() {
           </div>
         )}
       </div>
+      )}
 
       {quickEditTarget && (
         <QuickEditModal
