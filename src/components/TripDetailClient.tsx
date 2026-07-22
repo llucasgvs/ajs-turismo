@@ -514,8 +514,22 @@ function ShareButton({ title }: { title: string }) {
    8. Sticky Mobile CTA
 ═══════════════════════════════════════════ */
 function StickyMobileCTA({
-  trip, sold, onBook, whatsappFallback, isQuote = false, onQuote,
-}: { trip: Trip; sold: boolean; onBook: () => void; whatsappFallback: string; isQuote?: boolean; onQuote?: () => void }) {
+  trip, sold, onBook, whatsappFallback, isQuote = false, onQuote, semDatas = false, waDatas = "",
+}: { trip: Trip; sold: boolean; onBook: () => void; whatsappFallback: string; isQuote?: boolean; onQuote?: () => void; semDatas?: boolean; waDatas?: string }) {
+  if (semDatas) {
+    return (
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] text-gray-400 leading-none">próximas saídas</p>
+          <p className="font-display font-black text-xl text-navy-700 leading-tight">Em breve</p>
+        </div>
+        <a href={waDatas} target="_blank" rel="noopener noreferrer"
+          className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-bold px-5 py-3.5 rounded-xl text-sm transition-[color,background-color,border-color,box-shadow,transform,opacity]">
+          Consultar datas
+        </a>
+      </div>
+    );
+  }
   if (isQuote) {
     return (
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
@@ -1474,7 +1488,7 @@ function OpenDateCalendar({
 /* ═══════════════════════════════════════════
    12. Main Component
 ═══════════════════════════════════════════ */
-export default function TripDetailClient({ trip }: { trip: Trip }) {
+export default function TripDetailClient({ trip, semDatas = false }: { trip: Trip; semDatas?: boolean }) {
   const router = useRouter();
   const { show: showLoading } = useLoading();
 
@@ -1549,7 +1563,8 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
     ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * priceForLabel(label), 0)
     : sidebarPeople * activeTrip.price_per_person;
 
-  const sold = activeTrip.available_spots === 0 || activeTrip.status === "sold_out";
+  // Sem data aberta não é "esgotado": não há vaga porque não há saída publicada.
+  const sold = !semDatas && (activeTrip.available_spots === 0 || activeTrip.status === "sold_out");
   const lowStock = !sold && activeTrip.available_spots > 0 && activeTrip.available_spots <= 5;
   const discount = activeTrip.original_price
     ? Math.round((1 - activeTrip.price_per_person / activeTrip.original_price) * 100)
@@ -1564,7 +1579,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
   // Load all dates for same template
   useEffect(() => {
-    if (!trip.template_id) return;
+    if (!trip.template_id || semDatas) return;
     fetch(`${API}/trips/?template_id=${trip.template_id}&limit=500&future_only=true`, { cache: "no-store" })
       .then(r => r.json())
       .then((data: Trip[]) => {
@@ -1606,6 +1621,9 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
   // Roteiro sob cotação: sem data/preço. CTA leva direto ao checkout (cadastro
   // + solicitar cotação pelo WhatsApp), usando o placeholder como alvo.
   const isQuote = !!trip.quote_only;
+  // Sem data aberta: mesma página, sem preço/data e com o WhatsApp no lugar da compra.
+  const semCompra = isQuote || semDatas;
+  const waDatas = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no roteiro *${trip.title}*. Quando abrem as próximas saídas?`)}`;
   const handleQuote = useCallback(() => {
     const sel = encodeURIComponent(JSON.stringify({ people: 1, optionals: [], tiers: [] }));
     showLoading();
@@ -1671,7 +1689,7 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
 
       {/* Sticky Mobile CTA */}
-      <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} isQuote={isQuote} onQuote={handleQuote} />
+      <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} isQuote={isQuote} onQuote={handleQuote} semDatas={semDatas} waDatas={waDatas} />
 
       <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
         {/* ── Mobile top bar: back + share only ── */}
@@ -1755,14 +1773,20 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
             <div className="lg:col-span-2 space-y-6">
               {/* Key info - uses activeTrip so it updates with date selection */}
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                {isQuote ? (
+                {semCompra ? (
                   <div className="p-5 flex items-center gap-3">
                     <span className="w-9 h-9 rounded-full bg-navy-50 flex items-center justify-center flex-shrink-0">
                       <Calendar size={16} className="text-navy-500" />
                     </span>
                     <div>
-                      <p className="font-semibold text-navy-800 text-sm">Roteiro sob cotação</p>
-                      <p className="text-xs text-gray-500">Valor e datas montados sob medida. Solicite a sua cotação.</p>
+                      <p className="font-semibold text-navy-800 text-sm">
+                        {semDatas ? "Próximas saídas ainda não abertas" : "Roteiro sob cotação"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {semDatas
+                          ? "Este roteiro está entre temporadas. Fale com a nossa equipe para saber das próximas datas."
+                          : "Valor e datas montados sob medida. Solicite a sua cotação."}
+                      </p>
                     </div>
                   </div>
                 ) : trip.is_open_date ? (
@@ -2077,9 +2101,11 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
               )}
 
               {/* Trust Block - hidden on mobile */}
-              <div className="hidden sm:block">
-                <TrustBlock maxInstallments={activeTrip.max_installments} />
-              </div>
+              {!semDatas && (
+                <div className="hidden sm:block">
+                  <TrustBlock maxInstallments={activeTrip.max_installments} />
+                </div>
+              )}
 
               {/* Related Trips */}
               <DestinationOptions templateId={trip.template_id} parentId={trip.parent_id} />
@@ -2092,7 +2118,19 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
 
                 {/* Main booking card */}
                 <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-                  {isQuote ? (
+                  {semDatas ? (
+                    <div className="p-5">
+                      <p className="text-xs text-gray-400 mb-0.5">Próximas saídas</p>
+                      <p className="font-display font-black text-3xl text-navy-700 leading-tight mb-1">Em breve</p>
+                      <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                        Este roteiro está entre temporadas. Fale com a nossa equipe para saber quando abrem as próximas datas e garantir sua vaga antes de todo mundo.
+                      </p>
+                      <a href={waDatas} target="_blank" rel="noopener noreferrer"
+                        className="w-full block font-bold py-4 rounded-xl text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg bg-emerald-500 hover:bg-emerald-400 text-white hover:shadow-lg hover:shadow-emerald-500/20">
+                        Consultar datas no WhatsApp
+                      </a>
+                    </div>
+                  ) : isQuote ? (
                     <div className="p-5">
                       <p className="text-xs text-gray-400 mb-0.5">Valor</p>
                       <p className="font-display font-black text-3xl text-navy-700 leading-tight mb-1">Sob consulta</p>
@@ -2325,7 +2363,12 @@ export default function TripDetailClient({ trip }: { trip: Trip }) {
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-lg font-bold mb-2">Pronto para embarcar?</p>
           <p className="text-navy-300 text-sm mb-6">Fale com nossa equipe agora e garanta sua vaga</p>
-          {isQuote ? (
+          {semDatas ? (
+            <a href={waDatas} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-colors text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
+              Consultar datas no WhatsApp
+            </a>
+          ) : isQuote ? (
             <button onClick={handleQuote}
               className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-8 py-4 rounded-2xl transition-[color,background-color,border-color,box-shadow,transform,opacity] text-lg hover:scale-105 hover:shadow-xl shadow-emerald-500/20">
               Solicitar cotação

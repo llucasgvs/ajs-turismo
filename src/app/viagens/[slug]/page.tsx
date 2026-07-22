@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Suspense } from "react";
 import TripDetailClient from "@/components/TripDetailClient";
-import RoteiroSemDatas, { type RoteiroPublic } from "@/components/RoteiroSemDatas";
 import type { Trip } from "@/types/trip";
 import { fmtBRL } from "@/lib/format";
 
@@ -14,7 +13,14 @@ type BySlug = {
   slug: string | null;
   has_dates: boolean;
   trip: Trip | null;
-  roteiro: RoteiroPublic & { quote_only?: boolean };
+  roteiro: {
+    id: number; slug: string | null; title: string; destination: string; description: string;
+    short_description: string | null; image_url: string | null; gallery: string[];
+    duration_nights: number; includes: string[]; excludes: string[]; optionals: unknown[];
+    itinerary: unknown[]; departure_locations: string[]; required_documents: string | null;
+    category: string; tag: string | null; whatsapp_only?: boolean; quote_only?: boolean;
+    parent_id?: number | null; is_open_date?: boolean;
+  };
 };
 
 const ehIdAntigo = (v: string) => /^\d+$/.test(v);
@@ -130,9 +136,43 @@ export default async function TripDetailPage({
   const data = await getBySlug(slug);
   if (!data) notFound();
 
-  // Sem data aberta: página continua no ar (fora do catálogo), só com o WhatsApp.
+  // Sem data aberta: mesma página do roteiro (fotos, inclui, itinerário...), só
+  // que o bloco de compra vira "consultar datas no WhatsApp". Os campos de
+  // data/preço abaixo são neutros e nunca chegam à tela (gateados por semDatas).
   if (!data.has_dates || !data.trip) {
-    return <RoteiroSemDatas roteiro={data.roteiro} />;
+    const r = data.roteiro;
+    const agora = new Date().toISOString();
+    const semData = {
+      ...r,
+      template_id: r.id,
+      gallery: r.gallery ?? [],
+      includes: r.includes ?? [],
+      excludes: r.excludes ?? [],
+      optionals: r.optionals ?? [],
+      itinerary: r.itinerary ?? [],
+      departure_locations: r.departure_locations ?? [],
+      min_group_size: 1,
+      departure_date: agora,
+      return_date: agora,
+      price_per_person: 0,
+      original_price: null,
+      max_installments: 1,
+      price_tiers: [],
+      total_spots: 0,
+      available_spots: 0,
+      status: "active",
+      is_active: true,
+      is_featured: false,
+      created_at: agora,
+      updated_at: null,
+      hidden_at: null,
+    } as unknown as Trip;
+
+    return (
+      <Suspense>
+        <TripDetailClient trip={semData} semDatas />
+      </Suspense>
+    );
   }
 
   return (
