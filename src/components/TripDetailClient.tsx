@@ -367,7 +367,7 @@ function DestinationHighlights({ trip }: { trip: Trip }) {
 function RelatedCard({ trip }: { trip: Trip }) {
   const depDate = new Date(trip.departure_date);
   return (
-    <Link href={`/viagens/${trip.id}`}
+    <Link href={`/viagens/${trip.slug ?? trip.id}`}
       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 border border-gray-100 hover:border-gold-300 hover:-translate-y-0.5 flex flex-col"
     >
       <div className="relative h-40 overflow-hidden flex-shrink-0">
@@ -447,7 +447,7 @@ function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: n
 }
 
 /* Outras vertentes do mesmo destino (família principal + variações via parent_id) */
-type PubTemplate = { id: number; first_trip_id: number; title: string; image_url: string | null; parent_id?: number | null; price_from: number };
+type PubTemplate = { id: number; first_trip_id: number; slug?: string | null; title: string; image_url: string | null; parent_id?: number | null; price_from: number };
 function DestinationOptions({ templateId, parentId }: { templateId: number | null; parentId?: number | null }) {
   const [items, setItems] = useState<PubTemplate[]>([]);
   // raiz da família: se este é variação, o principal; senão, ele mesmo.
@@ -464,7 +464,7 @@ function DestinationOptions({ templateId, parentId }: { templateId: number | nul
       <h2 className="font-display font-black text-2xl text-navy-800 mb-6">Outras opções deste destino</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {items.map(t => (
-          <Link key={t.id} href={`/viagens/${t.first_trip_id}`} className="group block rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+          <Link key={t.id} href={`/viagens/${t.slug ?? t.first_trip_id}`} className="group block rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div className="relative h-32 bg-navy-100 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {t.image_url && <img src={t.image_url} alt={t.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />}

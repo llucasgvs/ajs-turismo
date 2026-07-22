@@ -51,6 +51,7 @@ interface PublicTemplate {
   id: number;
   first_trip_id: number;
   title: string;
+  slug?: string | null;
   destination: string;
   image_url: string | null;
   category: string;
@@ -503,7 +504,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
 
   return (
     <Link
-      href={`/viagens/${tmpl.first_trip_id}`}
+      href={`/viagens/${tmpl.slug ?? tmpl.first_trip_id}`}
       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 flex flex-col border border-gray-100 hover:border-gold-300 hover:-translate-y-1"
     >
       {/* Image */}

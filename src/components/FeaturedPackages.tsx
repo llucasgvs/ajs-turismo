@@ -14,6 +14,7 @@ interface PublicTemplate {
   id: number;
   first_trip_id: number;
   title: string;
+  slug?: string | null;
   destination: string;
   image_url: string | null;
   tag: string | null;
@@ -60,7 +61,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
             const nextDates = pkg.dates.filter((d) => d.status === "active").slice(0, 2);
 
             return (
-              <Link key={pkg.id} href={`/viagens/${pkg.first_trip_id}`} className="card flex flex-col group cursor-pointer">
+              <Link key={pkg.id} href={`/viagens/${pkg.slug ?? pkg.first_trip_id}`} className="card flex flex-col group cursor-pointer">
                 {/* Image */}
                 <div className="relative h-52 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

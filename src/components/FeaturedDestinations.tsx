@@ -5,6 +5,7 @@ import { fmtBRL } from "@/lib/format";
 interface PublicTemplate {
   id: number;
   first_trip_id: number;
+  slug?: string | null;
   title: string;
   destination: string;
   image_url: string | null;
@@ -40,7 +41,7 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
           {templates.map((tmpl) => (
             <Link
               key={tmpl.id}
-              href={`/viagens/${tmpl.first_trip_id}`}
+              href={`/viagens/${tmpl.slug ?? tmpl.first_trip_id}`}
               className="card group cursor-pointer block"
             >
               <div className="relative h-52 sm:h-56 overflow-hidden">

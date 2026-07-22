@@ -12,21 +12,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const res = await fetch(`${API}/trips/?limit=200`, { next: { revalidate: 3600 } });
+    // Uma URL por ROTEIRO (antes era uma por data, o que gerava dezenas de
+    // páginas com o mesmo conteúdo disputando entre si no Google).
+    const res = await fetch(`${API}/templates/slugs`, { next: { revalidate: 3600 } });
     if (!res.ok) return staticRoutes;
 
-    const trips: Array<{ id: number; updated_at?: string }> = await res.json();
+    const roteiros: Array<{ slug: string; updated_at?: string }> = await res.json();
+    if (!Array.isArray(roteiros)) return staticRoutes;
 
-    const tripRoutes: MetadataRoute.Sitemap = Array.isArray(trips)
-      ? trips.map((trip) => ({
-          url: `${SITE}/viagens/${trip.id}`,
-          lastModified: trip.updated_at ? new Date(trip.updated_at) : new Date(),
-          changeFrequency: "weekly" as const,
-          priority: 0.8,
-        }))
-      : [];
+    const roteiroRoutes: MetadataRoute.Sitemap = roteiros
+      .filter((r) => r.slug)
+      .map((r) => ({
+        url: `${SITE}/viagens/${r.slug}`,
+        lastModified: r.updated_at ? new Date(r.updated_at) : new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+      }));
 
-    return [...staticRoutes, ...tripRoutes];
+    return [...staticRoutes, ...roteiroRoutes];
   } catch {
     return staticRoutes;
   }
