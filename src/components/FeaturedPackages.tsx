@@ -30,7 +30,7 @@ interface PublicTemplate {
 }
 
 function fmtDate(d: string) {
-  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short" });
 }
 
 export default function FeaturedPackages({ templates: raw }: { templates: PublicTemplate[] }) {

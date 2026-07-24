@@ -115,7 +115,7 @@ export default function CheckoutPage({ params }: { params: { code: string } }) {
             )}
             {booking.trip_departure_date && (
               <p className="text-sm text-gray-500 mt-1">
-                {new Date(booking.trip_departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                {new Date(booking.trip_departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "long", year: "numeric" })}
               </p>
             )}
             <p className="text-sm text-gray-500 mt-1">{booking.num_travelers} viajante{booking.num_travelers > 1 ? "s" : ""}</p>

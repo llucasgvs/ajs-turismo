@@ -80,7 +80,9 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 function fmt(d: string) {
-  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR");
+  // Converte para o fuso de SP: fatiar o ISO cru usaria a data em UTC, o que
+  // vira o dia seguinte para saídas de fim de noite (ex.: 23:45 BRT = 02:45 UTC).
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 /** Horário em SP (HH:MM) a partir de um ISO */
@@ -103,7 +105,9 @@ function toISO(date: string, time: string): string {
 
 /** Dias até a partida (negativo = passado) */
 function daysUntil(iso: string): number {
-  const dep = new Date(iso.slice(0, 10) + "T12:00:00");
+  // Usa a data em SP (não a UTC crua) para não errar o dia em saídas noturnas.
+  const spDate = new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+  const dep = new Date(spDate + "T12:00:00");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((dep.getTime() - today.getTime()) / 86_400_000);

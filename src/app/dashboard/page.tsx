@@ -30,9 +30,12 @@ const WA_HELP = WA_BASE + encodeURIComponent("Olá! Preciso de ajuda com minha r
 const PLACEHOLDER = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&q=80";
 const PAY: Record<string, string> = { whatsapp: "Presencial / WhatsApp", pix: "PIX", credit_card: "Cartão de crédito", transfer: "Transferência" };
 
-const fmtDate = (d: string) => { const [y, m, day] = d.slice(0, 10).split("-"); return `${day}/${m}/${y}`; };
+// Data no fuso de Brasília (fatiar o ISO cru pega a data em UTC, que vira o dia
+// seguinte em saídas de fim de noite - ex.: 23:45 BRT = 02:45 UTC).
+const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+const fmtDate = (d: string) => { const [y, m, day] = spDay(d).split("-"); return `${day}/${m}/${y}`; };
 const fmtTime = (iso?: string | null) => { if (!iso) return ""; const t = new Date(iso); return isNaN(t.getTime()) ? "" : t.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }); };
-const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
+const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
 const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
 const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* - ${b.trip_title ?? "viagem"}.`);

@@ -26,8 +26,9 @@ type TripInstance = { id: number; title: string; destination: string; departure_
 type Template = { id: number; title: string; is_active: boolean; active_dates_count: number; photos_count: number };
 
 /* ─── Helpers ─── */
-const fmt = (d: string) => new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR");
-const daysUntil = (d: string) => Math.ceil((new Date(d.slice(0, 10) + "T12:00:00").getTime() - Date.now()) / 86400000);
+const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+const fmt = (d: string) => new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").getTime() - Date.now()) / 86400000);
 const daysSince = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 const todayLabel = () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
@@ -392,7 +393,7 @@ export default function AdminDashboard() {
               const sold = t.total_spots - t.available_spots;
               const fill = t.total_spots > 0 ? Math.round((sold / t.total_spots) * 100) : 0;
               const days = t.departure_date ? daysUntil(t.departure_date) : null;
-              const dep = t.departure_date ? new Date(t.departure_date.slice(0, 10) + "T12:00:00") : null;
+              const dep = t.departure_date ? new Date(spDay(t.departure_date) + "T12:00:00") : null;
               return (
                 <div key={t.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors sm:border-b sm:border-gray-50">
                   <div className="flex-shrink-0 w-11 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p></> : <span className="text-gray-300 text-xs">-</span>}</div>

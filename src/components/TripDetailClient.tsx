@@ -836,9 +836,9 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
             </p>
             <div className="flex items-end justify-between gap-3 flex-wrap">
               <p className="text-sm font-bold text-navy-800 leading-snug">
-                {new Date(trip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                {new Date(trip.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short", year: "numeric" })}
                 {" → "}
-                {new Date(trip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                {new Date(trip.return_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short", year: "numeric" })}
               </p>
               <span className="font-black text-navy-700 text-base flex-shrink-0">
                 R$ {fmtBRL(trip.price_per_person)}
@@ -1061,8 +1061,9 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
    11. Date Selector
 ═══════════════════════════════════════════ */
 function fmtDate(d: string) {
-  // Always show full date as dd/MM/yyyy - compact and unambiguous
-  const [y, m, day] = d.slice(0, 10).split("-");
+  // Data no fuso de Brasília: fatiar o ISO cru usaria a data em UTC, que vira o
+  // dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC).
+  const [y, m, day] = new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" }).split("-");
   return `${day}/${m}/${y}`;
 }
 
@@ -1269,7 +1270,7 @@ function CompactDateSelector({
     return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   };
   const fmtDay = (d: string) =>
-    new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+    new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short" });
 
   return (
     <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
@@ -1403,8 +1404,8 @@ function OpenDateCalendar({
           {selected ? (
             <p className="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
               <Check size={12} />
-              {new Date(selected.departure_date.slice(0, 10) + "T12:00:00")
-                .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+              {new Date(selected.departure_date)
+                .toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             </p>
           ) : (
             <p className="text-xs text-gray-400 mt-0.5">Saídas todos os dias - escolha o dia que deseja ir</p>
@@ -1811,13 +1812,13 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                     <div className="p-5">
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
                         value={selectedTrip
-                          ? new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                          ? new Date(activeTrip.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short", year: "numeric" })
                           : "-"} />
                     </div>
                     <div className="p-5">
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Retorno"
                         value={selectedTrip
-                          ? new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+                          ? new Date(activeTrip.return_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short", year: "numeric" })
                           : "-"} />
                     </div>
                     <div className="p-5">
@@ -2080,14 +2081,14 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                       <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Saída</p>
                       <p className="font-black text-2xl text-navy-800 leading-none">{fmtTimeSP(activeTrip.departure_date)}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {new Date(activeTrip.departure_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                        {new Date(activeTrip.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short" })}
                       </p>
                     </div>
                     <div className="bg-navy-50 rounded-xl px-4 py-3">
                       <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Retorno</p>
                       <p className="font-black text-2xl text-navy-800 leading-none">{fmtTimeSP(activeTrip.return_date)}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {new Date(activeTrip.return_date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                        {new Date(activeTrip.return_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short" })}
                       </p>
                     </div>
                   </div>

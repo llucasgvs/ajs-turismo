@@ -220,15 +220,21 @@ function InfoMsg({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Data (YYYY-MM-DD) no fuso de Brasília. Fatiar o ISO cru usaria a data em UTC,
+// que vira o dia seguinte para saídas de fim de noite (23:45 BRT = 02:45 UTC).
+const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+
 /* Intervalo de datas compacto: "11 - 14 jul 2026" ou "30 jul - 2 ago 2026" */
 function fmtDateRange(dep?: string, ret?: string) {
   if (!dep) return "";
-  const d1 = new Date(dep.slice(0, 10) + "T12:00:00");
+  const sp1 = spDay(dep);
+  const d1 = new Date(sp1 + "T12:00:00");
   const mon = (x: Date) => x.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   if (!ret) return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
-  const d2 = new Date(ret.slice(0, 10) + "T12:00:00");
+  const sp2 = spDay(ret);
+  const d2 = new Date(sp2 + "T12:00:00");
   // Bate-e-volta (mesmo dia): mostra só a data, sem intervalo "5 - 5".
-  if (dep.slice(0, 10) === ret.slice(0, 10))
+  if (sp1 === sp2)
     return `${d1.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
   if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
     return `${d1.getDate()} - ${d2.getDate()} ${mon(d1)} ${d1.getFullYear()}`;
@@ -237,12 +243,14 @@ function fmtDateRange(dep?: string, ret?: string) {
 /* Versão por extenso (telas maiores): "11 a 14 de julho de 2026" */
 function fmtDateRangeFull(dep?: string, ret?: string) {
   if (!dep) return "";
-  const d1 = new Date(dep.slice(0, 10) + "T12:00:00");
+  const sp1 = spDay(dep);
+  const d1 = new Date(sp1 + "T12:00:00");
   const mon = (x: Date) => x.toLocaleDateString("pt-BR", { month: "long" });
   if (!ret) return `${d1.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;
-  const d2 = new Date(ret.slice(0, 10) + "T12:00:00");
+  const sp2 = spDay(ret);
+  const d2 = new Date(sp2 + "T12:00:00");
   // Bate-e-volta (mesmo dia): data única.
-  if (dep.slice(0, 10) === ret.slice(0, 10))
+  if (sp1 === sp2)
     return `${d1.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;
   if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
     return `${d1.getDate()} a ${d2.getDate()} de ${mon(d1)} de ${d1.getFullYear()}`;

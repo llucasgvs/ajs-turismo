@@ -84,7 +84,7 @@ const isPastTrip = (b: Booking) => !!b.trip_departure_date && new Date(b.trip_de
 
 function fmt(d: string) {
   if (!d) return "-";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 function daysSince(dateStr: string): number {

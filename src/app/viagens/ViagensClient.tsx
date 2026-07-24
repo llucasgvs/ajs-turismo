@@ -68,7 +68,10 @@ interface PublicTemplate {
 }
 
 function fmtDate(d: string) {
-  const date = new Date(d.slice(0, 10) + "T12:00:00");
+  // Data no fuso de Brasília (fatiar o ISO cru usaria a data em UTC, que vira o
+  // dia seguinte em saídas de fim de noite).
+  const spDay = new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+  const date = new Date(spDay + "T12:00:00");
   const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return date.toLocaleDateString("pt-BR", opts);
