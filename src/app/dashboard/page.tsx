@@ -36,7 +36,7 @@ const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "A
 const fmtDate = (d: string) => { const [y, m, day] = spDay(d).split("-"); return `${day}/${m}/${y}`; };
 const fmtTime = (iso?: string | null) => { if (!iso) return ""; const t = new Date(iso); return isNaN(t.getTime()) ? "" : t.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }); };
 const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);
-const sameDay = (a?: string, b?: string) => !!a && !!b && a.slice(0, 10) === b.slice(0, 10);
+const sameDay = (a?: string, b?: string) => !!a && !!b && spDay(a) === spDay(b);
 const pessoas = (n: number) => `${n} ${n === 1 ? "pessoa" : "pessoas"}`;
 const waMsg = (b: Booking) => WA_BASE + encodeURIComponent(`Olá! Quero acompanhar minha reserva *${b.booking_code}* - ${b.trip_title ?? "viagem"}.`);
 const locName = (l: unknown) => typeof l === "string" ? l : (l && typeof l === "object" ? ((l as Record<string, string>).name || (l as Record<string, string>).label || "") : "");

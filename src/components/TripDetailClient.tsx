@@ -17,6 +17,10 @@ import { tierLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Dia da saída (YYYY-MM-DD) no fuso de Brasília. Fatiar o ISO cru usaria a data
+// em UTC, que vira o dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC).
+const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+
 /* ─── types ─── */
 type StoredUser = {
   id: number;
@@ -93,8 +97,8 @@ function buildWhatsAppMessage(
   let msg =
     `*Interesse em reserva -- ${trip.title}*\n` +
     `Destino: ${trip.destination}\n` +
-    `Saida: ${fmt(trip.departure_date.slice(0, 10))}\n` +
-    `Retorno: ${fmt(trip.return_date.slice(0, 10))}\n` +
+    `Saida: ${fmt(spDay(trip.departure_date))}\n` +
+    `Retorno: ${fmt(spDay(trip.return_date))}\n` +
     `Preco por pessoa: R$ ${fmtBRL(trip.price_per_person)}\n` +
     `Codigo: ${bookingCode}\n\n` +
     `*Titular:*\n` +
@@ -396,7 +400,7 @@ function RelatedCard({ trip }: { trip: Trip }) {
             <p className="font-black text-base text-navy-700 leading-tight">R$ {fmtBRL(trip.price_per_person)}</p>
           </div>
           <span className="text-[10px] text-navy-500 font-medium">
-            {depDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+            {depDate.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short" })}
           </span>
         </div>
       </div>
@@ -1257,7 +1261,7 @@ function CompactDateSelector({
 
   // Agrupar por "YYYY-MM"
   const grouped = trips.reduce<Record<string, Trip[]>>((acc, t) => {
-    const key = t.departure_date.slice(0, 7); // "2026-04"
+    const key = spDay(t.departure_date).slice(0, 7); // "2026-04" (fuso BRT)
     (acc[key] ||= []).push(t);
     return acc;
   }, {});
@@ -1378,7 +1382,7 @@ function OpenDateCalendar({
   // Map: "YYYY-MM-DD" → Trip
   const tripsByDate = useMemo(() => {
     const map: Record<string, Trip> = {};
-    trips.forEach(t => { map[t.departure_date.slice(0, 10)] = t; });
+    trips.forEach(t => { map[spDay(t.departure_date)] = t; });
     return map;
   }, [trips]);
 
@@ -1453,7 +1457,7 @@ function OpenDateCalendar({
           const isBeyond = d > maxDate;
           const isSold = trip?.available_spots === 0 || trip?.status === "sold_out";
           const isUnavailable = isPast || isBeyond || !trip || isSold;
-          const isSelected = selected?.departure_date.slice(0, 10) === key;
+          const isSelected = selected ? spDay(selected.departure_date) === key : false;
           const isToday = d.getTime() === today.getTime();
 
           return (
@@ -1988,7 +1992,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
               {/* Itinerary */}
               {trip.itinerary?.length > 0 && (() => {
                 const isSameDay = trip.departure_date && trip.return_date &&
-                  trip.departure_date.slice(0, 10) === trip.return_date.slice(0, 10);
+                  spDay(trip.departure_date) === spDay(trip.return_date);
 
                 const isNewFormat = Array.isArray(trip.itinerary[0]?.items);
 
@@ -2182,9 +2186,9 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
                           {selectedTrip ? (
                             <p className="text-sm font-bold text-navy-800">
-                              {new Date(selectedTrip.departure_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})}
+                              {new Date(selectedTrip.departure_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short",year:"numeric"})}
                               {" → "}
-                              {new Date(selectedTrip.return_date.slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}
+                              {new Date(selectedTrip.return_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short"})}
                             </p>
                           ) : (
                             <p className="text-sm font-bold text-gray-400">Selecione uma data</p>

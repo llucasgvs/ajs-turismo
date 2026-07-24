@@ -939,8 +939,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                   <option value="">Selecione a data...</option>
                   {dateOptions.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR") : "Data indefinida"}
-                      {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR")}` : ""}
+                      {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Data indefinida"}
+                      {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}
                       {" "}· {spotsLabel(t.available_spots)} · R$ {fmtBRL(t.price_per_person)}
                     </option>
                   ))}
@@ -1449,7 +1449,7 @@ export default function AdminReservasPage() {
               <option value="">Todas as viagens</option>
               {trips.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.title}{t.departure_date ? ` · ${new Date(t.departure_date).toLocaleDateString("pt-BR")}` : ""}
+                  {t.title}{t.departure_date ? ` · ${new Date(t.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}
                 </option>
               ))}
             </select>

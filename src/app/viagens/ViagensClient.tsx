@@ -67,6 +67,12 @@ interface PublicTemplate {
   dates: PublicDate[];
 }
 
+// Dia/mês da saída no fuso de Brasília. Fatiar o ISO cru usaria a data em UTC,
+// que vira o dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC),
+// desalinhando o calendário e os filtros do dia mostrado no card.
+const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+const spMonth = (iso: string) => spDay(iso).slice(0, 7);
+
 function fmtDate(d: string) {
   // Data no fuso de Brasília (fatiar o ISO cru usaria a data em UTC, que vira o
   // dia seguinte em saídas de fim de noite).
@@ -115,13 +121,13 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = spDay(new Date().toISOString());
 
   // Map de datas → contagem (apenas templates com data fixa; open_date não polui o calendário)
   const datesByDate = useMemo(() => {
     const map: Record<string, number> = {};
     templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
-      const key = d.departure_date.slice(0, 10);
+      const key = spDay(d.departure_date);
       if (key >= today) map[key] = (map[key] || 0) + 1;
     }));
     return map;
@@ -130,8 +136,8 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
   const datesByMonth = useMemo(() => {
     const map: Record<string, number> = {};
     templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
-      const key = d.departure_date.slice(0, 7);
-      if (d.departure_date.slice(0, 10) >= today) map[key] = (map[key] || 0) + 1;
+      const key = spMonth(d.departure_date);
+      if (spDay(d.departure_date) >= today) map[key] = (map[key] || 0) + 1;
     }));
     return map;
   }, [templates, today]);
@@ -141,7 +147,7 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
     let lastMonth = "";
     // Apenas templates com data fixa definem o alcance do calendário
     templates.filter((t) => !t.is_open_date).forEach((t) => t.dates.forEach((d) => {
-      const m = d.departure_date.slice(0, 7);
+      const m = spMonth(d.departure_date);
       if (m > lastMonth) lastMonth = m;
     }));
     if (!lastMonth) return months;
@@ -183,12 +189,12 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
     }
     if (selectedDate) {
       result = result.filter((t) =>
-        t.is_open_date || t.dates.some((d) => d.departure_date.slice(0, 10) === selectedDate)
+        t.is_open_date || t.dates.some((d) => spDay(d.departure_date) === selectedDate)
       );
     }
     if (selectedMonth) {
       result = result.filter((t) =>
-        t.is_open_date || t.dates.some((d) => d.departure_date.slice(0, 7) === selectedMonth)
+        t.is_open_date || t.dates.some((d) => spMonth(d.departure_date) === selectedMonth)
       );
     }
     setFiltered(sortTemplates(result, sort));
@@ -493,10 +499,10 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
 
   // Sort dates: highlight matching ones first, then by date
   const sortedDates = [...tmpl.dates].sort((a, b) => {
-    const aMatch = (highlightDate && a.departure_date.slice(0, 10) === highlightDate) ||
-                   (highlightMonth && a.departure_date.slice(0, 7) === highlightMonth);
-    const bMatch = (highlightDate && b.departure_date.slice(0, 10) === highlightDate) ||
-                   (highlightMonth && b.departure_date.slice(0, 7) === highlightMonth);
+    const aMatch = (highlightDate && spDay(a.departure_date) === highlightDate) ||
+                   (highlightMonth && spMonth(a.departure_date) === highlightMonth);
+    const bMatch = (highlightDate && spDay(b.departure_date) === highlightDate) ||
+                   (highlightMonth && spMonth(b.departure_date) === highlightMonth);
     if (aMatch && !bMatch) return -1;
     if (!aMatch && bMatch) return 1;
     return new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime();
@@ -575,8 +581,8 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
               <div className="space-y-1">
                 {shownDates.map((d) => {
                   const isSoldOut = d.status === "sold_out";
-                  const isHighlighted = (highlightDate && d.departure_date.slice(0, 10) === highlightDate) ||
-                                        (highlightMonth && d.departure_date.slice(0, 7) === highlightMonth);
+                  const isHighlighted = (highlightDate && spDay(d.departure_date) === highlightDate) ||
+                                        (highlightMonth && spMonth(d.departure_date) === highlightMonth);
                   return (
                     <div key={d.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
                       isHighlighted ? "bg-gold-50 border border-gold-200" :
