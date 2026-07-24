@@ -54,6 +54,7 @@ interface TemplateFormData {
   // Saídas diárias
   is_open_date: boolean;
   open_date_price: string;
+  open_date_max_installments: string;
   open_date_spots_per_day: string;
   open_date_min_advance: string;
   open_date_max_advance: string;
@@ -92,7 +93,7 @@ const EMPTY: TemplateFormData = {
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
   is_featured: false, is_active: true, whatsapp_only: false, quote_only: false, parent_id: null,
-  is_open_date: false, open_date_price: "", open_date_spots_per_day: "0",
+  is_open_date: false, open_date_price: "", open_date_max_installments: "12", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
 };
@@ -118,6 +119,7 @@ export default function TemplateForm({
     departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
+    open_date_max_installments: String((initialData as Record<string, unknown>)?.open_date_max_installments ?? "12"),
     open_date_spots_per_day: String((initialData as Record<string, unknown>)?.open_date_spots_per_day ?? "0"),
     open_date_min_advance: String((initialData as Record<string, unknown>)?.open_date_min_advance ?? "1"),
     open_date_max_advance: String((initialData as Record<string, unknown>)?.open_date_max_advance ?? "180"),
@@ -231,6 +233,7 @@ export default function TemplateForm({
             .map(o => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
           // converte open_date campos de string para number
           open_date_price: form.open_date_price ? parseFloat(form.open_date_price) : null,
+          open_date_max_installments: Math.max(1, Math.min(parseInt(form.open_date_max_installments) || 12, 12)),
           open_date_spots_per_day: parseInt(form.open_date_spots_per_day) || 0,
           open_date_min_advance: parseInt(form.open_date_min_advance) || 1,
           open_date_max_advance: parseInt(form.open_date_max_advance) || 180,
@@ -423,6 +426,17 @@ export default function TemplateForm({
                         value={form.open_date_price} min="0" step="0.01"
                         onChange={e => set("open_date_price", e.target.value)} />
                     </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold mb-1 block">Máximo de parcelas <span className="text-gray-400 font-normal">(cartão)</span></label>
+                      <select className="input-field text-sm" value={form.open_date_max_installments}
+                        onChange={e => set("open_date_max_installments", e.target.value)}>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>{n}x</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-gray-500 font-semibold mb-1 block">
                         Vagas por dia <span className="text-gray-400 font-normal">(0 = ilimitado)</span>

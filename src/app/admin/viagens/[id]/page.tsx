@@ -36,6 +36,7 @@ interface TripTemplate {
   open_date_return_hour: number | null;
   open_date_return_minute: number | null;
   open_date_price: number | null;
+  open_date_max_installments: number | null;
   open_date_spots_per_day: number;
 }
 
@@ -874,6 +875,7 @@ export default function TemplateDetailPage() {
   const [odDeparture, setOdDeparture] = useState("06:00");
   const [odReturn, setOdReturn] = useState("23:59");
   const [odPrice, setOdPrice] = useState("");
+  const [odInstallments, setOdInstallments] = useState("12");
   const [odSpots, setOdSpots] = useState("");
   const [odSaving, setOdSaving] = useState(false);
   const [odSuccess, setOdSuccess] = useState(false);
@@ -894,6 +896,7 @@ export default function TemplateDetailPage() {
           setOdDeparture(`${String(dh).padStart(2,"0")}:${String(dm).padStart(2,"0")}`);
           setOdReturn(`${String(rh).padStart(2,"0")}:${String(rm).padStart(2,"0")}`);
           setOdPrice(data.open_date_price != null ? String(data.open_date_price) : "");
+          setOdInstallments(String(data.open_date_max_installments ?? 12));
           setOdSpots(String(data.open_date_spots_per_day ?? 0));
         }
       })
@@ -912,6 +915,7 @@ export default function TemplateDetailPage() {
           open_date_return_hour: parseInt(odReturn.split(":")[0]) || 23,
           open_date_return_minute: parseInt(odReturn.split(":")[1] ?? "59"),
           open_date_price: odPrice ? parseFloat(odPrice) : null,
+          open_date_max_installments: Math.max(1, Math.min(parseInt(odInstallments) || 12, 12)),
           open_date_spots_per_day: parseInt(odSpots) || 0,
         }),
       });
@@ -1146,16 +1150,28 @@ export default function TemplateDetailPage() {
             </div>
             <div>
               <label className="text-xs text-gray-500 font-semibold mb-1 block">
+                Máximo de parcelas <span className="text-gray-400 font-normal">(cartão)</span>
+              </label>
+              <select className="input-field text-sm" value={odInstallments}
+                onChange={(e) => setOdInstallments(e.target.value)}>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>{n}x</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500 font-semibold mb-1 block">
                 Vagas por dia <span className="text-gray-400 font-normal">(0 = ilimitado)</span>
               </label>
               <input type="number" className="input-field text-sm" value={odSpots} min="0"
                 onChange={(e) => setOdSpots(e.target.value)} />
             </div>
           </div>
+          <p className="text-[11px] text-gray-400">Preço e parcelas valem para todas as datas já geradas e as futuras. Reservas já feitas não mudam.</p>
           <button onClick={saveOpenDateConfig} disabled={odSaving}
             className="w-full flex items-center justify-center gap-2 bg-navy-800 text-white font-semibold py-2.5 rounded-xl hover:bg-navy-700 transition-colors text-sm disabled:opacity-50">
             {odSaving ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {odSaving ? "Salvando..." : "Salvar e atualizar todos os horários"}
+            {odSaving ? "Salvando..." : "Salvar e aplicar em todas as datas"}
           </button>
         </div>
       )}
