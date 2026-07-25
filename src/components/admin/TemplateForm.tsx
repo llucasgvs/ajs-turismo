@@ -84,8 +84,11 @@ const PRESET_DOCUMENTS =
 
 const PRESET_DEPARTURE_LOCATIONS = [
   "Curitiba · Shopping Curitiba (Rua Lamenha Lins, 447)",
+  "Curitiba · Shopping Curitiba (Rua Brigadeiro Franco, 2300)",
   "Curitiba · Shopping Estação (Rua Barão do Rio Branco, 805)",
+  "São José dos Pinhais · Aeroporto Internacional de Curitiba",
   "São José dos Pinhais · Posto Pinheirão",
+  "São José dos Pinhais · Posto Ipiranga (Av. Rui Barbosa, 3406)",
 ];
 
 const EMPTY: TemplateFormData = {
