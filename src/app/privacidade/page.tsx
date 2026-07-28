@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function PoliticaDePrivacidade() {
-  const updated = "31 de março de 2026";
+  const updated = "28 de julho de 2026";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,6 +54,7 @@ export default function PoliticaDePrivacidade() {
                 "CPF (Cadastro de Pessoa Física)",
                 "Data de nascimento",
                 "Dados de acompanhantes informados no momento da reserva",
+                "Dados de navegação: páginas visitadas, origem do acesso e tipo de dispositivo (ver item 7)",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0" />
@@ -144,10 +145,29 @@ export default function PoliticaDePrivacidade() {
           </section>
 
           <section>
-            <h2 className="font-bold text-navy-800 text-lg mb-3">7. Cookies</h2>
+            <h2 className="font-bold text-navy-800 text-lg mb-3">7. Cookies e medição de audiência</h2>
+            <p className="mb-3">
+              Utilizamos cookies <strong>estritamente necessários</strong> para manter sua sessão autenticada
+              no site. Sem eles, não seria possível fazer login nem concluir uma reserva.
+            </p>
+            <p className="mb-3">
+              Também utilizamos ferramentas de <strong>medição de audiência</strong> para entender como as
+              pessoas navegam pelo site (páginas visitadas, origem do acesso e tipo de dispositivo). Esses
+              dados são estatísticos e nos ajudam a melhorar os roteiros e a experiência de navegação:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 mb-3">
+              <li>
+                <strong>Google Analytics</strong> (Google LLC): utiliza cookies próprios para medir o
+                acesso ao site e o desempenho das nossas campanhas de divulgação.
+              </li>
+              <li>
+                <strong>Vercel Analytics</strong>: mede o acesso às páginas sem utilizar cookies.
+              </li>
+            </ul>
             <p>
-              Utilizamos cookies estritamente necessários para manter sua sessão autenticada no site. Não
-              utilizamos cookies de rastreamento ou publicidade de terceiros.
+              Você pode bloquear ou apagar cookies nas configurações do seu navegador. Os cookies de medição
+              podem ser recusados sem prejuízo ao uso do site; já os cookies necessários, se bloqueados,
+              impedem o login e a finalização de reservas.
             </p>
           </section>
 
