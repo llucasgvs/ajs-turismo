@@ -138,14 +138,6 @@ body {
   right: 24px;
   z-index: 1000;
   border-radius: 9999px;
-  /* Mantém o botão na própria camada de composição desde o início.
-     Sem isto, no mobile a animação infinita (waPulse) neste elemento fixo
-     colado na borda inferior inflava a área de rolagem: sobrava um espaço
-     branco depois do rodapé, que não voltava no elástico. Tocar no botão
-     aplicava um transform (hover:scale) e o espaço sumia - ou seja, era o
-     próprio recálculo de camada que corrigia. Aqui isso já vem aplicado. */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .whatsapp-float > a {
