@@ -16,7 +16,7 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://ajsturismo.com.br";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),

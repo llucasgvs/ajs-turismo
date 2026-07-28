@@ -6,7 +6,7 @@ import type { Trip } from "@/types/trip";
 import { fmtBRL } from "@/lib/format";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://ajsturismo.com.br";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
 
 type BySlug = {
   template_id: number;
