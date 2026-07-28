@@ -15,6 +15,86 @@ function getGtag(): Gtag | null {
   return typeof g === "function" ? g : null;
 }
 
+/** Dispara um evento com segurança: se algo falhar, o site segue igual. */
+function enviar(evento: string, dados: Record<string, unknown>) {
+  try {
+    const gtag = getGtag();
+    if (!gtag) return;
+    gtag("event", evento, dados);
+  } catch {
+    // Silêncio proposital.
+  }
+}
+
+/**
+ * Etapa 1 do funil: a pessoa abriu a página de um roteiro.
+ * Cada visualização conta (não é deduplicado, é o comportamento correto aqui).
+ */
+export function trackViewItem(dados: {
+  id: string | number;
+  name?: string | null;
+  price?: number | null;
+  category?: string | null;
+}) {
+  const { id, name, price, category } = dados;
+  if (!id || !name) return;
+  const valor = Number(price);
+  enviar("view_item", {
+    currency: "BRL",
+    value: Number.isFinite(valor) && valor > 0 ? valor : 0,
+    items: [
+      {
+        item_id: String(id),
+        item_name: name,
+        item_category: category || undefined,
+        price: Number.isFinite(valor) && valor > 0 ? valor : undefined,
+      },
+    ],
+  });
+}
+
+/**
+ * Etapa 2 do funil: a pessoa entrou no checkout (reserva aberta).
+ * Deduplicado por sessão para não inflar quando a página é atualizada.
+ */
+export function trackBeginCheckout(dados: {
+  code: string;
+  amount?: number | null;
+  tripTitle?: string | null;
+  travelers?: number | null;
+}) {
+  try {
+    const { code, amount, tripTitle, travelers } = dados;
+    if (!code) return;
+
+    const chave = `ga_checkout_${code}`;
+    try {
+      if (sessionStorage.getItem(chave)) return; // já contado nesta sessão
+      sessionStorage.setItem(chave, "1");
+    } catch {
+      // Sem sessionStorage: segue, no pior caso conta a mais numa atualização.
+    }
+
+    const valor = Number(amount);
+    const pessoas = Number(travelers);
+    enviar("begin_checkout", {
+      currency: "BRL",
+      value: Number.isFinite(valor) && valor > 0 ? valor : 0,
+      items: tripTitle
+        ? [
+            {
+              item_id: code,
+              item_name: tripTitle,
+              quantity: Number.isFinite(pessoas) && pessoas > 0 ? pessoas : 1,
+            },
+          ]
+        : undefined,
+    });
+  } catch {
+    // Silêncio proposital.
+  }
+}
+
 /**
  * Registra a compra concluída - no máximo UMA vez por reserva.
  *

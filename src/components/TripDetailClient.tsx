@@ -14,6 +14,7 @@ import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel } from "@/lib/tiers";
+import { trackViewItem } from "@/lib/analytics";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -1599,6 +1600,22 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
       })
       .catch(() => {});
   }, [trip.id, trip.template_id]);
+
+  // Etapa 1 do funil (Google Analytics): visualização do roteiro.
+  // Só observa; não interfere em nada da página. A trava por ref garante um
+  // único envio por roteiro, sem depender do modo de execução do React.
+  const viewEnviado = useRef<string | null>(null);
+  useEffect(() => {
+    const chave = String(trip.template_id ?? trip.id);
+    if (viewEnviado.current === chave) return;
+    viewEnviado.current = chave;
+    trackViewItem({
+      id: trip.template_id ?? trip.id,
+      name: trip.title,
+      price: trip.price_per_person,
+      category: trip.category,
+    });
+  }, [trip.template_id, trip.id, trip.title, trip.price_per_person, trip.category]);
 
   const handleSelectDate = useCallback((t: Trip) => {
     setSelectedTrip(t);

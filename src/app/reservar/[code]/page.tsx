@@ -12,7 +12,7 @@ import {
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { fmtBRL, spotsLabel, salesClosed } from "@/lib/format";
-import { trackPurchaseOnce } from "@/lib/analytics";
+import { trackPurchaseOnce, trackBeginCheckout } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel } from "@/lib/tiers";
 
@@ -381,6 +381,18 @@ function BookingCheckout({ code }: { code: string }) {
 
   // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
+  // Etapa 2 do funil: entrou no checkout (reserva aberta, ainda não paga).
+  useEffect(() => {
+    if (booking && booking.status !== "confirmed" && !confirmed) {
+      trackBeginCheckout({
+        code,
+        amount: booking.final_amount,
+        tripTitle: booking.trip_title,
+        travelers: booking.num_travelers,
+      });
+    }
+  }, [booking, confirmed, code]);
+
   // Medição da compra (Google Analytics). Só observa: não interfere no fluxo.
   useEffect(() => {
     if (confirmed || booking?.status === "confirmed") {
