@@ -28,6 +28,12 @@
 
 html {
   scroll-behavior: smooth;
+  /* Cor da "tela" do navegador (canvas), atrás do documento.
+     No Chrome do iOS, ao recolher as barras, ele revela a área além do fim do
+     documento. Sem um fundo no html, quem pinta essa área é o fundo do body
+     (branco) - daí a faixa branca depois do rodapé. Com a cor do rodapé, essa
+     faixa fica invisível. O branco do conteúdo continua vindo do body. */
+  background-color: #070D20;
 }
 
 body {
