@@ -44,6 +44,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* iOS: o campo de data tem largura mínima própria e, dentro de um grid/flex
+   (ex.: CPF + Data de nascimento lado a lado), não encolhe - o campo escapava
+   do quadro do viajante. min-width:0 deixa ele respeitar a coluna. */
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @layer components {
   .btn-primary {
     @apply bg-gold-500 hover:bg-gold-400 text-navy-700 font-bold py-3 px-6 rounded-xl transition-[transform,box-shadow,background-color] duration-200 ease-[var(--ease-out)] shadow-gold hover:shadow-gold-hover hover:-translate-y-0.5 active:scale-[0.98] text-sm md:text-base;
