@@ -2,7 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { LoadingProvider } from "@/components/LoadingProvider";
+
+// Google Analytics 4. O ID é público (aparece no código da página), então fica
+// aqui mesmo. Serve de base para medir as campanhas do Google Ads.
+const GA_ID = "G-5YSD4T8XW9";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -168,6 +173,8 @@ export default function RootLayout({
         {/* Visitas por página (Vercel Analytics). Não usa cookie, então não
             exige aviso de cookies. */}
         <Analytics />
+        {/* Google Analytics 4: base de medição para o Google Ads. */}
+        <GoogleAnalytics gaId={GA_ID} />
       </body>
     </html>
   );
