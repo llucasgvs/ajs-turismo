@@ -25,7 +25,7 @@ const reasons = [
   {
     icon: Award,
     title: "Qualidade Comprovada",
-    description: "Nota 4.9/5 nas avaliações de clientes. Mais de 16.000 famílias atendidas com excelência.",
+    description: "Nota 4.9/5 nas avaliações de clientes. Mais de 19.000 famílias atendidas com excelência.",
     color: "text-gold-600",
     bg: "bg-gold-50",
   },
@@ -67,7 +67,7 @@ export default function WhyUs() {
             <div className="grid grid-cols-3 gap-4 mb-8 max-w-sm mx-auto lg:mx-0">
               {[
                 { value: "10+", label: "Anos de mercado" },
-                { value: "16k+", label: "Viajantes" },
+                { value: "19k+", label: "Viajantes" },
                 { value: "4.9★", label: "Avaliação" },
               ].map(({ value, label }) => (
                 <div key={label} className="text-center lg:text-left">

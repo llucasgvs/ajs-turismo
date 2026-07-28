@@ -319,7 +319,7 @@ function TrustBlock({ maxInstallments }: { maxInstallments: number }) {
     { icon: Award, title: "10+ anos de experiência", desc: "Mais de uma década levando viajantes com segurança e qualidade" },
     { icon: Shield, title: "Pagamento seguro", desc: paymentDesc },
     { icon: Headphones, title: "Suporte via WhatsApp", desc: "Nossa equipe responde em minutos, antes e durante a viagem" },
-    { icon: Users, title: "+16.000 viajantes felizes", desc: "Avaliação média de 4.9 estrelas pelos nossos clientes" },
+    { icon: Users, title: "+19.000 viajantes felizes", desc: "Avaliação média de 4.9 estrelas pelos nossos clientes" },
   ];
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm">
