@@ -10,6 +10,7 @@ import {
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
 import { BrandedLoader } from "@/components/BrandedLoader";
+import { trackPurchaseOnce } from "@/lib/analytics";
 
 interface Booking {
   booking_code: string;
@@ -52,6 +53,18 @@ export default function CheckoutPage({ params }: { params: { code: string } }) {
       setLoading(false);
     });
   }, [loadStatus]);
+
+  // Medição da compra (Google Analytics). Só observa: não interfere no fluxo.
+  useEffect(() => {
+    if (confirmed || booking?.status === "confirmed") {
+      trackPurchaseOnce({
+        code,
+        amount: booking?.final_amount,
+        tripTitle: booking?.trip_title,
+        travelers: booking?.num_travelers,
+      });
+    }
+  }, [confirmed, booking, code]);
 
   if (loading) {
     return <BrandedLoader label="Carregando pagamento..." />;

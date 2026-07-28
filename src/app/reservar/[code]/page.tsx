@@ -12,6 +12,7 @@ import {
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { fmtBRL, spotsLabel, salesClosed } from "@/lib/format";
+import { trackPurchaseOnce } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel } from "@/lib/tiers";
 
@@ -380,6 +381,17 @@ function BookingCheckout({ code }: { code: string }) {
 
   // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
+  // Medição da compra (Google Analytics). Só observa: não interfere no fluxo.
+  useEffect(() => {
+    if (confirmed || booking?.status === "confirmed") {
+      trackPurchaseOnce({
+        code,
+        amount: booking?.final_amount,
+        tripTitle: booking?.trip_title,
+        travelers: booking?.num_travelers,
+      });
+    }
+  }, [confirmed, booking, code]);
   // Roteiro só por WhatsApp: já abre o passo de pagamento nessa opção.
   useEffect(() => { if (booking?.trip_whatsapp_only) setMethod("whatsapp"); }, [booking?.trip_whatsapp_only]);
 
