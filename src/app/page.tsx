@@ -27,7 +27,7 @@ export default async function Home() {
   const templates = await getPublicTemplates();
 
   return (
-    <main className="min-h-screen">
+    <main>
       <Navbar />
       <Hero />
       <FeaturedDestinations templates={templates} />

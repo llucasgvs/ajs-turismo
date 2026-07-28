@@ -41,7 +41,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden">
+    <section className="relative min-h-[100svh] flex flex-col justify-center overflow-hidden">
       {/* Background slides */}
       {heroSlides.map((slide, i) => (
         <div
