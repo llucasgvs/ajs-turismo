@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Montserrat } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { LoadingProvider } from "@/components/LoadingProvider";
 
 const inter = Inter({
@@ -164,6 +165,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <LoadingProvider>{children}</LoadingProvider>
+        {/* Visitas por página (Vercel Analytics). Não usa cookie, então não
+            exige aviso de cookies. */}
+        <Analytics />
       </body>
     </html>
   );
