@@ -44,12 +44,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* iOS: o campo de data tem largura mínima própria e, dentro de um grid/flex
-   (ex.: CPF + Data de nascimento lado a lado), não encolhe - o campo escapava
-   do quadro do viajante. min-width:0 deixa ele respeitar a coluna. */
+/* iOS aplica a aparência nativa no campo de data (fundo cinza, texto centrado)
+   e junto vem uma largura própria, que escapava do quadro do viajante.
+   Desligar a aparência nativa faz ele seguir o estilo dos outros campos.
+   No desktop não muda nada (verificado: mesma largura e mesmo visual). */
 input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
   min-width: 0;
   max-width: 100%;
+  text-align: left;
 }
 
 @layer components {
