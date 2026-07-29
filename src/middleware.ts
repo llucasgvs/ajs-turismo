@@ -50,5 +50,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/viagens/:path*"],
+  // Em /viagens, só intercepta os links antigos (id numérico). Rodar o
+  // middleware nas páginas de slug fazia a rota devolver 200 no lugar de 404
+  // quando o roteiro não existia - o Google indexaria a página de erro.
+  matcher: ["/admin/:path*", "/viagens/:id(\\d+)"],
 };
