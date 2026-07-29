@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image-1.jpg",
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "AJS Turismo - Viagens e excursões saindo de Curitiba",
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     title: "AJS Turismo - Viagens e excursões saindo de Curitiba",
     description:
       "Pacotes completos para os melhores destinos nacionais e internacionais. Saindo de Curitiba com preço justo e atendimento personalizado.",
-    images: ["/og-image-1.jpg"],
+    images: ["/og-image.jpg"],
   },
 
   icons: {
@@ -112,7 +112,7 @@ const jsonLd = {
     "Agência de viagens em Curitiba com mais de 10 anos de experiência. Pacotes nacionais e internacionais com atendimento personalizado e parcelamento facilitado.",
   url: SITE,
   logo: `${SITE}/logo_horizontal.png`,
-  image: `${SITE}/og-image-1.jpg`,
+  image: `${SITE}/og-image.jpg`,
   telephone: "+55-41-99834-8766",
   email: "ajsturismooficial@gmail.com",
   priceRange: "$$",
