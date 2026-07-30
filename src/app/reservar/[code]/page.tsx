@@ -120,7 +120,9 @@ function ageError(label: string | undefined, birth: string, who: string): string
 function Field({ label, hint, req, children }: { label: string; hint?: string; req?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="flex items-baseline justify-between mb-1">
+      {/* flex-wrap: em coluna estreita a dica desce para a linha de baixo em vez
+          de se sobrepor ao rotulo. */}
+      <span className="flex flex-wrap items-baseline justify-between gap-x-2 mb-1">
         <span className="text-xs font-semibold text-gray-600">{label}{req && <span className="text-red-500"> *</span>}</span>
         {hint && <span className="text-[11px] text-gray-400">{hint}</span>}
       </span>
@@ -804,23 +806,26 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 
           {/* Titular */}
           <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-            <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex items-center gap-1.5"><User size={13} /> Titular {titularCat && <span className="ml-1 normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{titularCat}</span>}</p>
+            <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex flex-wrap items-center gap-x-1.5 gap-y-1.5"><User size={13} className="shrink-0" /> Titular {titularCat && <span className="normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{titularCat}</span>}</p>
             <Field label="Nome completo" req><VInput value={fullName} onChange={setFullName} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Seu nome completo" /></Field>
-            <div className="grid grid-cols-2 gap-3">
+            {/* No celular cada campo ocupa a linha inteira: em duas colunas o CPF
+                e o telefone nao cabiam e o numero aparecia cortado. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="CPF" req><VInput value={cpf} onChange={v => setCpf(maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
               <Field label="Telefone" req><VInput value={phone} onChange={v => setPhone(maskPhone(v))} validate={vPhone} errorMsg="Telefone incompleto." placeholder="(00) 00000-0000" inputMode="numeric" /></Field>
             </div>
-            <Field label="Data de nascimento" req hint={titularCat || undefined}><VInput value={birth} onChange={setBirth} validate={v => !!v && !ageError(titularCat, v, "")} errorMsg={titularCat ? `A idade não corresponde à faixa ${titularCat}.` : undefined} type="date" showIcon={false} /></Field>
+            {/* Sem hint: a faixa ja aparece na etiqueta do topo deste mesmo card. */}
+            <Field label="Data de nascimento" req><VInput value={birth} onChange={setBirth} validate={v => !!v && !ageError(titularCat, v, "")} errorMsg={titularCat ? `A idade não corresponde à faixa ${titularCat}.` : undefined} type="date" showIcon={false} /></Field>
           </div>
 
           {/* Acompanhantes */}
           {companions.map((c, i) => (
             <div key={i} className="rounded-xl border border-gray-100 p-4 space-y-3">
-              <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex items-center gap-1.5"><Users size={13} /> Acompanhante {i + 1} {compCat(i) && <span className="ml-1 normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{compCat(i)}</span>}</p>
+              <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex flex-wrap items-center gap-x-1.5 gap-y-1.5"><Users size={13} className="shrink-0" /> Acompanhante {i + 1} {compCat(i) && <span className="normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{compCat(i)}</span>}</p>
               <Field label="Nome completo" req><VInput value={c.full_name} onChange={v => setComp(i, "full_name", v)} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Nome completo" /></Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="CPF" req><VInput value={c.cpf} onChange={v => setComp(i, "cpf", maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
-                <Field label="Data de nascimento" req hint={compCat(i) || undefined}><VInput value={c.birth_date} onChange={v => setComp(i, "birth_date", v)} validate={v => !!v && !ageError(compCat(i), v, "")} errorMsg={compCat(i) ? `A idade não corresponde à faixa ${compCat(i)}.` : undefined} type="date" showIcon={false} /></Field>
+                <Field label="Data de nascimento" req><VInput value={c.birth_date} onChange={v => setComp(i, "birth_date", v)} validate={v => !!v && !ageError(compCat(i), v, "")} errorMsg={compCat(i) ? `A idade não corresponde à faixa ${compCat(i)}.` : undefined} type="date" showIcon={false} /></Field>
               </div>
             </div>
           ))}
