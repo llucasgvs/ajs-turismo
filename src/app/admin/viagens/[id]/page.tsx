@@ -37,6 +37,7 @@ interface TripTemplate {
   open_date_return_minute: number | null;
   open_date_price: number | null;
   open_date_max_installments: number | null;
+  default_price_tiers?: { name?: string; age_range?: string; price: number }[];
   open_date_spots_per_day: number;
 }
 
@@ -140,6 +141,228 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
 }
 
 /* ── Modal de edição rápida (preço, vagas, horário) ─────────────────────── */
+/* ── Faixas de preço em várias datas de uma vez ─────────────────────────────
+   Cadastrar criança/idoso data a data é inviável em roteiros com muitas datas.
+   Aqui o admin define as faixas uma vez e escolhe em quais datas aplicar. */
+
+type TierForm = { name: string; age_range: string; price: string };
+
+/** O site só valida a idade se houver dois números, ou um número seguido de "+". */
+function idadeValida(txt: string): boolean {
+  const s = (txt || "").trim();
+  if (!s) return false;
+  return /(\d+)\s*\+/.test(s) || /(\d+)\D+(\d+)/.test(s);
+}
+
+function TiersPanel({ templateId, defaultTiers, onSaved }: {
+  templateId: number;
+  defaultTiers: { name?: string; age_range?: string; price: number }[];
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [tiers, setTiers] = useState<TierForm[]>([]);
+  const [dates, setDates] = useState<TripDate[]>([]);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [saveDefault, setSaveDefault] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState("");
+
+  // Carrega as datas futuras só quando o painel abre (não pesa a página).
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    setTiers(
+      (defaultTiers ?? []).map((t) => ({
+        name: t.name ?? "", age_range: t.age_range ?? "", price: String(t.price ?? ""),
+      }))
+    );
+    apiFetch(`/templates/${templateId}/trips?limit=100&trip_status=active`)
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => {
+        const agora = Date.now();
+        const futuras = (d.items ?? []).filter((x: TripDate) => new Date(x.departure_date).getTime() > agora);
+        setDates(futuras);
+        setSel(new Set());
+      })
+      .finally(() => setLoading(false));
+  }, [open, templateId, defaultTiers]);
+
+  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "" }]);
+  const setTier = (i: number, k: keyof TierForm, v: string) =>
+    setTiers((t) => t.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const delTier = (i: number) => setTiers((t) => t.filter((_, j) => j !== i));
+  const toggle = (id: number) =>
+    setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const validos = tiers.filter((t) => t.name.trim());
+  const podeAplicar = sel.size > 0 || saveDefault;
+
+  const aplicar = async () => {
+    setSaving(true); setDone("");
+    try {
+      const res = await apiFetch(`/templates/${templateId}/trips/tiers`, {
+        method: "POST",
+        body: JSON.stringify({
+          tiers: validos.map((t) => ({
+            name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price) || 0,
+          })),
+          trip_ids: [...sel],
+          set_as_default: saveDefault,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        invalidateAdminCache();
+        setDone(
+          d.updated > 0
+            ? `Aplicado em ${d.updated} data${d.updated > 1 ? "s" : ""}.`
+            : "Salvo como padrão para as próximas datas."
+        );
+        onSaved();
+        setTimeout(() => setDone(""), 5000);
+      }
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left">
+        <span className="flex items-center gap-2 text-sm font-bold text-navy-800">
+          <DollarSign size={14} className="text-gold-500" /> Valores por idade (criança, idoso)
+          {defaultTiers?.length > 0 && (
+            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+              padrão definido
+            </span>
+          )}
+        </span>
+        <ChevronRight size={16} className={`text-gray-400 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
+          {/* 1. as faixas */}
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">1. Defina as faixas</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {TIER_SUGGESTIONS.filter((s) => !tiers.some((t) => t.name.trim().toLowerCase() === s.toLowerCase())).map((s) => (
+                <button key={s} type="button" onClick={() => addTier(s)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
+                  <Plus size={10} /> {s}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {tiers.map((t, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl p-2.5 space-y-2 bg-gray-50/50">
+                  <div className="flex gap-2 items-center">
+                    <input className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400"
+                      placeholder="Categoria (ex: Criança)" value={t.name}
+                      onChange={(e) => setTier(i, "name", e.target.value)} />
+                    <button type="button" onClick={() => delTier(i)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400"
+                      placeholder="Idade (ex: 4 a 11 anos)" value={t.age_range}
+                      onChange={(e) => setTier(i, "age_range", e.target.value)} />
+                    <div className="relative w-24 flex-shrink-0">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">R$</span>
+                      <input type="number" min="0" step="0.01" placeholder="0,00" value={t.price}
+                        onChange={(e) => setTier(i, "price", e.target.value)}
+                        className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                    </div>
+                  </div>
+                  {t.age_range.trim() && !idadeValida(t.age_range) && (
+                    <p className="text-[11px] text-amber-700 flex items-start gap-1">
+                      <AlertTriangle size={11} className="mt-0.5 flex-shrink-0" />
+                      O site não vai conferir esta idade. Use dois números (&quot;4 a 11 anos&quot;) ou &quot;60+&quot;.
+                    </p>
+                  )}
+                </div>
+              ))}
+              {tiers.length === 0 && (
+                <p className="text-xs text-gray-400">Nenhuma faixa. Clique numa sugestão acima para começar.</p>
+              )}
+            </div>
+          </div>
+
+          {/* 2. as datas */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                2. Escolha as datas {sel.size > 0 && <span className="text-navy-600">({sel.size} selecionada{sel.size > 1 ? "s" : ""})</span>}
+              </p>
+              {dates.length > 0 && (
+                <div className="flex gap-2 text-[11px] font-semibold">
+                  <button onClick={() => setSel(new Set(dates.map((d) => d.id)))} className="text-navy-600 hover:underline">marcar todas</button>
+                  <span className="text-gray-300">·</span>
+                  <button onClick={() => setSel(new Set())} className="text-gray-500 hover:underline">limpar</button>
+                </div>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-navy-400" /></div>
+            ) : dates.length === 0 ? (
+              <p className="text-xs text-gray-400">Nenhuma data futura neste roteiro.</p>
+            ) : (
+              <div className="border border-gray-100 rounded-xl divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                {dates.map((d) => {
+                  const tem = (d.price_tiers ?? []).length > 0;
+                  const marcada = sel.has(d.id);
+                  return (
+                    <button key={d.id} type="button" onClick={() => toggle(d.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${marcada ? "bg-navy-50" : "hover:bg-gray-50"}`}>
+                      <span className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${marcada ? "bg-navy-700 border-navy-700" : "border-gray-300"}`}>
+                        {marcada && <CheckCircle2 size={10} className="text-white" strokeWidth={3} />}
+                      </span>
+                      <span className="text-sm text-navy-800 font-medium w-24 flex-shrink-0">{fmt(d.departure_date)}</span>
+                      <span className="text-sm text-gray-500 flex-1">R$ {fmtBRL(d.price_per_person)}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${tem ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                        {tem ? "já tem faixa" : "sem faixa"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              As faixas escolhidas substituem as que já existirem nessas datas. O preço do adulto não muda.
+            </p>
+          </div>
+
+          {/* 3. aplicar */}
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-navy-700" />
+            <span className="text-xs text-gray-600">
+              Usar como padrão do roteiro
+              <span className="block text-[11px] text-gray-400">Datas novas já nascem com estas faixas.</span>
+            </span>
+          </label>
+
+          <div className="flex items-center gap-3">
+            <button onClick={aplicar} disabled={saving || !podeAplicar}
+              className="flex items-center justify-center gap-2 bg-navy-800 text-white font-semibold px-4 py-2.5 rounded-xl hover:bg-navy-700 transition-colors text-sm disabled:opacity-50">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? "Aplicando..." : sel.size > 0 ? `Aplicar em ${sel.size} data${sel.size > 1 ? "s" : ""}` : "Salvar padrão"}
+            </button>
+            {done && (
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <CheckCircle2 size={13} /> {done}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   date: TripDate;
   templateId: number;
@@ -1178,6 +1401,15 @@ export default function TemplateDetailPage() {
             {odSaving ? "Salvando..." : "Salvar e aplicar em todas as datas"}
           </button>
         </div>
+      )}
+
+      {/* Faixas de preço (criança/idoso) em várias datas */}
+      {!template.quote_only && !template.is_open_date && (
+        <TiersPanel
+          templateId={templateId}
+          defaultTiers={template.default_price_tiers ?? []}
+          onSaved={() => { fetchDates(); }}
+        />
       )}
 
       {/* Seção de datas */}
