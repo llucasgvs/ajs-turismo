@@ -35,6 +35,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setSidebarOpen(false);
   }, [pathname]);
 
+  // Num campo <input type="number"> o navegador soma ou subtrai o "step" quando
+  // o campo esta focado e chega a rodinha do mouse ou a seta cima/baixo. Nos
+  // campos de valor o step e 0,01, entao o preco muda de centavo em centavo sem
+  // ninguem perceber: foi assim que R$ 210,00 virou R$ 209,98 (duas setas para
+  // baixo). Aqui desligamos so o "stepping"; digitar continua normal.
+  useEffect(() => {
+    const ehCampoNumeroFocado = (alvo: EventTarget | null) =>
+      alvo instanceof HTMLInputElement &&
+      alvo.type === "number" &&
+      alvo === document.activeElement;
+
+    // Rodinha: tira o foco, assim a rolagem da pagina segue normal.
+    const naRodinha = (e: WheelEvent) => {
+      if (ehCampoNumeroFocado(e.target)) (e.target as HTMLInputElement).blur();
+    };
+    // Setas: bloqueia o passo, sem mexer no resto do teclado.
+    const naTecla = (e: KeyboardEvent) => {
+      if ((e.key === "ArrowUp" || e.key === "ArrowDown") && ehCampoNumeroFocado(e.target)) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("wheel", naRodinha, { passive: true });
+    document.addEventListener("keydown", naTecla);
+    return () => {
+      document.removeEventListener("wheel", naRodinha);
+      document.removeEventListener("keydown", naTecla);
+    };
+  }, []);
+
   if (checking) {
     return <BrandedLoader label="Carregando painel..." />;
   }
