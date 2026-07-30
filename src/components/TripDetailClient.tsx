@@ -1577,6 +1577,16 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
     });
   };
 
+  /** Economia total em reais, somando o "de" de TODAS as categorias escolhidas. */
+  const sidebarSavings = activeHasTiers
+    ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => {
+        const de = deForLabel(label);
+        return s + (de > 0 ? (de - priceForLabel(label)) * qty : 0);
+      }, 0)
+    : (activeTrip.original_price && activeTrip.original_price > activeTrip.price_per_person
+        ? (activeTrip.original_price - activeTrip.price_per_person) * sidebarPeople
+        : 0);
+
   const sidebarTotalPeople = activeHasTiers
     ? Object.values(sidebarTiers).reduce((a, b) => a + b, 0)
     : sidebarPeople;
@@ -2200,7 +2210,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                     )}
                     {activeTrip.original_price && discount && discount > 0 && (
                       <div className="mt-2 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center border border-emerald-100">
-                        Economia de R$ {fmtBRL(activeTrip.original_price - activeTrip.price_per_person)} por pessoa
+                        Economia de {discount}%
                       </div>
                     )}
                   </div>
@@ -2344,11 +2354,25 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           <span className="text-gray-600 font-semibold">Total ({sidebarTotalPeople})</span>
                           <span className="font-black text-navy-700">R$ {fmtBRL(sidebarBaseTotal)}</span>
                         </div>
+                        {sidebarSavings > 0 && (
+                          <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                            <span>Você economiza</span>
+                            <span>− R$ {fmtBRL(sidebarSavings)}</span>
+                          </div>
+                        )}
                       </div>
                     ) : sidebarPeople > 1 && (
-                      <div className="flex items-center justify-between mb-3 text-sm">
-                        <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
-                        <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
+                      <div className="mb-3 text-sm space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
+                          <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
+                        </div>
+                        {sidebarSavings > 0 && (
+                          <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                            <span>Você economiza</span>
+                            <span>− R$ {fmtBRL(sidebarSavings)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 

@@ -596,8 +596,7 @@ export default function TripDateForm({
                 value={form.price_per_person} onChange={e => set("price_per_person", e.target.value)}
                 placeholder="299.00" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">Desconto (De: e %)</label>
+            <div className="flex items-end">
               <DiscountFields price={form.price_per_person} original={form.original_price}
                 onOriginal={(v) => set("original_price", v)} />
             </div>

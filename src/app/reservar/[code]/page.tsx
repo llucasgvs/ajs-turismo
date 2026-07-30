@@ -681,11 +681,13 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         {(() => {
           const price = trip?.price_per_person || 0;
           const orig = trip?.original_price && trip.original_price > price ? trip.original_price : 0;
-          // O preço "de" só vale para o Adulto (faixas têm preço próprio).
-          const adultQty = hasTiers
-            ? (booking.tier_breakdown?.find(t => t.label.startsWith(ADULT))?.qty || 0)
-            : booking.num_travelers;
-          const savings = orig > 0 ? (orig - price) * adultQty : 0;
+          // Economia de TODAS as categorias: cada faixa tem o seu próprio "de".
+          const savings = booking.tier_breakdown?.length
+            ? booking.tier_breakdown.reduce((s, t) => {
+                const de = t.label.startsWith(ADULT) ? orig : deForLabel(t.label);
+                return s + (de > t.price ? (de - t.price) * t.qty : 0);
+              }, 0)
+            : (orig > 0 ? (orig - price) * booking.num_travelers : 0);
           return (
             <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
               {booking.tier_breakdown?.length > 0 ? booking.tier_breakdown.map(t => {

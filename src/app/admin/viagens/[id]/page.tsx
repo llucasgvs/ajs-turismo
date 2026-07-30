@@ -509,7 +509,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           {/* Preço */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Preço</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2.5">
               <div>
                 <p className="text-[11px] text-gray-400 mb-1">Por pessoa</p>
                 <div className="relative">
@@ -518,10 +518,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                     className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
                 </div>
               </div>
-              <div>
-                <p className="text-[11px] text-gray-400 mb-1">Desconto (De: e %)</p>
-                <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
-              </div>
+              <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
             </div>
             <div className="mt-2">
               <p className="text-[11px] text-gray-400 mb-1">Parcelamento máximo</p>
@@ -886,10 +883,7 @@ function BulkModal({ templateId, onClose, onDone }: {
                     <input type="number" className="input-field text-sm" placeholder="Ex: 199.90"
                       value={price} min="0" step="0.01" onChange={e => setPrice(e.target.value)} />
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Desconto (opcional)</label>
-                    <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
-                  </div>
+                  <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
                 </div>
               </div>
 
