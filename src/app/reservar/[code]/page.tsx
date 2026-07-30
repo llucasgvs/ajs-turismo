@@ -26,7 +26,7 @@ interface Trip {
   id: number; template_id: number | null; departure_date: string; return_date: string;
   title?: string | null; destination?: string | null; image_url?: string | null;
   price_per_person: number; original_price?: number | null; available_spots: number; max_installments: number;
-  price_tiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
+  price_tiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
   optionals: { name: string; price: number }[];
   quote_only?: boolean;
 }
@@ -458,6 +458,13 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   // Adulto sempre ocupa lugar; faixa sem a marcação também.
   const ocupaPoltrona = (label: string) =>
     label === ADULT ? true : tierOccupiesSeat(trip?.price_tiers.find(t => tierLabel(t) === label));
+  /** O "de" da categoria. Zero quando não há desconto. Só vitrine. */
+  const deForLabel = (label: string) => {
+    const de = label === ADULT
+      ? (trip?.original_price ?? 0)
+      : (trip?.price_tiers.find(t => tierLabel(t) === label)?.original_price ?? 0);
+    return de > priceForLabel(label) ? de : 0;
+  };
   /** Poltronas de uma escolha por categoria (criança de colo não conta). */
   const contaPoltronas = (sel: Record<string, number>) =>
     Object.entries(sel).reduce((s, [label, qty]) => s + (ocupaPoltrona(label) ? qty : 0), 0);
@@ -516,8 +523,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     // O limite é de poltronas: a criança de colo não consome vaga do ônibus.
     if (d > 0 && contaPoltronas(next) > (trip?.available_spots || 50)) return prev;
     if (Object.values(next).reduce((a, b) => a + b, 0) < 1) return prev;
-    // Alguém tem que levar a criança de colo: nunca só faixas sem poltrona.
-    if (contaPoltronas(next) < 1) return prev;
+    // Alguém tem que levar as crianças: o Adulto nunca chega a zero.
+    if ((next[ADULT] || 0) < 1) return prev;
     push(0, next, opts); onTravelersChange?.(); return next;
   });
   const toggleOpt = (name: string) => setOpts(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); push(people, tierCounts, n); return n; });
@@ -622,6 +629,9 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                   <div>
                     <p className="text-sm text-navy-800">{label}</p>
                     <p className="text-xs text-gray-400">
+                      {deForLabel(label) > 0 && (
+                        <s className="text-gray-300 mr-1">R$ {fmtBRL(deForLabel(label))}</s>
+                      )}
                       {tierPriceLabel(priceForLabel(label), fmtBRL)}
                       {!ocupaPoltrona(label) && " · não ocupa poltrona"}
                     </p>
@@ -680,10 +690,12 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
               {booking.tier_breakdown?.length > 0 ? booking.tier_breakdown.map(t => {
                 const isAdult = t.label.startsWith(ADULT);
+                // Cada faixa tem o seu próprio "de"; o do adulto vem da viagem.
+                const deUnit = isAdult ? orig : deForLabel(t.label);
                 return (
                   <div key={t.label} className="flex justify-between gap-2 text-gray-600">
                     <span className="min-w-0 truncate">{t.qty}× {t.label}</span>
-                    <span className="shrink-0 whitespace-nowrap">{isAdult && orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * t.qty)}</s>}{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
+                    <span className="shrink-0 whitespace-nowrap">{deUnit > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(deUnit * t.qty)}</s>}{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
                   </div>
                 );
               }) : (

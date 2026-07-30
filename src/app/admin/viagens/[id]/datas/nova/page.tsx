@@ -13,7 +13,7 @@ interface TripDateDefaults {
   total_spots?: number;
   dep_time?: string;
   ret_time?: string;
-  price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
+  price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
 }
 
 /** ISO → "HH:MM" no horário de São Paulo */
@@ -48,7 +48,7 @@ export default function NovaDatum() {
         original_price: number | null;
         max_installments: number;
         total_spots: number;
-        price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
+        price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
       }> = datesData?.items ?? [];
 
       // Com ?dup=<id>, herda daquela data específica; senão, da última criada

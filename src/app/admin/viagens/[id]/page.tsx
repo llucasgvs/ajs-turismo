@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { tierLabel } from "@/lib/tiers";
+import DiscountFields from "@/components/admin/DiscountFields";
 
 interface TripTemplate {
   id: number;
@@ -37,7 +38,7 @@ interface TripTemplate {
   open_date_return_minute: number | null;
   open_date_price: number | null;
   open_date_max_installments: number | null;
-  default_price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean }[];
+  default_price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean }[];
   open_date_spots_per_day: number;
 }
 
@@ -49,7 +50,7 @@ interface TripDate {
   price_per_person: number;
   original_price: number | null;
   max_installments: number;
-  price_tiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[] | null;
+  price_tiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[] | null;
   total_spots: number;
   available_spots: number;
   /** Passageiros confirmados que não ocupam poltrona (criança de colo). */
@@ -147,7 +148,7 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
    Cadastrar criança/idoso data a data é inviável em roteiros com muitas datas.
    Aqui o admin define as faixas uma vez e escolhe em quais datas aplicar. */
 
-type TierForm = { name: string; age_range: string; price: string; occupies_seat: boolean };
+type TierForm = { name: string; age_range: string; price: string; original_price: string; occupies_seat: boolean };
 
 /** O site só valida a idade se houver dois números, ou um número seguido de "+". */
 function idadeValida(txt: string): boolean {
@@ -158,7 +159,7 @@ function idadeValida(txt: string): boolean {
 
 function TiersPanel({ templateId, defaultTiers, onSaved }: {
   templateId: number;
-  defaultTiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean }[];
+  defaultTiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean }[];
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -177,6 +178,7 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
     setTiers(
       (defaultTiers ?? []).map((t) => ({
         name: t.name ?? "", age_range: t.age_range ?? "", price: String(t.price ?? ""),
+        original_price: t.original_price ? String(t.original_price) : "",
         occupies_seat: t.occupies_seat === undefined ? true : !!t.occupies_seat,
       }))
     );
@@ -191,7 +193,7 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
       .finally(() => setLoading(false));
   }, [open, templateId, defaultTiers]);
 
-  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "", occupies_seat: true }]);
+  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "", original_price: "", occupies_seat: true }]);
   const setTier = (i: number, k: keyof TierForm, v: string | boolean) =>
     setTiers((t) => t.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const delTier = (i: number) => setTiers((t) => t.filter((_, j) => j !== i));
@@ -209,6 +211,7 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
         body: JSON.stringify({
           tiers: validos.map((t) => ({
             name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price) || 0,
+            original_price: parseFloat(t.original_price) || null,
             occupies_seat: t.occupies_seat,
           })),
           trip_ids: [...sel],
@@ -280,6 +283,8 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
                         className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400" />
                     </div>
                   </div>
+                  <DiscountFields price={t.price} original={t.original_price}
+                    onOriginal={(v) => setTier(i, "original_price", v)} />
                   <label className="flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer select-none">
                     <input type="checkbox" checked={t.occupies_seat}
                       onChange={(e) => setTier(i, "occupies_seat", e.target.checked)}
@@ -392,9 +397,10 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   const [availSpots, setAvailSpots] = useState(date.available_spots);
   const [depTime, setDepTime] = useState(dep.time);
   const [retTime, setRetTime] = useState(ret.time);
-  const [tiers, setTiers] = useState<{ name: string; age_range: string; price: string; occupies_seat: boolean }[]>(
+  const [tiers, setTiers] = useState<{ name: string; age_range: string; price: string; original_price: string; occupies_seat: boolean }[]>(
     (date.price_tiers ?? []).map((t) => ({
       name: t.name ?? t.label ?? "", age_range: t.age_range ?? "", price: String(t.price),
+      original_price: t.original_price ? String(t.original_price) : "",
       // Ausente = ocupa: faixa cadastrada antes desta opção não muda de comportamento.
       occupies_seat: t.occupies_seat === undefined ? true : !!t.occupies_seat,
     }))
@@ -403,9 +409,9 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   const [error, setError] = useState("");
 
   const addTier = (name = "") => setTiers(prev =>
-    prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name) ? prev : [...prev, { name, age_range: "", price: "", occupies_seat: true }]);
+    prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name) ? prev : [...prev, { name, age_range: "", price: "", original_price: "", occupies_seat: true }]);
   const removeTier = (i: number) => setTiers(prev => prev.filter((_, idx) => idx !== i));
-  const updateTier = (i: number, key: "name" | "age_range" | "price" | "occupies_seat", value: string | boolean) =>
+  const updateTier = (i: number, key: "name" | "age_range" | "price" | "original_price" | "occupies_seat", value: string | boolean) =>
     setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [key]: value } : t));
 
   const sold = totalSpots - availSpots;
@@ -447,7 +453,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           max_installments: maxInst,
           total_spots: totalSpots,
           available_spots: availSpots,
-          price_tiers: tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price), occupies_seat: t.occupies_seat })),
+          price_tiers: tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price), original_price: parseFloat(t.original_price) || null, occupies_seat: t.occupies_seat })),
         }),
       });
       if (!res.ok) {
@@ -513,12 +519,8 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                 </div>
               </div>
               <div>
-                <p className="text-[11px] text-gray-400 mb-1">Original (De:)</p>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
-                  <input type="number" min="0" step="0.01" placeholder="-" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
-                </div>
+                <p className="text-[11px] text-gray-400 mb-1">Desconto (De: e %)</p>
+                <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
               </div>
             </div>
             <div className="mt-2">
@@ -592,6 +594,8 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                         className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
                     </div>
                   </div>
+                  <DiscountFields price={tier.price} original={tier.original_price}
+                    onOriginal={(v) => updateTier(i, "original_price", v)} />
                   <label className="flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer select-none">
                     <input type="checkbox" checked={tier.occupies_seat}
                       onChange={(e) => updateTier(i, "occupies_seat", e.target.checked)}
@@ -696,7 +700,7 @@ function BulkModal({ templateId, onClose, onDone }: {
   const [retTime, setRetTime] = useState("23:59");
   const [skipExisting, setSkipExisting] = useState(true);
   const [inherited, setInherited] = useState(false);
-  const [tiersInherited, setTiersInherited] = useState<{ name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[]>([]);
+  const [tiersInherited, setTiersInherited] = useState<{ name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   const [error, setError] = useState("");
@@ -883,9 +887,8 @@ function BulkModal({ templateId, onClose, onDone }: {
                       value={price} min="0" step="0.01" onChange={e => setPrice(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Preço original (opcional)</label>
-                    <input type="number" className="input-field text-sm" placeholder="Ex: 249.90"
-                      value={originalPrice} min="0" step="0.01" onChange={e => setOriginalPrice(e.target.value)} />
+                    <label className="text-xs text-gray-400 mb-1 block">Desconto (opcional)</label>
+                    <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
                   </div>
                 </div>
               </div>

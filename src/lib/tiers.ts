@@ -5,6 +5,8 @@ export interface PriceTier {
   name?: string;
   age_range?: string;
   price: number;
+  /** O "de" da faixa. Só vitrine: nunca entra no valor cobrado. */
+  original_price?: number | null;
   /** Desconta uma vaga do ônibus? Ausente = sim (faixas anteriores a esta opção). */
   occupies_seat?: boolean;
   label?: string; // legado

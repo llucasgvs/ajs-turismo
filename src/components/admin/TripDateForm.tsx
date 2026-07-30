@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DiscountFields from "@/components/admin/DiscountFields";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign, Plus, X } from "lucide-react";
@@ -8,7 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 
 /* ── types ── */
-interface PriceTierInput { name: string; age_range: string; price: string }
+interface PriceTierInput { name: string; age_range: string; price: string; original_price: string; occupies_seat: boolean }
 
 // Sugestões rápidas de categoria (clique adiciona já com o nome)
 const TIER_SUGGESTIONS = ["Criança", "Bebê", "Idoso", "Estudante"];
@@ -42,7 +43,7 @@ interface TripDateInitialData {
   max_installments?: number;
   total_spots?: number;
   available_spots?: number;
-  price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
+  price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
 }
 
 /** ISO UTC → { date: "YYYY-MM-DD", time: "HH:MM" } em SP */
@@ -322,7 +323,7 @@ interface TripDateDefaults {
   total_spots?: number;
   dep_time?: string; // "HH:MM"
   ret_time?: string; // "HH:MM"
-  price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
+  price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
 }
 
 /* ── Main form ── */
@@ -366,6 +367,9 @@ export default function TripDateForm({
       : (d?.original_price != null ? String(d.original_price) : ""),
     price_tiers: (initialData?.price_tiers ?? d?.price_tiers ?? []).map((t) => ({
       name: t.name ?? t.label ?? "", age_range: t.age_range ?? "", price: String(t.price),
+      original_price: t.original_price ? String(t.original_price) : "",
+      // Ausente = ocupa: faixa cadastrada antes desta opção não muda de comportamento.
+      occupies_seat: t.occupies_seat === undefined ? true : !!t.occupies_seat,
     })),
   });
   const [loading, setLoading] = useState(false);
@@ -410,9 +414,9 @@ export default function TripDateForm({
   const addTier = (name = "") => setForm(f =>
     f.price_tiers.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name)
       ? f
-      : { ...f, price_tiers: [...f.price_tiers, { name, age_range: "", price: "" }] });
+      : { ...f, price_tiers: [...f.price_tiers, { name, age_range: "", price: "", original_price: "", occupies_seat: true }] });
   const removeTier = (i: number) => setForm(f => ({ ...f, price_tiers: f.price_tiers.filter((_, idx) => idx !== i) }));
-  const updateTier = (i: number, key: keyof PriceTierInput, value: string) =>
+  const updateTier = (i: number, key: keyof PriceTierInput, value: string | boolean) =>
     setForm(f => ({ ...f, price_tiers: f.price_tiers.map((t, idx) => idx === i ? { ...t, [key]: value } : t) }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -465,7 +469,7 @@ export default function TripDateForm({
       max_installments: form.max_installments,
       total_spots: form.total_spots,
       available_spots: form.available_spots,
-      price_tiers: form.price_tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price) })),
+      price_tiers: form.price_tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price), original_price: parseFloat(t.original_price) || null, occupies_seat: t.occupies_seat })),
     };
     try {
       const url = tripId
@@ -593,10 +597,9 @@ export default function TripDateForm({
                 placeholder="299.00" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1.5">Preço Original (De:)</label>
-              <input className="input-field" type="number" step="0.01" min="0"
-                value={form.original_price} onChange={e => set("original_price", e.target.value)}
-                placeholder="399.00" />
+              <label className="block text-sm font-medium text-navy-700 mb-1.5">Desconto (De: e %)</label>
+              <DiscountFields price={form.price_per_person} original={form.original_price}
+                onOriginal={(v) => set("original_price", v)} />
             </div>
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-1.5">Parcelamento máx.</label>
@@ -649,6 +652,15 @@ export default function TripDateForm({
                         value={tier.price} onChange={(e) => updateTier(i, "price", e.target.value)} />
                     </div>
                   </div>
+                  <DiscountFields price={tier.price} original={tier.original_price}
+                    onOriginal={(v) => updateTier(i, "original_price", v)} />
+                  <label className="flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={tier.occupies_seat}
+                      onChange={(e) => updateTier(i, "occupies_seat", e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-navy-700" />
+                    Ocupa poltrona
+                    {!tier.occupies_seat && <span className="text-gray-400">(não desconta vaga)</span>}
+                  </label>
                 </div>
               ))}
             </div>

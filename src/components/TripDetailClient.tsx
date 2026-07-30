@@ -1544,6 +1544,13 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   // Adulto sempre ocupa lugar; faixa sem a marcação também.
   const ocupaPoltrona = (label: string) =>
     label === ADULT ? true : tierOccupiesSeat(activeTiers.find(t => tierLabel(t) === label));
+  /** O "de" da categoria. Zero quando não há desconto. Só vitrine. */
+  const deForLabel = (label: string) => {
+    const de = label === ADULT
+      ? (activeTrip.original_price ?? 0)
+      : (activeTiers.find(t => tierLabel(t) === label)?.original_price ?? 0);
+    return de > priceForLabel(label) ? de : 0;
+  };
   /** Poltronas de uma escolha por categoria (criança de colo não conta). */
   const contaPoltronas = (sel: Record<string, number>) =>
     Object.entries(sel).reduce((s, [label, qty]) => s + (ocupaPoltrona(label) ? qty : 0), 0);
@@ -1564,8 +1571,8 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
       // O limite é de poltronas: a criança de colo não consome vaga do ônibus.
       if (delta > 0 && contaPoltronas(updated) > (activeTrip.available_spots || 50)) return prev;
       if (Object.values(updated).reduce((a, b) => a + b, 0) < 1) return prev;
-      // Alguém tem que levar a criança de colo: nunca só faixas sem poltrona.
-      if (contaPoltronas(updated) < 1) return prev;
+      // Alguém tem que levar as crianças: o Adulto nunca chega a zero.
+      if ((updated[ADULT] || 0) < 1) return prev;
       return updated;
     });
   };
@@ -2288,6 +2295,9 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{label}</p>
                                   <p className="text-[11px] text-gray-400 leading-tight">
+                                    {deForLabel(label) > 0 && (
+                                      <s className="text-gray-300 mr-1">R$ {fmtBRL(deForLabel(label))}</s>
+                                    )}
                                     {tierPriceLabel(priceForLabel(label), fmtBRL)}
                                     {!ocupaPoltrona(label) && " · não ocupa poltrona"}
                                   </p>
@@ -2325,7 +2335,9 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                         {Object.entries(sidebarTiers).filter(([, q]) => q > 0).map(([label, qty]) => (
                           <div key={label} className="flex items-center justify-between">
                             <span className="text-gray-500">{qty} × {label}</span>
-                            <span className="font-semibold text-navy-700">R$ {fmtBRL(qty * priceForLabel(label))}</span>
+                            <span className="font-semibold text-navy-700">
+                              {tierPriceLabel(qty * priceForLabel(label), fmtBRL)}
+                            </span>
                           </div>
                         ))}
                         <div className="flex items-center justify-between pt-1 border-t border-gray-100">
