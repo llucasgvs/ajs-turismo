@@ -37,7 +37,7 @@ interface TripTemplate {
   open_date_return_minute: number | null;
   open_date_price: number | null;
   open_date_max_installments: number | null;
-  default_price_tiers?: { name?: string; age_range?: string; price: number }[];
+  default_price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean }[];
   open_date_spots_per_day: number;
 }
 
@@ -49,9 +49,11 @@ interface TripDate {
   price_per_person: number;
   original_price: number | null;
   max_installments: number;
-  price_tiers: { name?: string; age_range?: string; price: number; label?: string }[] | null;
+  price_tiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[] | null;
   total_spots: number;
   available_spots: number;
+  /** Passageiros confirmados que não ocupam poltrona (criança de colo). */
+  lap_passengers?: number;
   status: string;
   is_active: boolean;
   created_at: string;
@@ -145,7 +147,7 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
    Cadastrar criança/idoso data a data é inviável em roteiros com muitas datas.
    Aqui o admin define as faixas uma vez e escolhe em quais datas aplicar. */
 
-type TierForm = { name: string; age_range: string; price: string };
+type TierForm = { name: string; age_range: string; price: string; occupies_seat: boolean };
 
 /** O site só valida a idade se houver dois números, ou um número seguido de "+". */
 function idadeValida(txt: string): boolean {
@@ -156,7 +158,7 @@ function idadeValida(txt: string): boolean {
 
 function TiersPanel({ templateId, defaultTiers, onSaved }: {
   templateId: number;
-  defaultTiers: { name?: string; age_range?: string; price: number }[];
+  defaultTiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean }[];
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -175,6 +177,7 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
     setTiers(
       (defaultTiers ?? []).map((t) => ({
         name: t.name ?? "", age_range: t.age_range ?? "", price: String(t.price ?? ""),
+        occupies_seat: t.occupies_seat === undefined ? true : !!t.occupies_seat,
       }))
     );
     apiFetch(`/templates/${templateId}/trips?limit=100&trip_status=active`)
@@ -188,8 +191,8 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
       .finally(() => setLoading(false));
   }, [open, templateId, defaultTiers]);
 
-  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "" }]);
-  const setTier = (i: number, k: keyof TierForm, v: string) =>
+  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "", occupies_seat: true }]);
+  const setTier = (i: number, k: keyof TierForm, v: string | boolean) =>
     setTiers((t) => t.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const delTier = (i: number) => setTiers((t) => t.filter((_, j) => j !== i));
   const toggle = (id: number) =>
@@ -206,6 +209,7 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
         body: JSON.stringify({
           tiers: validos.map((t) => ({
             name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price) || 0,
+            occupies_seat: t.occupies_seat,
           })),
           trip_ids: [...sel],
           set_as_default: saveDefault,
@@ -276,6 +280,15 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
                         className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400" />
                     </div>
                   </div>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={t.occupies_seat}
+                      onChange={(e) => setTier(i, "occupies_seat", e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-navy-700" />
+                    Ocupa poltrona
+                    {!t.occupies_seat && (
+                      <span className="text-gray-400">(não desconta vaga e o site avisa o cliente)</span>
+                    )}
+                  </label>
                   {t.age_range.trim() && !idadeValida(t.age_range) && (
                     <p className="text-[11px] text-amber-700 flex items-start gap-1">
                       <AlertTriangle size={11} className="mt-0.5 flex-shrink-0" />
@@ -379,16 +392,20 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   const [availSpots, setAvailSpots] = useState(date.available_spots);
   const [depTime, setDepTime] = useState(dep.time);
   const [retTime, setRetTime] = useState(ret.time);
-  const [tiers, setTiers] = useState<{ name: string; age_range: string; price: string }[]>(
-    (date.price_tiers ?? []).map((t) => ({ name: t.name ?? t.label ?? "", age_range: t.age_range ?? "", price: String(t.price) }))
+  const [tiers, setTiers] = useState<{ name: string; age_range: string; price: string; occupies_seat: boolean }[]>(
+    (date.price_tiers ?? []).map((t) => ({
+      name: t.name ?? t.label ?? "", age_range: t.age_range ?? "", price: String(t.price),
+      // Ausente = ocupa: faixa cadastrada antes desta opção não muda de comportamento.
+      occupies_seat: t.occupies_seat === undefined ? true : !!t.occupies_seat,
+    }))
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const addTier = (name = "") => setTiers(prev =>
-    prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name) ? prev : [...prev, { name, age_range: "", price: "" }]);
+    prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name) ? prev : [...prev, { name, age_range: "", price: "", occupies_seat: true }]);
   const removeTier = (i: number) => setTiers(prev => prev.filter((_, idx) => idx !== i));
-  const updateTier = (i: number, key: "name" | "age_range" | "price", value: string) =>
+  const updateTier = (i: number, key: "name" | "age_range" | "price" | "occupies_seat", value: string | boolean) =>
     setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [key]: value } : t));
 
   const sold = totalSpots - availSpots;
@@ -430,7 +447,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           max_installments: maxInst,
           total_spots: totalSpots,
           available_spots: availSpots,
-          price_tiers: tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price) })),
+          price_tiers: tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price), occupies_seat: t.occupies_seat })),
         }),
       });
       if (!res.ok) {
@@ -575,6 +592,15 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                         className="w-full pl-7 pr-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 bg-white" />
                     </div>
                   </div>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={tier.occupies_seat}
+                      onChange={(e) => updateTier(i, "occupies_seat", e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-navy-700" />
+                    Ocupa poltrona
+                    {!tier.occupies_seat && (
+                      <span className="text-gray-400">(não desconta vaga)</span>
+                    )}
+                  </label>
                 </div>
               ))}
             </div>
@@ -670,7 +696,7 @@ function BulkModal({ templateId, onClose, onDone }: {
   const [retTime, setRetTime] = useState("23:59");
   const [skipExisting, setSkipExisting] = useState(true);
   const [inherited, setInherited] = useState(false);
-  const [tiersInherited, setTiersInherited] = useState<{ name?: string; age_range?: string; price: number; label?: string }[]>([]);
+  const [tiersInherited, setTiersInherited] = useState<{ name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
   const [error, setError] = useState("");
@@ -1626,6 +1652,11 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500 flex items-center gap-1">
             <Users size={10} /> {sold}/{date.total_spots} vendidas
+            {(date.lap_passengers ?? 0) > 0 && (
+              <span className="text-navy-500 font-medium">
+                · +{date.lap_passengers} de colo
+              </span>
+            )}
           </span>
           <span className={availCls}>{date.available_spots} disponíveis</span>
         </div>

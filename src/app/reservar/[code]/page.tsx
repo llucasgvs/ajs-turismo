@@ -14,7 +14,7 @@ import { apiFetch, getUser, getToken } from "@/lib/api";
 import { fmtBRL, spotsLabel, salesClosed } from "@/lib/format";
 import { trackPurchaseOnce, trackBeginCheckout } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
-import { tierLabel } from "@/lib/tiers";
+import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const WA_NUMBER = "5541998348766";
@@ -26,7 +26,7 @@ interface Trip {
   id: number; template_id: number | null; departure_date: string; return_date: string;
   title?: string | null; destination?: string | null; image_url?: string | null;
   price_per_person: number; original_price?: number | null; available_spots: number; max_installments: number;
-  price_tiers: { name?: string; age_range?: string; price: number; label?: string }[];
+  price_tiers: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
   optionals: { name: string; price: number }[];
   quote_only?: boolean;
 }
@@ -455,6 +455,12 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   const hasTiers = (trip?.price_tiers ?? []).length > 0;
   const priceForLabel = (label: string) =>
     label === ADULT ? (trip?.price_per_person ?? 0) : (trip?.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip?.price_per_person ?? 0);
+  // Adulto sempre ocupa lugar; faixa sem a marcação também.
+  const ocupaPoltrona = (label: string) =>
+    label === ADULT ? true : tierOccupiesSeat(trip?.price_tiers.find(t => tierLabel(t) === label));
+  /** Poltronas de uma escolha por categoria (criança de colo não conta). */
+  const contaPoltronas = (sel: Record<string, number>) =>
+    Object.entries(sel).reduce((s, [label, qty]) => s + (ocupaPoltrona(label) ? qty : 0), 0);
 
   const [people, setPeople] = useState(booking.num_travelers);
   const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
@@ -506,10 +512,12 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
 
   const changePeople = (d: number) => { const v = Math.max(1, Math.min(trip?.available_spots || 50, people + d)); setPeople(v); push(v, tierCounts, opts); onTravelersChange?.(); };
   const changeTier = (label: string, d: number) => setTierCounts(prev => {
-    const total = Object.values(prev).reduce((a, b) => a + b, 0);
-    if (d > 0 && total >= (trip?.available_spots || 50)) return prev;
     const next = { ...prev, [label]: Math.max(0, (prev[label] || 0) + d) };
+    // O limite é de poltronas: a criança de colo não consome vaga do ônibus.
+    if (d > 0 && contaPoltronas(next) > (trip?.available_spots || 50)) return prev;
     if (Object.values(next).reduce((a, b) => a + b, 0) < 1) return prev;
+    // Alguém tem que levar a criança de colo: nunca só faixas sem poltrona.
+    if (contaPoltronas(next) < 1) return prev;
     push(0, next, opts); onTravelersChange?.(); return next;
   });
   const toggleOpt = (name: string) => setOpts(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); push(people, tierCounts, n); return n; });
@@ -611,7 +619,13 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             <div className="space-y-2.5">
               {[ADULT, ...(trip?.price_tiers ?? []).map(t => tierLabel(t))].map(label => (
                 <div key={label} className="flex items-center justify-between">
-                  <div><p className="text-sm text-navy-800">{label}</p><p className="text-xs text-gray-400">R$ {fmtBRL(priceForLabel(label))}</p></div>
+                  <div>
+                    <p className="text-sm text-navy-800">{label}</p>
+                    <p className="text-xs text-gray-400">
+                      {tierPriceLabel(priceForLabel(label), fmtBRL)}
+                      {!ocupaPoltrona(label) && " · não ocupa poltrona"}
+                    </p>
+                  </div>
                   <Counter value={tierCounts[label] || 0} onMinus={() => changeTier(label, -1)} onPlus={() => changeTier(label, 1)} />
                 </div>
               ))}
@@ -669,7 +683,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                 return (
                   <div key={t.label} className="flex justify-between gap-2 text-gray-600">
                     <span className="min-w-0 truncate">{t.qty}× {t.label}</span>
-                    <span className="shrink-0 whitespace-nowrap">{isAdult && orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * t.qty)}</s>}R$ {fmtBRL(t.qty * t.price)}</span>
+                    <span className="shrink-0 whitespace-nowrap">{isAdult && orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * t.qty)}</s>}{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
                   </div>
                 );
               }) : (

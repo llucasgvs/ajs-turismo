@@ -26,6 +26,8 @@ type Booking = {
   traveler_phone: string | null;
   traveler_birth_date: string | null;
   num_travelers: number;
+  /** Poltronas ocupadas. Nulo nas reservas antigas: aí vale num_travelers. */
+  seats_used?: number | null;
   price_per_person: number;
   total_amount: number;
   final_amount: number;
@@ -283,6 +285,15 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 <div className="flex justify-between text-gray-600">
                   <span>{booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""} × R$ {fmtBRL(booking.price_per_person)}</span>
                   <span>R$ {fmtBRL(booking.total_amount)}</span>
+                </div>
+              )}
+              {typeof booking.seats_used === "number" && booking.seats_used !== booking.num_travelers && (
+                <div className="flex justify-between gap-2 text-[11px] text-navy-600 border-t border-gray-100 pt-2">
+                  <span className="shrink-0">Ocupação no ônibus</span>
+                  <span className="text-right">
+                    {booking.num_travelers} pessoas · {booking.seats_used} poltrona{booking.seats_used !== 1 ? "s" : ""} ·{" "}
+                    {booking.num_travelers - booking.seats_used} de colo
+                  </span>
                 </div>
               )}
               {booking.selected_optionals && booking.selected_optionals.length > 0 && (

@@ -13,7 +13,7 @@ import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
-import { tierLabel } from "@/lib/tiers";
+import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1541,6 +1541,12 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   const activeHasTiers = activeTiers.length > 0;
   const priceForLabel = (label: string) =>
     label === ADULT ? activeTrip.price_per_person : (activeTiers.find(t => tierLabel(t) === label)?.price ?? activeTrip.price_per_person);
+  // Adulto sempre ocupa lugar; faixa sem a marcação também.
+  const ocupaPoltrona = (label: string) =>
+    label === ADULT ? true : tierOccupiesSeat(activeTiers.find(t => tierLabel(t) === label));
+  /** Poltronas de uma escolha por categoria (criança de colo não conta). */
+  const contaPoltronas = (sel: Record<string, number>) =>
+    Object.entries(sel).reduce((s, [label, qty]) => s + (ocupaPoltrona(label) ? qty : 0), 0);
 
   // Reinicia os contadores por categoria quando a data ativa muda
   useEffect(() => {
@@ -1553,11 +1559,13 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
 
   const changeSidebarTier = (label: string, delta: number) => {
     setSidebarTiers(prev => {
-      const total = Object.values(prev).reduce((a, b) => a + b, 0);
-      if (delta > 0 && total >= (activeTrip.available_spots || 50)) return prev;
       const next = Math.max(0, (prev[label] || 0) + delta);
       const updated = { ...prev, [label]: next };
+      // O limite é de poltronas: a criança de colo não consome vaga do ônibus.
+      if (delta > 0 && contaPoltronas(updated) > (activeTrip.available_spots || 50)) return prev;
       if (Object.values(updated).reduce((a, b) => a + b, 0) < 1) return prev;
+      // Alguém tem que levar a criança de colo: nunca só faixas sem poltrona.
+      if (contaPoltronas(updated) < 1) return prev;
       return updated;
     });
   };
@@ -2279,7 +2287,10 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                               <div key={label} className="flex items-center gap-2">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{label}</p>
-                                  <p className="text-[11px] text-gray-400 leading-tight">R$ {fmtBRL(priceForLabel(label))}</p>
+                                  <p className="text-[11px] text-gray-400 leading-tight">
+                                    {tierPriceLabel(priceForLabel(label), fmtBRL)}
+                                    {!ocupaPoltrona(label) && " · não ocupa poltrona"}
+                                  </p>
                                 </div>
                                 <button type="button" onClick={() => changeSidebarTier(label, -1)}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>

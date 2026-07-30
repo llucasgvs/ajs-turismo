@@ -42,7 +42,7 @@ interface TripDateInitialData {
   max_installments?: number;
   total_spots?: number;
   available_spots?: number;
-  price_tiers?: { name?: string; age_range?: string; price: number; label?: string }[];
+  price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
 }
 
 /** ISO UTC → { date: "YYYY-MM-DD", time: "HH:MM" } em SP */
@@ -322,7 +322,7 @@ interface TripDateDefaults {
   total_spots?: number;
   dep_time?: string; // "HH:MM"
   ret_time?: string; // "HH:MM"
-  price_tiers?: { name?: string; age_range?: string; price: number; label?: string }[];
+  price_tiers?: { name?: string; age_range?: string; price: number; occupies_seat?: boolean; label?: string }[];
 }
 
 /* ── Main form ── */
