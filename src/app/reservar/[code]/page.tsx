@@ -731,8 +731,10 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 }) {
   const user = typeof window !== "undefined" ? getUser() : null;
   const [fullName, setFullName] = useState(user?.full_name || "");
-  const [cpf, setCpf] = useState(user?.cpf || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  // Ja formata o que vem do cadastro: no banco fica so o numero, e sem isso o
+  // campo abria sem mascara ate a pessoa digitar alguma coisa nele.
+  const [cpf, setCpf] = useState(maskCPF(user?.cpf || ""));
+  const [phone, setPhone] = useState(maskPhone(user?.phone || ""));
   const [birth, setBirth] = useState(user?.birth_date || "");
   const need = booking.num_travelers - 1;
   const [companions, setCompanions] = useState<Companion[]>([]);
