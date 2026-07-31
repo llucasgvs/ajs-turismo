@@ -69,6 +69,20 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
   completed:  { label: "Realizado",  color: "bg-gray-100 text-gray-600",       border: "border-l-gray-300" },
 };
 
+/**
+ * O sistema cancela sozinho quem não pagou em 48h ou cuja data entrou no prazo
+ * de encerramento, e deixa esse marcador nas observações. Serve para separar
+ * "desistiu/foi cancelada na mão" de "o prazo acabou".
+ */
+const MARCA_EXPIRADA = "[expirada por falta de pagamento]";
+function statusVisual(b: { status: string; notes?: string | null }) {
+  const base = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+  if (b.status === "cancelled" && (b.notes ?? "").includes(MARCA_EXPIRADA)) {
+    return { label: "Expirado", color: "bg-gray-100 text-gray-600", border: "border-l-gray-400" };
+  }
+  return base;
+}
+
 const PAYMENT_LABEL: Record<string, string> = {
   whatsapp: "Presencial / WhatsApp",
   pix: "PIX",
@@ -170,7 +184,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   onRefund: (booking: Booking) => void;
   actionLoading: string | null;
 }) {
-  const st = STATUS_LABEL[booking.status] ?? { label: booking.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+  const st = statusVisual(booking);
   const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
   const [codeCopied, setCodeCopied] = useState(false);
   const copyCode = () => {
@@ -1523,7 +1537,7 @@ export default function AdminReservasPage() {
                 <tbody>
                   {bookings.map((b) => {
                     const trip = tripMap[b.trip_id];
-                    const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+                    const st = statusVisual(b);
                     const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
                     return (
                       <tr key={b.id} onClick={() => setSelectedBooking(b)}
@@ -1572,7 +1586,7 @@ export default function AdminReservasPage() {
             <div className="md:hidden p-4 flex flex-col gap-3">
               {bookings.map((b) => {
                 const trip = tripMap[b.trip_id];
-                const st = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+                const st = statusVisual(b);
                 const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
                 const showActions = ["interesse", "confirmed", "pending"].includes(b.status) || !!b.traveler_phone;
                 return (
