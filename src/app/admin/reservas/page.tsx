@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2 } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket } from "lucide-react";
 import { getToken, fetchWithTimeout } from "@/lib/api";
-import { fmtBRL, spotsLabel } from "@/lib/format";
+import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -236,11 +236,11 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
               <p className="font-semibold text-navy-800">{travelerName}</p>
               {booking.traveler_cpf && (
-                <p className="text-gray-500 font-mono text-xs flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{booking.traveler_cpf}</p>
+                <p className="text-gray-500 font-mono text-xs flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(booking.traveler_cpf)}</p>
               )}
               {booking.traveler_phone && (
                 <div className="flex items-center gap-2">
-                  <p className="text-gray-500 text-xs flex items-center gap-1.5"><Phone size={11} className="text-gray-400" />{booking.traveler_phone}</p>
+                  <p className="text-gray-500 text-xs flex items-center gap-1.5"><Phone size={11} className="text-gray-400" />{formatPhone(booking.traveler_phone)}</p>
                   <a href={buildWaUrl(booking)}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-xs font-semibold text-[#25D366] hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors">
@@ -262,7 +262,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 {companions.map((c, i) => (
                   <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
                     <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
-                    <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{c.cpf}</p>
+                    <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>
                     {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)}</p>}
                   </div>
                 ))}
@@ -355,6 +355,9 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
           </section>
         </div>
 
+        {/* Voucher: só depois de pago, que é quando o backend libera. */}
+        {["confirmed", "completed"].includes(booking.status) && <VoucherButton booking={booking} />}
+
         {/* Actions */}
         {canAct && (
           <div className="p-4 border-t border-gray-100 flex gap-2">
@@ -388,6 +391,58 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   );
 }
 
+/* ─── Voucher da reserva (para o admin reenviar ao cliente) ─── */
+function VoucherButton({ booking }: { booking: Booking }) {
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState("");
+  const filename = `voucher-${booking.booking_code}.pdf`;
+
+  const baixar = async () => {
+    if (busy) return;
+    setBusy(true); setErro("");
+    try {
+      const res = await fetchWithTimeout(`${API}/bookings/my/${booking.booking_code}/voucher`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+
+      // No celular abre o compartilhamento nativo, que é o caminho direto para
+      // o WhatsApp; no computador cai no download do arquivo.
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `Voucher ${booking.booking_code}` });
+          return;
+        } catch (e) {
+          if ((e as DOMException)?.name === "AbortError") return;   // usuário desistiu
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch {
+      setErro("Não foi possível gerar o voucher. Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-4 pt-4">
+      <button onClick={baixar} disabled={busy}
+        className="w-full flex items-center justify-center gap-2 border border-navy-200 bg-navy-50 text-navy-700 hover:bg-navy-100 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <Ticket size={14} />}
+        {busy ? "Gerando..." : "Voucher do cliente"}
+      </button>
+      {erro && <p className="text-xs text-red-500 mt-1.5 text-center">{erro}</p>}
+    </div>
+  );
+}
+
 /* ─── Edit Booking Modal ─── */
 function EditBookingModal({ booking, onClose, onSaved }: {
   booking: Booking;
@@ -414,21 +469,6 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const formatCPF = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 3) return d;
-    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
-    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
-    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-  };
-
-  const formatPhone = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 2) return d;
-    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  };
 
   const changePeople = (n: number) => {
     const clamped = Math.max(1, n);
@@ -786,21 +826,6 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 
   const updateCompanion = (i: number, field: keyof Companion, value: string) => {
     setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
-  };
-
-  const formatCPF = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 3) return d;
-    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
-    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
-    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-  };
-
-  const formatPhone = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 2) return d;
-    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   };
 
   const handleCpfChange = (v: string) => {
@@ -1517,7 +1542,7 @@ export default function AdminReservasPage() {
                         </td>
                         <td className="px-4 py-3 align-top">
                           <p className="font-semibold text-navy-800 truncate max-w-[170px]">{travelerName}</p>
-                          {b.traveler_phone && <p className="text-xs text-gray-400">{b.traveler_phone}</p>}
+                          {b.traveler_phone && <p className="text-xs text-gray-400">{formatPhone(b.traveler_phone)}</p>}
                         </td>
                         <td className="px-4 py-3 align-top">
                           <p className="text-navy-700 truncate max-w-[200px]">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
