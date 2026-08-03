@@ -9,6 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { imgOtim } from "@/lib/imagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
@@ -520,7 +521,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
       <div className="relative h-44 flex-shrink-0 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img loading="lazy" decoding="async"
-          src={tmpl.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80"}
+          src={tmpl.image_url ? imgOtim(tmpl.image_url, 828, 85) : "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80"}
           alt={tmpl.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
