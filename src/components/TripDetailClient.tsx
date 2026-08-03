@@ -15,6 +15,7 @@ import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed } fro
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
+import { imgOtim } from "@/lib/imagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -200,7 +201,7 @@ function GalleryModal({ images, startIndex, onClose }: { images: string[]; start
       {/* Main image */}
       <div className="flex-1 flex items-center justify-center relative px-14 min-h-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async" src={images[idx]} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+        <img loading="lazy" decoding="async" src={imgOtim(images[idx], 2048, 100)} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
         {images.length > 1 && (
           <>
             <button onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
@@ -222,7 +223,7 @@ function GalleryModal({ images, startIndex, onClose }: { images: string[]; start
             <button key={i} onClick={() => setIdx(i)}
               className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${i === idx ? "border-gold-400" : "border-white/20 opacity-60 hover:opacity-100"}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={imgOtim(img, 128, 85)} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -242,7 +243,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
       {/* Mobile: single large image */}
       <div className="sm:hidden relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async" src={images[0]} alt="" className="w-full h-full object-cover" />
+        <img loading="lazy" decoding="async" src={imgOtim(images[0], 828, 90)} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         {images.length > 1 && (
           <button
@@ -259,7 +260,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
         {/* Large left */}
         <div className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpen(0)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img loading="lazy" decoding="async" src={images[0]} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+          <img loading="lazy" decoding="async" src={imgOtim(images[0], 1200, 90)} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         </div>
         {/* 4 small right - fill with placeholders if < 5 images */}
         {[1, 2, 3, 4].map((pos) => {
@@ -268,7 +269,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
           return img ? (
             <div key={pos} className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(pos)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              <img loading="lazy" decoding="async" src={imgOtim(img, 640, 85)} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
               {isLast && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white font-bold text-xl">+{images.length - 5}</span>
@@ -378,7 +379,7 @@ function RelatedCard({ trip }: { trip: Trip }) {
       <div className="relative h-40 overflow-hidden flex-shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img loading="lazy" decoding="async"
-          src={trip.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80"}
+          src={trip.image_url ? imgOtim(trip.image_url, 828, 85) : "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80"}
           alt={trip.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
@@ -472,7 +473,7 @@ function DestinationOptions({ templateId, parentId }: { templateId: number | nul
           <Link key={t.id} href={`/viagens/${t.slug ?? t.first_trip_id}`} className="group block rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div className="relative h-32 bg-navy-100 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {t.image_url && <img src={t.image_url} alt={t.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />}
+              {t.image_url && <img src={imgOtim(t.image_url, 640, 85)} alt={t.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />}
             </div>
             <div className="p-3">
               <p className="font-bold text-navy-800 text-sm leading-tight line-clamp-2">{t.title}</p>

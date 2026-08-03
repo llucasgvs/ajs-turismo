@@ -11,8 +11,10 @@
  * responde 400 para host não liberado e a foto quebraria na tela.
  */
 
-// Larguras aceitas pelo Next (deviceSizes padrão). Pedir outra dá 400.
-const LARGURAS = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
+// Larguras aceitas pelo Next (imageSizes + deviceSizes padrão). Pedir outra
+// dá 400 e a foto some da tela, por isso a lista é fechada. Testadas uma a uma
+// contra o otimizador em produção.
+const LARGURAS = [16, 32, 48, 64, 96, 128, 256, 384, 640, 750, 828, 1080, 1200, 1920, 2048, 3840];
 
 // Precisa bater com o remotePatterns do next.config.js.
 const HOSTS_LIBERADOS = /(^|\.)supabase\.co$|(^|\.)unsplash\.com$/i;
