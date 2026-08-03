@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { imgOtim } from "@/lib/imagem";
 
 interface PublicDate {
   id: number;
@@ -66,7 +67,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                 <div className="relative h-52 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img loading="lazy" decoding="async"
-                    src={pkg.image_url || "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"}
+                    src={pkg.image_url ? imgOtim(pkg.image_url, 828, 85) : "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"}
                     alt={pkg.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
