@@ -33,6 +33,9 @@ type Booking = {
   final_amount: number;
   payment_method: string | null;
   status: string;
+  /** Confirmada sem passar pelo gateway (admin confirmou na mão). Derivado no
+   *  backend pela ausência de cobrança no Asaas, não é um status separado. */
+  confirmado_manual?: boolean;
   notes: string | null;
   travelers_info: string | null;
   created_at: string;
@@ -75,10 +78,16 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
  * "desistiu/foi cancelada na mão" de "o prazo acabou".
  */
 const MARCA_EXPIRADA = "[expirada por falta de pagamento]";
-function statusVisual(b: { status: string; notes?: string | null }) {
+function statusVisual(b: { status: string; notes?: string | null; confirmado_manual?: boolean }) {
   const base = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
   if (b.status === "cancelled" && (b.notes ?? "").includes(MARCA_EXPIRADA)) {
     return { label: "Expirado", color: "bg-gray-100 text-gray-600", border: "border-l-gray-400" };
+  }
+  // Venda de verdade, mas o dinheiro não entrou pelo site: foi o admin que
+  // confirmou. Continua verde de propósito, porque conta como receita igual;
+  // muda só o texto, que é o que separa uma da outra ao bater o caixa.
+  if (b.status === "confirmed" && b.confirmado_manual) {
+    return { label: "Confirmado manual", color: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-400" };
   }
   return base;
 }
