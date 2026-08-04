@@ -877,12 +877,14 @@ function BulkModal({ templateId, onClose, onDone }: {
               {/* Preço */}
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Preço</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Preço por pessoa *</label>
-                    <input type="number" className="input-field text-sm" placeholder="Ex: 199.90"
-                      value={price} min="0" step="0.01" onChange={e => setPrice(e.target.value)} />
-                  </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Preço por pessoa *</label>
+                  <input type="number" className="input-field text-sm" placeholder="Ex: 199.90"
+                    value={price} min="0" step="0.01" onChange={e => setPrice(e.target.value)} />
+                </div>
+                {/* Linha inteira: dividindo a largura com o preço, o "De:" ficava
+                    estreito demais e cortava o valor. */}
+                <div className="mt-3">
                   <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
                 </div>
               </div>

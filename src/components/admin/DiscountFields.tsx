@@ -49,8 +49,11 @@ export default function DiscountFields({ price, original, onOriginal, title = "D
         )}
       </div>
 
-      <div className="flex items-end gap-2">
-        <div className="flex-1 min-w-0">
+      {/* Quebra a linha em vez de espremer: abaixo de ~128px o campo "De:"
+          corta o valor (R$ 240 vira "R$ 2"). O "ou" acompanha o percentual
+          para não sobrar sozinho no fim da primeira linha. */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[128px]">
           <label className="block text-[10px] text-gray-400 mb-1">Preço cheio (De:)</label>
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">R$</span>
@@ -63,20 +66,22 @@ export default function DiscountFields({ price, original, onOriginal, title = "D
           </div>
         </div>
 
-        <span className="pb-2.5 text-gray-300 text-xs select-none">ou</span>
+        <div className="flex items-end gap-2">
+          <span className="pb-2.5 text-gray-300 text-xs select-none">ou</span>
 
-        <div className="w-[86px] flex-shrink-0">
-          <label className="block text-[10px] text-gray-400 mb-1">Desconto</label>
-          <div className="relative">
-            <input
-              type="number" min="0" max="99" step="0.01" placeholder="0"
-              value={mostrado}
-              onFocus={() => { setTexto(mostrado); setDigitando(true); }}
-              onBlur={() => setDigitando(false)}
-              onChange={(e) => mudarPct(e.target.value)}
-              className={`${campo} pl-2.5 pr-6`}
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+          <div className="w-[86px] flex-shrink-0">
+            <label className="block text-[10px] text-gray-400 mb-1">Desconto</label>
+            <div className="relative">
+              <input
+                type="number" min="0" max="99" step="0.01" placeholder="0"
+                value={mostrado}
+                onFocus={() => { setTexto(mostrado); setDigitando(true); }}
+                onBlur={() => setDigitando(false)}
+                onChange={(e) => mudarPct(e.target.value)}
+                className={`${campo} pl-2.5 pr-6`}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+            </div>
           </div>
         </div>
       </div>

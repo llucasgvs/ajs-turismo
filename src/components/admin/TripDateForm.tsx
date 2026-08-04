@@ -589,16 +589,12 @@ export default function TripDateForm({
           <h2 className="text-xs font-bold text-navy-500 uppercase tracking-wider mb-4 flex items-center gap-2">
             <DollarSign size={13} /> Preço
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-1.5">Preço por Pessoa (R$) *</label>
               <input className="input-field" type="number" required step="0.01" min="0"
                 value={form.price_per_person} onChange={e => set("price_per_person", e.target.value)}
                 placeholder="299.00" />
-            </div>
-            <div className="flex items-end">
-              <DiscountFields price={form.price_per_person} original={form.original_price}
-                onOriginal={(v) => set("original_price", v)} />
             </div>
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-1.5">Parcelamento máx.</label>
@@ -609,6 +605,12 @@ export default function TripDateForm({
                 ))}
               </select>
             </div>
+          </div>
+          {/* Linha inteira: espremido em um terço da grade, o campo "De:" ficava
+              com ~120px e cortava o valor (R$ 240 aparecia como "R$ 2"). */}
+          <div className="mt-4">
+            <DiscountFields price={form.price_per_person} original={form.original_price}
+              onOriginal={(v) => set("original_price", v)} />
           </div>
 
           {/* Valores por idade (faixas) */}
