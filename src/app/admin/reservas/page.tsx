@@ -78,16 +78,24 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
  * "desistiu/foi cancelada na mão" de "o prazo acabou".
  */
 const MARCA_EXPIRADA = "[expirada por falta de pagamento]";
-function statusVisual(b: { status: string; notes?: string | null; confirmado_manual?: boolean }) {
+function statusVisual(
+  b: { status: string; notes?: string | null; confirmado_manual?: boolean },
+): { label: string; color: string; border: string; hint?: string } {
   const base = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
   if (b.status === "cancelled" && (b.notes ?? "").includes(MARCA_EXPIRADA)) {
     return { label: "Expirado", color: "bg-gray-100 text-gray-600", border: "border-l-gray-400" };
   }
   // Venda de verdade, mas o dinheiro não entrou pelo site: foi o admin que
-  // confirmou. Continua verde de propósito, porque conta como receita igual;
-  // muda só o texto, que é o que separa uma da outra ao bater o caixa.
+  // confirmou. Continua verde de propósito, porque conta como receita igual.
+  // Uma palavra só, como todos os outros selos: a coluna é estreita e duas
+  // palavras quebram a linha, deixando a pílula com o dobro da altura.
   if (b.status === "confirmed" && b.confirmado_manual) {
-    return { label: "Confirmado manual", color: "bg-emerald-100 text-emerald-700", border: "border-l-emerald-400" };
+    return {
+      label: "Manual",
+      color: "bg-emerald-100 text-emerald-700",
+      border: "border-l-emerald-400",
+      hint: "Confirmada pelo admin. O pagamento não passou pelo site.",
+    };
   }
   return base;
 }
@@ -220,7 +228,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               {booking.booking_code}
               {codeCopied ? <CheckCheck size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-300 group-hover:text-gold-500 transition-colors" />}
             </button>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+            <span title={st.hint} className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
             {booking.is_external
               ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700"><Store size={10} /> Externo</span>
               : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"><Globe size={10} /> Via Site</span>
@@ -1576,7 +1584,7 @@ export default function AdminReservasPage() {
                         <td className="px-4 py-3 align-top text-xs text-gray-500 max-w-[130px]">{paymentLabel(b.payment_method, b.installments)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex items-center gap-1.5">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                            <span title={st.hint} className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                             {b.status === "interesse" && !isPastTrip(b) && <WaitingBadge createdAt={b.created_at} />}
                             {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou - contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
                           </div>
@@ -1624,7 +1632,7 @@ export default function AdminReservasPage() {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
+                        <span title={st.hint} className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold ${st.color}`}>{st.label}</span>
                         {b.status === "interesse" && !isPastTrip(b) && <WaitingBadge createdAt={b.created_at} />}
                         {b.status === "interesse" && isPastTrip(b) && <span title="Viagem já passou - contate para oferecer outra data" className="text-[10px] font-bold text-gold-700 bg-gold-50 border border-gold-200 px-1.5 py-0.5 rounded-full">Oportunidade</span>}
                       </div>
