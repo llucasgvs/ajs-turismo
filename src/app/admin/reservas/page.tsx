@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket } from "lucide-react";
-import { getToken, fetchWithTimeout } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const PAGE_SIZE = 25;
 
 // Cache da lista de viagens (dados de referência p/ dropdown + venda externa).
@@ -56,6 +55,8 @@ type Booking = {
 };
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
+
+type TripFiltro = { trip_id: number; roteiro: string; departure_date: string | null; total: number };
 
 type Counts = {
   interesse: number; pending: number; confirmed: number; completed: number;
@@ -133,6 +134,41 @@ function paymentLabel(method: string | null, installments?: number): string {
 
 // Interesse de viagem que já passou = oportunidade (contatar para outra data).
 const isPastTrip = (b: Booking) => !!b.trip_departure_date && new Date(b.trip_departure_date) < new Date();
+
+/**
+ * Idade em anos numa data de referência.
+ *
+ * A referência é a DATA DA SAÍDA, não hoje: para a agência o que importa é a
+ * idade que a pessoa terá viajando, que é o que decide faixa de preço, meia
+ * entrada e autorização de menor. Uma criança que faz 12 anos entre a reserva
+ * e o embarque paga como 12. Sem data de saída, cai na idade de hoje.
+ *
+ * Meio-dia fixo evita o clássico escorregão de um dia por causa de fuso.
+ */
+function idadeEm(nascimento: string, referencia?: string | null): number | null {
+  if (!nascimento) return null;
+  const n = new Date(nascimento.slice(0, 10) + "T12:00:00");
+  const r = referencia ? new Date(referencia.slice(0, 10) + "T12:00:00") : new Date();
+  if (isNaN(n.getTime()) || isNaN(r.getTime())) return null;
+  let anos = r.getFullYear() - n.getFullYear();
+  const m = r.getMonth() - n.getMonth();
+  if (m < 0 || (m === 0 && r.getDate() < n.getDate())) anos--;
+  return anos >= 0 && anos < 130 ? anos : null;
+}
+
+/** "· 12 anos" ao lado da data de nascimento. Some se a data for inválida. */
+function IdadeAoLado({ nascimento, saida }: { nascimento: string; saida?: string | null }) {
+  const anos = idadeEm(nascimento, saida);
+  if (anos === null) return null;
+  return (
+    <span className="text-gray-400" title={saida ? "Idade na data da saída" : "Idade hoje"}>
+      · {plural(anos, "ano", "anos")}
+    </span>
+  );
+}
+
+/** plural(2,"reserva","reservas") → "2 reservas" */
+const plural = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 
 function fmt(d: string) {
   if (!d) return "-";
@@ -299,7 +335,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 </div>
               )}
               {booking.traveler_birth_date && (
-                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)}</p>
+                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} /></p>
               )}
             </div>
           </section>
@@ -313,7 +349,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
                     <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>
-                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)}</p>}
+                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} /></p>}
                   </div>
                 ))}
               </div>
@@ -451,9 +487,7 @@ function VoucherButton({ booking }: { booking: Booking }) {
     if (busy) return;
     setBusy(true); setErro("");
     try {
-      const res = await fetchWithTimeout(`${API}/bookings/my/${booking.booking_code}/voucher`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const res = await apiFetch(`/bookings/my/${booking.booking_code}/voucher`);
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
 
@@ -547,9 +581,8 @@ function EditBookingModal({ booking, onClose, onSaved }: {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/bookings/${booking.booking_code}/edit`, {
+      const res = await apiFetch(`/bookings/${booking.booking_code}/edit`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await import("@/lib/api")).getToken()}` },
         body: JSON.stringify({
           price_per_person: priceNum !== booking.price_per_person ? priceNum : undefined,
           discount_amount: discNum,
@@ -888,9 +921,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
     if (cpfTimer.current) clearTimeout(cpfTimer.current);
     cpfTimer.current = setTimeout(async () => {
       try {
-        const res = await fetchWithTimeout(`${API}/bookings/admin/lookup-cpf?cpf=${clean}`, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
+        const res = await apiFetch(`/bookings/admin/lookup-cpf?cpf=${clean}`);
         const d = await res.json();
         if (d.found) {
           setCpfStatus("found");
@@ -945,9 +976,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 
     setLoading(true);
     try {
-      const res = await fetchWithTimeout(`${API}/bookings/admin/external`, {
+      const res = await apiFetch(`/bookings/admin/external`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
           trip_id: parseInt(tripId),
           traveler_name: name,
@@ -1218,6 +1248,12 @@ export default function AdminReservasPage() {
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
   const [tripFilter, setTripFilter] = useState<string>(searchParams.get("trip_id") ?? "");
+  const [erroCarga, setErroCarga] = useState(false);
+  // Só as datas que TÊM reserva, já ordenadas por roteiro e depois por saída.
+  // Antes o seletor lia /trips/admin-list, que traz todas as 331 datas
+  // cadastradas limitadas a 100: quase toda opção escolhida não tinha reserva
+  // nenhuma, e duas que tinham ficavam de fora por serem antigas.
+  const [tripsFiltro, setTripsFiltro] = useState<TripFiltro[]>([]);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const copyCode = (code: string) => {
@@ -1238,9 +1274,7 @@ export default function AdminReservasPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const res = await fetchWithTimeout(`${API}/bookings/admin/counts`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const res = await apiFetch(`/bookings/admin/counts`);
       if (res.ok) setCounts(await res.json());
     } catch { /* ignore */ }
   }, []);
@@ -1255,14 +1289,19 @@ export default function AdminReservasPage() {
       if (tripFilter) params.set("trip_id", tripFilter);
       if (debouncedSearch) params.set("search", debouncedSearch);
 
-      const res = await fetchWithTimeout(`${API}/bookings/admin/all?${params}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const res = await apiFetch(`/bookings/admin/all?${params}`);
       if (res.ok) {
         const data = await res.json();
         setBookings(data.items);
         setTotal(data.total);
+        setErroCarga(false);
+      } else {
+        // Sem isto a tela dizia "Nenhuma reserva encontrada" quando na verdade a
+        // busca falhou, e não dava para distinguir lista vazia de erro.
+        setErroCarga(true);
       }
+    } catch {
+      setErroCarga(true);
     } finally {
       setLoading(false);
     }
@@ -1272,12 +1311,19 @@ export default function AdminReservasPage() {
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
 
   useEffect(() => {
+    apiFetch(`/bookings/admin/trips-com-reserva`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setTripsFiltro(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     // Usa cache fresco se houver (dentro do TTL e após a última mutação)
     if (_tripsCache.data && (Date.now() - _tripsCache.ts) < TRIPS_TTL && _tripsCache.ts >= adminDirtyTs()) {
       setTrips(_tripsCache.data);
       return;
     }
-    fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: { Authorization: `Bearer ${getToken()}` } })
+    apiFetch(`/trips/admin-list?limit=100`)
       .then((r) => r.json())
       .then((d) => {
         const list = d?.items ?? (Array.isArray(d) ? d : []);
@@ -1292,9 +1338,8 @@ export default function AdminReservasPage() {
     // Used only from BookingDetailModal (no price adjust)
     setActionLoading(code);
     try {
-      await fetchWithTimeout(`${API}/bookings/${code}/confirm`, {
+      await apiFetch(`/bookings/${code}/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({}),
       });
       invalidateAdminCache();
@@ -1309,9 +1354,8 @@ export default function AdminReservasPage() {
     if (!refundTarget) return;
     setRefundLoading(true);
     try {
-      const res = await fetchWithTimeout(`${API}/payments/${refundTarget.booking_code}/refund`, {
+      const res = await apiFetch(`/payments/${refundTarget.booking_code}/refund`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); alert(e.detail || "Não foi possível estornar."); return; }
       invalidateAdminCache();
@@ -1333,9 +1377,8 @@ export default function AdminReservasPage() {
     if (!cancelTarget) return;
     setCancelLoading(true);
     try {
-      await fetchWithTimeout(`${API}/bookings/${cancelTarget.booking_code}/cancel`, {
+      await apiFetch(`/bookings/${cancelTarget.booking_code}/cancel`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
       });
       invalidateAdminCache();
       setCancelTarget(null);
@@ -1347,6 +1390,17 @@ export default function AdminReservasPage() {
   };
 
   const tripMap = Object.fromEntries(trips.map((t) => [t.id, t]));
+  // A API já devolve ordenado por roteiro e depois por saída, então basta
+  // agrupar preservando a ordem de chegada.
+  const gruposFiltro = useMemo(() => {
+    const m = new Map<string, TripFiltro[]>();
+    for (const t of tripsFiltro) {
+      const atual = m.get(t.roteiro);
+      if (atual) atual.push(t);
+      else m.set(t.roteiro, [t]);
+    }
+    return Array.from(m.entries());
+  }, [tripsFiltro]);
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const tabs: { key: string; label: string; count: number }[] = [
@@ -1533,10 +1587,16 @@ export default function AdminReservasPage() {
             <select value={tripFilter} onChange={(e) => setTripFilter(e.target.value)}
               className={`w-full sm:w-auto pl-8 pr-8 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none cursor-pointer ${tripFilter ? "border-navy-400 bg-navy-50 text-navy-700 font-semibold" : "border-gray-200 text-gray-500"}`}>
               <option value="">Todas as viagens</option>
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}{t.departure_date ? ` · ${new Date(t.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}
-                </option>
+              {/* Roteiro vira grupo e as datas dele entram dentro: a lista fica
+                  curta, e cada opção mostra quantas reservas tem. */}
+              {gruposFiltro.map(([roteiro, datas]) => (
+                <optgroup key={roteiro} label={roteiro}>
+                  {datas.map((d) => (
+                    <option key={d.trip_id} value={d.trip_id}>
+                      {d.departure_date ? fmt(d.departure_date) : "sem data"} · {plural(d.total, "reserva", "reservas")}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -1548,6 +1608,15 @@ export default function AdminReservasPage() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : erroCarga ? (
+          <div className="text-center py-16">
+            <p className="font-bold text-navy-800">Não foi possível carregar as reservas</p>
+            <p className="text-gray-400 text-sm mt-1">Isso não quer dizer que a lista está vazia.</p>
+            <button onClick={() => fetchBookings()}
+              className="mt-4 bg-navy-800 hover:bg-navy-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
+              Tentar de novo
+            </button>
           </div>
         ) : bookings.length === 0 ? (
           <div className="text-center py-16 text-gray-400">

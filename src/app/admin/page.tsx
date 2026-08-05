@@ -7,10 +7,9 @@ import {
   Loader2, BookOpen, CreditCard, Camera, TrendingUp, TrendingDown, Trophy, Crown, Target,
   DollarSign, XCircle, ArrowUpRight,
 } from "lucide-react";
-import { getToken, fetchWithTimeout } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const RES = "/admin/reservas";
 
 /* ─── Types ─── */
@@ -41,7 +40,6 @@ const plw = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 const weekdayFull = (iso: string) => cap(new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long" }));
 const dayMonth = (iso: string) => { const d = new Date(iso + "T12:00:00"); return `${d.getDate()}/${d.getMonth() + 1}`; };
 const MES_FULL = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const authHeaders = () => ({ Authorization: `Bearer ${getToken()}` });
 
 function buildWaUrl(b: Booking) {
   const name = (b.traveler_name || "").split(" ")[0] || "tudo bem";
@@ -98,6 +96,8 @@ export default function AdminDashboard() {
   const [templates, setTemplates] = useState<Template[]>(_c.templates);
   const [loading, setLoading] = useState(!fresh);
   const [refreshing, setRefreshing] = useState(false);
+  // Falha ao carregar: o painel avisa em vez de mostrar zeros que parecem reais.
+  const [erroCarga, setErroCarga] = useState(false);
   const [chartMode, setChartMode] = useState<"day" | "month" | "year">("day");
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -109,17 +109,28 @@ export default function AdminDashboard() {
     silent ? setRefreshing(true) : setLoading(true);
     try {
       const R = await Promise.all([
-        fetchWithTimeout(`${API}/bookings/admin/stats`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/counts`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/analytics`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/revenue-series?months=6`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/revenue-series?granularity=day`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/revenue-series?granularity=year`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/all?booking_status=interesse&limit=6`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/bookings/admin/all?booking_status=pending&limit=6`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/trips/admin-list?limit=100`, { headers: authHeaders() }),
-        fetchWithTimeout(`${API}/templates/admin-list`, { headers: authHeaders() }),
+        apiFetch(`/bookings/admin/stats`),
+        apiFetch(`/bookings/admin/counts`),
+        apiFetch(`/bookings/admin/analytics`),
+        apiFetch(`/bookings/admin/revenue-series?months=6`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=day`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=year`),
+        apiFetch(`/bookings/admin/all?booking_status=interesse&limit=6`),
+        apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
+        apiFetch(`/trips/admin-list?limit=100`),
+        apiFetch(`/templates/admin-list`),
       ]);
+      // Se QUALQUER chamada falhou, não escreve nada: nem na tela, nem no cache.
+      // Antes o corpo de erro não passava nas validações abaixo e virava zero e
+      // lista vazia, que era gravado em _c com carimbo novo. A montagem seguinte
+      // considerava esse vazio "fresco" e nem tentava recarregar, então o painel
+      // ficava zerado até um F5. O 401 em si já é tratado pelo apiFetch, que
+      // renova o token e, se não conseguir, desloga.
+      if (R.some(r => !r.ok)) {
+        setErroCarga(true);
+        return;
+      }
+      setErroCarga(false);
       const [sD, cD, aD, mD, dD, yD, iD, pD, tD, tmD] = await Promise.all(R.map(r => r.json().catch(() => null)));
       const statsV = sD && typeof sD.total_revenue === "number" ? sD : null;
       const countsV = cD && typeof cD.interesse === "number" ? cD : null;
@@ -134,6 +145,8 @@ export default function AdminDashboard() {
       setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV); setSYear(yearV);
       setInterests(intV); setPendings(penV); setTrips(tripsV); setTemplates(tmplV);
       Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
+    } catch {
+      setErroCarga(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -188,6 +201,22 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-2 pb-10">
+
+      {/* Falhou o carregamento: avisa em vez de deixar zeros passando por dados
+          reais. Os números na tela são os da última carga que deu certo. */}
+      {erroCarga && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-800 flex-1 min-w-[200px]">
+            <span className="font-bold">Não foi possível atualizar os números agora.</span>{" "}
+            O que está na tela é da última atualização que deu certo.
+          </p>
+          <button onClick={() => load(false)} disabled={loading}
+            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition-colors">
+            {loading ? <Loader2 size={13} className="animate-spin" /> : null} Tentar de novo
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-wrap gap-3 items-start justify-between">
