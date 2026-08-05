@@ -445,8 +445,10 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   onDone: () => void;
 }) {
   const [escolhida, setEscolhida] = useState("");
+  const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const motivoOk = motivo.trim().length >= 3;
 
   const pago = Number(booking.final_amount) || 0;
   const opcoes = datas
@@ -462,11 +464,12 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
 
   const trocar = async () => {
     if (!alvo) { setErro("Escolha a nova data."); return; }
+    if (!motivoOk) { setErro("Escreva o motivo da troca."); return; }
     setSalvando(true); setErro("");
     try {
       const res = await apiFetch(`/bookings/${booking.booking_code}/trocar-data`, {
         method: "POST",
-        body: JSON.stringify({ trip_id: alvo.id }),
+        body: JSON.stringify({ trip_id: alvo.id, motivo: motivo.trim() }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -516,6 +519,22 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
             )}
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+              Motivo <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text" value={motivo} maxLength={300}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ex: previsão de chuva, cliente pediu"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Fica registrado na observação da reserva. Daqui a três meses, é a única resposta para
+              &quot;por que essa reserva mudou de data?&quot;.
+            </p>
+          </div>
+
           {alvo && (
             diverge ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
@@ -552,7 +571,7 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
             className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
             Voltar
           </button>
-          <button onClick={trocar} disabled={salvando || !alvo}
+          <button onClick={trocar} disabled={salvando || !alvo || !motivoOk}
             className="flex-1 flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
             {salvando ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Trocar data
           </button>
