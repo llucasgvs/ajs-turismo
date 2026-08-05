@@ -1302,8 +1302,15 @@ export default function AdminReservasPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const fetchBookings = useCallback(async () => {
-    setLoading(true);
+  // Quando foi a última busca que deu certo. Segura o gatilho de voltar à aba
+  // para trocar de janela rápido não virar uma requisição a cada alt-tab.
+  const ultimaCarga = useRef(0);
+
+  const fetchBookings = useCallback(async (silencioso = false) => {
+    // Em silêncio a lista fica na tela e só troca de conteúdo quando chega a
+    // resposta. Sem isso, voltar para a aba piscaria o esqueleto por cima de
+    // dados que já estavam certos.
+    if (!silencioso) setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("skip", String((page - 1) * PAGE_SIZE));
@@ -1318,6 +1325,7 @@ export default function AdminReservasPage() {
         setBookings(data.items);
         setTotal(data.total);
         setErroCarga(false);
+        ultimaCarga.current = Date.now();
       } else {
         // Sem isto a tela dizia "Nenhuma reserva encontrada" quando na verdade a
         // busca falhou, e não dava para distinguir lista vazia de erro.
@@ -1326,12 +1334,29 @@ export default function AdminReservasPage() {
     } catch {
       setErroCarga(true);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   }, [page, tab, tripFilter, debouncedSearch]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
+
+  // Voltar para a aba: atualiza a lista e as contagens em silêncio, e só se a
+  // última busca já passou de um minuto. Mesmo critério do painel inicial.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaCarga.current < 60_000) return;
+      fetchBookings(true);
+      fetchCounts();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [fetchBookings, fetchCounts]);
 
   useEffect(() => {
     apiFetch(`/bookings/admin/trips-com-reserva`)
