@@ -156,13 +156,35 @@ function idadeEm(nascimento: string, referencia?: string | null): number | null 
   return anos >= 0 && anos < 130 ? anos : null;
 }
 
-/** "· 12 anos" ao lado da data de nascimento. Some se a data for inválida. */
-function IdadeAoLado({ nascimento, saida }: { nascimento: string; saida?: string | null }) {
-  const anos = idadeEm(nascimento, saida);
+/**
+ * Roteiro sob cotação não tem data real: o sistema grava 01/01/2099 como
+ * marcador. Usar isso como referência fazia um cliente de 2001 aparecer com
+ * 97 anos. Também descarto qualquer referência absurdamente distante, porque
+ * marcador futuro é sempre erro de leitura, nunca uma viagem de verdade.
+ */
+const ANOS_PLAUSIVEIS = 5;
+function saidaUtilizavel(saida?: string | null, quoteOnly?: boolean): string | null {
+  if (!saida || quoteOnly) return null;
+  const d = new Date(saida.slice(0, 10) + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() + ANOS_PLAUSIVEIS);
+  return d > limite ? null : saida;
+}
+
+/**
+ * "· 25 anos na saída" ao lado da data de nascimento.
+ *
+ * O texto diz sempre a qual data a idade se refere, porque as duas respostas
+ * são legítimas e a diferença muda faixa de preço e autorização de menor.
+ */
+function IdadeAoLado({ nascimento, saida, quoteOnly }: { nascimento: string; saida?: string | null; quoteOnly?: boolean }) {
+  const ref = saidaUtilizavel(saida, quoteOnly);
+  const anos = idadeEm(nascimento, ref);
   if (anos === null) return null;
   return (
-    <span className="text-gray-400" title={saida ? "Idade na data da saída" : "Idade hoje"}>
-      · {plural(anos, "ano", "anos")}
+    <span className="text-gray-400 whitespace-nowrap">
+      · {plural(anos, "ano", "anos")} {ref ? "na saída" : "hoje"}
     </span>
   );
 }
@@ -335,7 +357,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 </div>
               )}
               {booking.traveler_birth_date && (
-                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} /></p>
+                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /></p>
               )}
             </div>
           </section>
@@ -349,7 +371,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
                     <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>
-                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} /></p>}
+                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /></p>}
                   </div>
                 ))}
               </div>
