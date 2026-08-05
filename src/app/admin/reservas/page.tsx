@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
@@ -55,6 +55,7 @@ type Booking = {
   /** Mesmos instantes dos dois acima, mas declarados datetime na API: são a
    *  fonte confiável para mostrar horário. Os `_date` são declarados `date` no
    *  schema e só não truncam a hora por sorte. */
+  trip_template_id?: number | null;
   trip_departure_at?: string | null;
   trip_return_at?: string | null;
   trip_quote_only?: boolean;
@@ -85,6 +86,13 @@ const STATUS_LABEL: Record<string, { label: string; color: string; border: strin
  * "desistiu/foi cancelada na mão" de "o prazo acabou".
  */
 const MARCA_EXPIRADA = "[expirada por falta de pagamento]";
+/** Deixadas pelo backend quando a data da reserva é trocada. A segunda só
+ *  aparece quando o valor pago não bate com o preço da data nova. */
+const MARCA_DATA_ALTERADA = "[data alterada";
+const MARCA_VALOR_DIVERGE = "valor diverge";
+const teveTrocaDeData = (b: { notes?: string | null }) => (b.notes ?? "").includes(MARCA_DATA_ALTERADA);
+const valorDiverge = (b: { notes?: string | null }) =>
+  teveTrocaDeData(b) && (b.notes ?? "").includes(MARCA_VALOR_DIVERGE);
 function statusVisual(
   b: { status: string; notes?: string | null; confirmado_manual?: boolean },
 ): { label: string; color: string; border: string; tag?: string; hint?: string } {
@@ -422,7 +430,139 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ─── Booking Detail Modal ─── */
-function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, onRefund, actionLoading }: {
+/**
+ * Troca a data da reserva por outra do MESMO roteiro.
+ *
+ * O valor pago não é recalculado, por decisão do dono: o dinheiro em geral já
+ * entrou, e mexer nele criaria uma cobrança ou devolução que o sistema não sabe
+ * executar sozinho. Quando o preço da data escolhida é diferente, este diálogo
+ * mostra a diferença ANTES de confirmar, e a reserva fica marcada depois.
+ */
+function TrocarDataModal({ booking, datas, onClose, onDone }: {
+  booking: Booking;
+  datas: Trip[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [escolhida, setEscolhida] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const pago = Number(booking.final_amount) || 0;
+  const opcoes = datas
+    .filter((t) => t.id !== booking.trip_id)
+    .filter((t) => booking.trip_template_id == null || t.template_id === booking.trip_template_id);
+  const alvo = opcoes.find((t) => String(t.id) === escolhida);
+
+  // Comparação só para AVISAR. A conta oficial é a do servidor, e ela usa as
+  // faixas de idade da data nova; aqui o preço por pessoa já cobre o caso comum.
+  const custoNaNova = alvo ? (Number(alvo.price_per_person) || 0) * booking.num_travelers : null;
+  const diferenca = custoNaNova === null ? null : Math.round((pago - custoNaNova) * 100) / 100;
+  const diverge = diferenca !== null && Math.abs(diferenca) >= 0.01;
+
+  const trocar = async () => {
+    if (!alvo) { setErro("Escolha a nova data."); return; }
+    setSalvando(true); setErro("");
+    try {
+      const res = await apiFetch(`/bookings/${booking.booking_code}/trocar-data`, {
+        method: "POST",
+        body: JSON.stringify({ trip_id: alvo.id }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        setErro(typeof e.detail === "string" ? e.detail : "Não foi possível trocar a data.");
+        setSalvando(false);
+        return;
+      }
+      invalidateAdminCache();
+      onDone();
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-gray-100">
+          <h3 className="font-display font-black text-navy-900 text-lg">Trocar a data</h3>
+          <p className="text-gray-400 text-sm mt-0.5">
+            {booking.trip_title ?? "Reserva"} · {booking.booking_code}
+          </p>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-gray-50 px-3.5 py-3 text-sm">
+            <p className="text-gray-400 text-xs uppercase font-semibold tracking-wide">Data atual</p>
+            <p className="font-bold text-navy-800 mt-0.5">
+              {fmtDataHoraViagem(booking.trip_departure_at ?? booking.trip_departure_date)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Nova data</label>
+            <select value={escolhida} onChange={(e) => setEscolhida(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400">
+              <option value="">Selecione...</option>
+              {opcoes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.departure_date ? fmtDataHoraViagem(t.departure_date) : "sem data"} · R$ {fmtBRL(t.price_per_person)} · {spotsLabel(t.available_spots)}
+                </option>
+              ))}
+            </select>
+            {opcoes.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1.5">Não há outra data cadastrada para este roteiro.</p>
+            )}
+          </div>
+
+          {alvo && (
+            diverge ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 uppercase tracking-wide">
+                  <AlertTriangle size={12} /> Confira o valor
+                </p>
+                <p className="text-sm text-amber-800 mt-1.5">
+                  Pago <span className="font-bold">R$ {fmtBRL(pago)}</span> · a data nova custa{" "}
+                  <span className="font-bold">R$ {fmtBRL(custoNaNova!)}</span>
+                </p>
+                <p className="text-sm font-bold text-amber-900 mt-1">
+                  {diferenca! > 0
+                    ? `A cliente pagou R$ ${fmtBRL(Math.abs(diferenca!))} a mais.`
+                    : `Faltam R$ ${fmtBRL(Math.abs(diferenca!))}.`}
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  O valor da reserva não muda. A diferença fica registrada na observação para você resolver com a cliente.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+                <p className="text-sm text-emerald-800">
+                  Mesmo valor: <span className="font-bold">R$ {fmtBRL(pago)}</span>. Nada a acertar.
+                </p>
+              </div>
+            )
+          )}
+
+          {erro && <p className="text-sm text-red-500">{erro}</p>}
+        </div>
+
+        <div className="p-4 border-t border-gray-100 flex gap-2">
+          <button onClick={onClose} disabled={salvando}
+            className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
+            Voltar
+          </button>
+          <button onClick={trocar} disabled={salvando || !alvo}
+            className="flex-1 flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Trocar data
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, onRefund, onTrocarData, actionLoading }: {
   booking: Booking;
   trip: Trip | undefined;
   onClose: () => void;
@@ -430,6 +570,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   onEdit: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
   onRefund: (booking: Booking) => void;
+  onTrocarData: (booking: Booking) => void;
   actionLoading: string | null;
 }) {
   const st = statusVisual(booking);
@@ -591,6 +732,22 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             </div>
           </section>
 
+          {/* Data trocada com valor divergente: o dinheiro nao e mexido na troca,
+              entao o acerto com a cliente fica pendente e precisa saltar aos olhos. */}
+          {valorDiverge(booking) && (
+            <section>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 uppercase tracking-wide">
+                  <AlertTriangle size={12} /> Valor a acertar
+                </p>
+                <p className="text-sm text-amber-800 mt-1.5">
+                  A data desta reserva foi trocada e o valor pago não bate com o preço da data atual.
+                  Os números estão na observação abaixo.
+                </p>
+              </div>
+            </section>
+          )}
+
           {/* Observações */}
           {booking.notes && (
             <section>
@@ -621,6 +778,11 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             <button onClick={() => { onEdit(booking); onClose(); }} disabled={isLoading}
               className="flex-1 flex items-center justify-center gap-2 border border-navy-300 text-navy-700 bg-navy-50 hover:bg-navy-100 font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
               <Pencil size={14} /> Editar
+            </button>
+            <button onClick={() => { onTrocarData(booking); onClose(); }} disabled={isLoading} title="Trocar a data desta reserva"
+              className="flex items-center justify-center gap-1.5 border border-navy-200 text-navy-600 hover:bg-navy-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm">
+              <Calendar size={14} />
+              <span className="hidden sm:inline">Trocar data</span>
             </button>
             {booking.status === "confirmed" && ["pix", "credit_card"].includes(booking.payment_method ?? "") ? (
               <button onClick={() => { onRefund(booking); onClose(); }} disabled={isLoading}
@@ -1412,6 +1574,7 @@ export default function AdminReservasPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [trocaTarget, setTrocaTarget] = useState<Booking | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
@@ -1670,6 +1833,15 @@ export default function AdminReservasPage() {
         </div>
       )}
 
+      {trocaTarget && (
+        <TrocarDataModal
+          booking={trocaTarget}
+          datas={trips}
+          onClose={() => setTrocaTarget(null)}
+          onDone={() => { setTrocaTarget(null); fetchBookings(); fetchCounts(); }}
+        />
+      )}
+
       {cancelTarget && (
         <CancelConfirmModal
           booking={cancelTarget}
@@ -1699,6 +1871,7 @@ export default function AdminReservasPage() {
           onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
           onCancel={(b) => { setSelectedBooking(null); promptCancel(b); }}
           onRefund={(b) => { setSelectedBooking(null); setRefundTarget(b); }}
+          onTrocarData={(b) => { setSelectedBooking(null); setTrocaTarget(b); }}
           actionLoading={actionLoading}
         />
       )}
@@ -1871,6 +2044,11 @@ export default function AdminReservasPage() {
                             {b.booking_code}
                             {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
                           </button>
+                          {valorDiverge(b) && (
+                            <span title="Data trocada: o valor pago não bate com o preço da data atual" className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              <AlertTriangle size={9} /> valor a acertar
+                            </span>
+                          )}
                           <span className="mt-1 flex items-center gap-0.5 text-[10px] font-semibold">
                             {b.is_external
                               ? <span className="text-purple-600 flex items-center gap-0.5"><Store size={9} /> Externo</span>
@@ -1923,6 +2101,11 @@ export default function AdminReservasPage() {
                             {b.booking_code}
                             {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
                           </button>
+                          {valorDiverge(b) && (
+                            <span title="Data trocada: o valor pago não bate com o preço da data atual" className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              <AlertTriangle size={9} /> valor a acertar
+                            </span>
+                          )}
                           {b.is_external
                             ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
                             : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>}
