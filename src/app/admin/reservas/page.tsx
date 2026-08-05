@@ -176,16 +176,78 @@ function saidaUtilizavel(saida?: string | null, quoteOnly?: boolean): string | n
 /**
  * "· 25 anos na saída" ao lado da data de nascimento.
  *
- * O texto diz sempre a qual data a idade se refere, porque as duas respostas
- * são legítimas e a diferença muda faixa de preço e autorização de menor.
+ * Quando há data de saída o texto diz isso na cara, porque a idade viajando é
+ * a que decide faixa de preço e autorização de menor. Sem data (roteiro sob
+ * cotação) fica só "25 anos": escrever "25 anos hoje" ali do lado de uma data
+ * de nascimento se lia como "faz aniversário hoje", que é outra informação.
+ * Essa, quando é verdade, tem selo próprio.
  */
 function IdadeAoLado({ nascimento, saida, quoteOnly }: { nascimento: string; saida?: string | null; quoteOnly?: boolean }) {
   const ref = saidaUtilizavel(saida, quoteOnly);
   const anos = idadeEm(nascimento, ref);
   if (anos === null) return null;
   return (
-    <span className="text-gray-400 whitespace-nowrap">
-      · {plural(anos, "ano", "anos")} {ref ? "na saída" : "hoje"}
+    <span className="text-gray-400 whitespace-nowrap" title={ref ? "Idade na data da saída" : "Idade atual (roteiro sem data definida)"}>
+      · {plural(anos, "ano", "anos")}{ref ? " na saída" : ""}
+    </span>
+  );
+}
+
+function _dataMeioDia(iso?: string | null): Date | null {
+  // Meio-dia fixo: com 00:00 o fuso empurra a data um dia para trás e o
+  // aniversário aparece no dia errado.
+  if (!iso) return null;
+  const d = new Date(iso.slice(0, 10) + "T12:00:00");
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Aniversário cai no dia da saída, durante a viagem, ou hoje? */
+function quandoFazAniversario(
+  nascimento: string,
+  saida?: string | null,
+  retorno?: string | null,
+  quoteOnly?: boolean,
+): "hoje" | "saida" | "viagem" | null {
+  const n = _dataMeioDia(nascimento);
+  if (!n) return null;
+
+  const mesDia = `${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  // "sv" devolve AAAA-MM-DD, e o fuso da operação é o que vale para "hoje".
+  const hoje = new Date().toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+  if (hoje.slice(5) === mesDia) return "hoje";
+
+  const ini = _dataMeioDia(saidaUtilizavel(saida, quoteOnly));
+  if (!ini) return null;
+  const fim = _dataMeioDia(retorno) ?? ini;
+
+  // Percorre os anos que a viagem atravessa, para pegar quem faz aniversário
+  // numa viagem de virada de ano (sai 30/12, volta 02/01).
+  // Nascido em 29/02: em ano não bissexto o JS joga para 01/03, que é onde a
+  // maioria das pessoas comemora mesmo.
+  for (const ano of Array.from(new Set([ini.getFullYear(), fim.getFullYear()]))) {
+    const dia = new Date(ano, n.getMonth(), n.getDate(), 12);
+    if (dia >= ini && dia <= fim) {
+      return dia.getTime() === ini.getTime() ? "saida" : "viagem";
+    }
+  }
+  return null;
+}
+
+const _ANIVERSARIO_TEXTO = {
+  hoje: "aniversário hoje",
+  saida: "aniversário no dia da saída",
+  viagem: "aniversário na viagem",
+} as const;
+
+/** Selo de aniversário. Fica invisível quando não é o caso, que é quase sempre. */
+function AniversarioTag({ nascimento, saida, retorno, quoteOnly }: {
+  nascimento: string; saida?: string | null; retorno?: string | null; quoteOnly?: boolean;
+}) {
+  const quando = quandoFazAniversario(nascimento, saida, retorno, quoteOnly);
+  if (!quando) return null;
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+      <Cake size={9} /> {_ANIVERSARIO_TEXTO[quando]}
     </span>
   );
 }
@@ -358,7 +420,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 </div>
               )}
               {booking.traveler_birth_date && (
-                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /></p>
+                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>
               )}
             </div>
           </section>
@@ -372,7 +434,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
                     <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>
-                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /></p>}
+                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={c.birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>}
                   </div>
                 ))}
               </div>
