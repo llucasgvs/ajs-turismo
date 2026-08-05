@@ -257,6 +257,67 @@ function AniversarioTag({ nascimento, saida, retorno, quoteOnly }: {
   );
 }
 
+/**
+ * Linha do tempo da reserva.
+ *
+ * Sobre o "Editado": `updated_at` no banco dispara em QUALQUER escrita, não só
+ * quando o admin edita. O cliente gerar um PIX, o sistema confirmar o
+ * pagamento, tudo mexe nele. Por isso as 11 reservas de produção mostravam
+ * "Editado", e em 7 delas o horário batia em menos de 1 segundo com o
+ * "Confirmado"/"Cancelado" logo acima: era o mesmo evento contado duas vezes.
+ *
+ * Agora o rótulo é "Última alteração", que é o que o campo realmente significa,
+ * e ela some quando coincide com um evento já listado.
+ */
+const _JUNTOS_SEGUNDOS = 5;
+
+function HistoricoReserva({ booking }: { booking: Booking }) {
+  const ts = (d?: string | null) => (d ? new Date(d).getTime() : null);
+
+  const eventos: { chave: string; rotulo: string; quando: string; ponto: string; texto: string }[] = [
+    { chave: "criada", rotulo: "Criada", quando: booking.created_at, ponto: "bg-gray-300", texto: "text-gray-600" },
+  ];
+  if (booking.confirmed_at) {
+    eventos.push({ chave: "confirmada", rotulo: "Confirmada", quando: booking.confirmed_at, ponto: "bg-emerald-500", texto: "text-emerald-700" });
+  }
+  if (booking.cancelled_at) {
+    const estorno = booking.status === "refunded";
+    eventos.push({
+      chave: "encerrada",
+      rotulo: estorno ? "Estornada" : "Cancelada",
+      quando: booking.cancelled_at,
+      ponto: estorno ? "bg-orange-500" : "bg-red-500",
+      texto: estorno ? "text-orange-700" : "text-red-600",
+    });
+  }
+
+  const alterada = ts(booking.updated_at);
+  const jaListado = alterada !== null && eventos.some((e) => {
+    const t = ts(e.quando);
+    return t !== null && Math.abs(alterada - t) <= _JUNTOS_SEGUNDOS * 1000;
+  });
+  if (booking.updated_at && !jaListado) {
+    eventos.push({ chave: "alterada", rotulo: "Última alteração", quando: booking.updated_at, ponto: "bg-gray-200", texto: "text-gray-400" });
+  }
+
+  eventos.sort((a, b) => (ts(a.quando) ?? 0) - (ts(b.quando) ?? 0));
+
+  return (
+    <ol className="relative pl-4 space-y-2.5">
+      {/* trilho: começa e termina no centro dos pontos das pontas */}
+      <span className="absolute left-[3px] top-[6px] bottom-[6px] w-px bg-gray-200" aria-hidden="true" />
+      {eventos.map((e) => (
+        <li key={e.chave} className="relative flex items-center gap-2 text-xs">
+          <span className={`absolute -left-4 top-1/2 -translate-y-1/2 w-[7px] h-[7px] rounded-full ring-2 ring-white ${e.ponto}`} aria-hidden="true" />
+          <span className={`font-semibold ${e.texto}`}>{e.rotulo}</span>
+          <span className="flex-1 border-b border-dashed border-gray-100" aria-hidden="true" />
+          <span className="text-gray-400 tabular-nums whitespace-nowrap">{fmtDataHora(e.quando)}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /** plural(2,"reserva","reservas") → "2 reservas" */
 const plural = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 
@@ -541,18 +602,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
           {/* Histórico */}
           <section>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock size={11} /> Histórico</p>
-            <div className="space-y-1 text-xs text-gray-500">
-              <p>Criado em {fmtDataHora(booking.created_at)}</p>
-              {booking.updated_at && booking.updated_at !== booking.created_at && (
-                <p className="text-gray-400">Editado em {fmtDataHora(booking.updated_at)}</p>
-              )}
-              {booking.confirmed_at && <p className="text-emerald-600">Confirmado em {fmtDataHora(booking.confirmed_at)}</p>}
-              {booking.cancelled_at && (
-                booking.status === "refunded"
-                  ? <p className="text-orange-600">Estornado em {fmtDataHora(booking.cancelled_at)}</p>
-                  : <p className="text-red-500">Cancelado em {fmtDataHora(booking.cancelled_at)}</p>
-              )}
-            </div>
+            <HistoricoReserva booking={booking} />
           </section>
         </div>
 
