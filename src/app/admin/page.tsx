@@ -28,6 +28,13 @@ type Template = { id: number; title: string; is_active: boolean; active_dates_co
 /* ─── Helpers ─── */
 const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 const fmt = (d: string) => new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+/** Horário no fuso da operação: o banco grava UTC, e sem isso a saída das 06:00
+ *  apareceria como 09:00. Devolve "" quando a data não presta. */
+const hora = (d?: string | null) => {
+  if (!d) return "";
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? "" : t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+};
 const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").getTime() - Date.now()) / 86400000);
 const daysSince = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
@@ -47,7 +54,7 @@ function buildWaUrl(b: Booking) {
   const clean = (b.traveler_phone || "").replace(/\D/g, "");
   const number = clean.startsWith("55") ? clean : `55${clean}`;
   const trip = b.trip_title || "sua viagem";
-  const when = b.trip_departure_date ? ` (saída em ${fmt(b.trip_departure_date)})` : "";
+  const when = b.trip_departure_date ? ` (saída em ${fmt(b.trip_departure_date)}${hora(b.trip_departure_date) ? ` às ${hora(b.trip_departure_date)}` : ""})` : "";
   return `https://wa.me/${number}?text=${encodeURIComponent(`Olá, ${name}! Aqui é a equipe da AJS Turismo. Estou entrando em contato sobre sua reserva da viagem *${trip}*${when}. (Código ${b.booking_code})`)}`;
 }
 function WhatsAppGlyph({ size = 14 }: { size?: number }) {
@@ -444,7 +451,7 @@ export default function AdminDashboard() {
               const dep = t.departure_date ? new Date(spDay(t.departure_date) + "T12:00:00") : null;
               return (
                 <div key={t.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors sm:border-b sm:border-gray-50">
-                  <div className="flex-shrink-0 w-11 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p></> : <span className="text-gray-300 text-xs">-</span>}</div>
+                  <div className="flex-shrink-0 w-12 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p>{hora(t.departure_date) && <p className="text-[10px] font-bold text-navy-400 tabular-nums mt-0.5">{hora(t.departure_date)}</p>}</> : <span className="text-gray-300 text-xs">-</span>}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2"><p className="font-semibold text-navy-800 text-sm truncate">{t.title}</p>{t.status === "sold_out" && <span className="flex-shrink-0 text-[10px] font-bold bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Esgotado</span>}</div>
                     {unlimited ? (

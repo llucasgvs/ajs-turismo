@@ -52,12 +52,17 @@ type Booking = {
   trip_destination: string | null;
   trip_departure_date: string | null;
   trip_return_date: string | null;
+  /** Mesmos instantes dos dois acima, mas declarados datetime na API: são a
+   *  fonte confiável para mostrar horário. Os `_date` são declarados `date` no
+   *  schema e só não truncam a hora por sorte. */
+  trip_departure_at?: string | null;
+  trip_return_at?: string | null;
   trip_quote_only?: boolean;
 };
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
 
-type TripFiltro = { trip_id: number; roteiro: string; departure_date: string | null; total: number };
+type TripFiltro = { trip_id: number; roteiro: string; departure_date: string | null; quote_only?: boolean; total: number };
 
 type Counts = {
   interesse: number; pending: number; confirmed: number; completed: number;
@@ -260,6 +265,31 @@ function fmt(d: string) {
   return new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
+/**
+ * Horário no fuso da operação. O banco grava em UTC, então sem o timeZone a
+ * saída das 06:00 apareceria como 09:00 para quem está no Brasil.
+ */
+function hora(d?: string | null): string {
+  if (!d) return "";
+  const t = new Date(d);
+  if (isNaN(t.getTime())) return "";
+  return t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+}
+
+/** "05/08/2026 às 14:32" - para carimbos de tempo (histórico). */
+function fmtDataHora(d?: string | null): string {
+  if (!d) return "-";
+  const h = hora(d);
+  return h ? `${fmt(d)} às ${h}` : fmt(d);
+}
+
+/** "09/08/2026 · 06:00" - para data de viagem, onde o horário é operacional. */
+function fmtDataHoraViagem(d?: string | null): string {
+  if (!d) return "-";
+  const h = hora(d);
+  return h ? `${fmt(d)} · ${h}` : fmt(d);
+}
+
 function daysSince(dateStr: string): number {
   const diff = Date.now() - new Date(dateStr).getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -296,7 +326,7 @@ function buildWaUrl(b: Booking) {
   const clean = (b.traveler_phone || "").replace(/\D/g, "");
   const number = clean.startsWith("55") ? clean : `55${clean}`;
   const trip = b.trip_title || "sua viagem";
-  const when = b.trip_quote_only ? "" : b.trip_departure_date ? ` (saída em ${fmt(b.trip_departure_date)})` : "";
+  const when = b.trip_quote_only ? "" : b.trip_departure_date ? ` (saída em ${fmtDataHoraViagem(b.trip_departure_at ?? b.trip_departure_date)})` : "";
   // Mensagem específica da viagem - o cliente reconhece o destino, não só um código.
   const msg = `Olá, ${name}! Aqui é a equipe da AJS Turismo. Estou entrando em contato sobre sua reserva da viagem *${trip}*${when}. (Código ${b.booking_code})`;
   return `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
@@ -396,7 +426,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             ) : booking.trip_departure_date && (
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5">
                 <Clock size={10} />
-                {fmt(booking.trip_departure_date)}{booking.trip_return_date ? ` → ${fmt(booking.trip_return_date)}` : ""}
+                {fmtDataHoraViagem(booking.trip_departure_at ?? booking.trip_departure_date)}{(booking.trip_return_at ?? booking.trip_return_date) ? ` → ${fmtDataHoraViagem(booking.trip_return_at ?? booking.trip_return_date)}` : ""}
               </p>
             )}
           </section>
@@ -512,15 +542,15 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
           <section>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock size={11} /> Histórico</p>
             <div className="space-y-1 text-xs text-gray-500">
-              <p>Criado em {fmt(booking.created_at)}</p>
+              <p>Criado em {fmtDataHora(booking.created_at)}</p>
               {booking.updated_at && booking.updated_at !== booking.created_at && (
-                <p className="text-gray-400">Editado em {fmt(booking.updated_at)}</p>
+                <p className="text-gray-400">Editado em {fmtDataHora(booking.updated_at)}</p>
               )}
-              {booking.confirmed_at && <p className="text-emerald-600">Confirmado em {fmt(booking.confirmed_at)}</p>}
+              {booking.confirmed_at && <p className="text-emerald-600">Confirmado em {fmtDataHora(booking.confirmed_at)}</p>}
               {booking.cancelled_at && (
                 booking.status === "refunded"
-                  ? <p className="text-orange-600">Estornado em {fmt(booking.cancelled_at)}</p>
-                  : <p className="text-red-500">Cancelado em {fmt(booking.cancelled_at)}</p>
+                  ? <p className="text-orange-600">Estornado em {fmtDataHora(booking.cancelled_at)}</p>
+                  : <p className="text-red-500">Cancelado em {fmtDataHora(booking.cancelled_at)}</p>
               )}
             </div>
           </section>
@@ -1140,8 +1170,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                   <option value="">Selecione a data...</option>
                   {dateOptions.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.departure_date ? new Date(t.departure_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Data indefinida"}
-                      {t.return_date ? ` → ${new Date(t.return_date).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}
+                      {t.departure_date ? fmtDataHoraViagem(t.departure_date) : "Data indefinida"}
+                      {t.return_date ? ` → ${fmtDataHoraViagem(t.return_date)}` : ""}
                       {" "}· {spotsLabel(t.available_spots)} · R$ {fmtBRL(t.price_per_person)}
                     </option>
                   ))}
@@ -1719,7 +1749,7 @@ export default function AdminReservasPage() {
                 <optgroup key={roteiro} label={roteiro}>
                   {datas.map((d) => (
                     <option key={d.trip_id} value={d.trip_id}>
-                      {d.departure_date ? fmt(d.departure_date) : "sem data"} · {plural(d.total, "reserva", "reservas")}
+                      {d.quote_only ? "sob cotação" : d.departure_date ? fmtDataHoraViagem(d.departure_date) : "sem data"} · {plural(d.total, "reserva", "reservas")}
                     </option>
                   ))}
                 </optgroup>
@@ -1803,7 +1833,7 @@ export default function AdminReservasPage() {
                         </td>
                         <td className="px-4 py-3 align-top">
                           <p className="text-navy-700 truncate max-w-[200px]">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
-                          {b.trip_quote_only ? <p className="text-xs text-gray-400">Sob cotação</p> : b.trip_departure_date && <p className="text-xs text-gray-400">{fmt(b.trip_departure_date)}</p>}
+                          {b.trip_quote_only ? <p className="text-xs text-gray-400">Sob cotação</p> : b.trip_departure_date && <p className="text-xs text-gray-400">{fmtDataHoraViagem(b.trip_departure_at ?? b.trip_departure_date)}</p>}
                         </td>
                         <td className="px-4 py-3 align-top text-center text-gray-600">{b.num_travelers}</td>
                         <td className="px-4 py-3 align-top text-right font-bold text-navy-800 whitespace-nowrap">R$ {fmtBRL(b.final_amount)}</td>
