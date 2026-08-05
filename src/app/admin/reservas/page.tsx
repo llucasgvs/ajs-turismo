@@ -451,9 +451,18 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   const motivoOk = motivo.trim().length >= 3;
 
   const pago = Number(booking.final_amount) || 0;
+  // Poltronas que a reserva ocupa: criança de colo não conta.
+  const poltronas = booking.seats_used ?? booking.num_travelers;
+  const agora = Date.now();
   const opcoes = datas
     .filter((t) => t.id !== booking.trip_id)
-    .filter((t) => booking.trip_template_id == null || t.template_id === booking.trip_template_id);
+    .filter((t) => booking.trip_template_id == null || t.template_id === booking.trip_template_id)
+    // Espelha as travas do servidor, para o seletor não oferecer o que vai ser
+    // recusado: só data ativa (oculta, esgotada, concluída e cancelada ficam de
+    // fora), ainda por vir e com lugar suficiente.
+    .filter((t) => t.is_active !== false && (t.status ?? "active") === "active")
+    .filter((t) => !t.departure_date || new Date(t.departure_date).getTime() > agora)
+    .filter((t) => (t.available_spots ?? 0) >= poltronas);
   const alvo = opcoes.find((t) => String(t.id) === escolhida);
 
   // Comparação só para AVISAR. A conta oficial é a do servidor, e ela usa as
@@ -515,7 +524,10 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
               ))}
             </select>
             {opcoes.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1.5">Não há outra data cadastrada para este roteiro.</p>
+              <p className="text-xs text-amber-600 mt-1.5">
+                Nenhuma outra data disponível neste roteiro. A lista mostra só datas ativas, ainda
+                por vir e com {plural(poltronas, "lugar livre", "lugares livres")}.
+              </p>
             )}
           </div>
 
