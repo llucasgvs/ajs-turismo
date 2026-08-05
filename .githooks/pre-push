@@ -1,0 +1,42 @@
+#!/bin/sh
+# Trava contra push acidental na main.
+#
+# Neste projeto, push na main NÃO é "salvar código": é deploy em produção, com
+# clientes comprando do outro lado. O trabalho acontece na branch `dev`, e a
+# main só recebe o que já foi testado.
+#
+# Para publicar de verdade, deixe explícito:
+#
+#     AJS_DEPLOY=1 git push origin main
+#
+# Instalação (uma vez por clone):
+#     git config core.hooksPath .githooks
+
+BRANCH_PROTEGIDA="refs/heads/main"
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    [ "$remote_ref" = "$BRANCH_PROTEGIDA" ] || continue
+
+    if [ "$AJS_DEPLOY" = "1" ]; then
+        echo ""
+        echo "  → Publicando na main (AJS_DEPLOY=1). Isso vai para produção."
+        echo ""
+        exit 0
+    fi
+
+    echo ""
+    echo "  ┌──────────────────────────────────────────────────────────────┐"
+    echo "  │  PUSH NA MAIN BLOQUEADO                                      │"
+    echo "  └──────────────────────────────────────────────────────────────┘"
+    echo ""
+    echo "  A main faz deploy automático em PRODUÇÃO."
+    echo "  Trabalhe na branch dev e só publique depois de testar."
+    echo ""
+    echo "  Se a intenção é publicar mesmo, repita com:"
+    echo ""
+    echo "      AJS_DEPLOY=1 git push origin main"
+    echo ""
+    exit 1
+done
+
+exit 0
