@@ -1255,6 +1255,9 @@ export default function AdminReservasPage() {
     interesse: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, refunded: 0, all: 0,
     stats: { confirmed_revenue: 0, pending_value: 0, month_count: 0, month_value: 0 },
   });
+  // Zero de verdade e "ainda não sei" desenhavam igual: os números apareciam do
+  // nada e o resumo saltava de R$ 0,00 para o valor real.
+  const [countsCarregou, setCountsCarregou] = useState(false);
   const [trips, setTrips] = useState<Trip[]>(_tripsCache.data ?? []);
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<string>(searchParams.get("status") ?? "interesse");
@@ -1298,7 +1301,7 @@ export default function AdminReservasPage() {
   const fetchCounts = useCallback(async () => {
     try {
       const res = await apiFetch(`/bookings/admin/counts`);
-      if (res.ok) setCounts(await res.json());
+      if (res.ok) { setCounts(await res.json()); setCountsCarregou(true); }
     } catch { /* ignore */ }
   }, []);
 
@@ -1596,8 +1599,17 @@ export default function AdminReservasPage() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
                 <Icon size={15} className={s.accent} />
               </div>
-              <p className={`mt-2 text-lg sm:text-xl font-black leading-tight ${s.accent}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+              {countsCarregou ? (
+                <>
+                  <p className={`mt-2 text-lg sm:text-xl font-black leading-tight ${s.accent}`}>{s.value}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+                </>
+              ) : (
+                <>
+                  <Skel className="mt-2 h-6 sm:h-7 w-28" />
+                  <Skel className="mt-1.5 h-3 w-20" />
+                </>
+              )}
             </div>
           );
         })}
@@ -1615,11 +1627,15 @@ export default function AdminReservasPage() {
                   : "bg-white border border-gray-200 text-gray-500 hover:border-navy-300 hover:text-navy-700"
               }`}>
               {label}
-              {count > 0 && (
+              {!countsCarregou ? (
+                <span className={`min-w-[20px] h-5 rounded-full animate-pulse ${
+                  tab === key ? "bg-white/20" : "bg-gray-100"
+                }`} aria-hidden="true" />
+              ) : count > 0 ? (
                 <span className={`min-w-[20px] h-5 flex items-center justify-center rounded-full text-xs font-bold px-1 ${
                   tab === key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
                 }`}>{count}</span>
-              )}
+              ) : null}
             </button>
           ))}
         </div>
@@ -1796,7 +1812,10 @@ export default function AdminReservasPage() {
 
       <Pagination page={page} totalPages={totalPages} onPage={setPage} />
       <p className="text-xs text-gray-400 text-right">
-        {total} registro{total !== 1 ? "s" : ""} · página {page} de {Math.max(1, totalPages)}
+        {/* Durante a primeira carga o contador dizia "0 registros", que e uma
+            afirmacao errada, nao um estado de espera. */}
+        {loading && total === 0 ? "carregando…" : `${total} registro${total !== 1 ? "s" : ""}`}
+        {" · "}página {page} de {Math.max(1, totalPages)}
       </p>
     </div>
   );
