@@ -1216,6 +1216,9 @@ function PreCheckout() {
   const [error, setError] = useState("");
   // Reserva "de mentira" (editável) antes do login. Vira a reserva real no checkout.
   const [book, setBook] = useState<Booking | null>(null);
+  // Editar o resumo aqui dentro conta como escolha do cliente. Só inicializar o
+  // `book` a partir da URL não conta: isso é o padrão, não uma decisão dele.
+  const [editouAqui, setEditouAqui] = useState(false);
 
   // Seleção feita na página da viagem (JSON na URL).
   const sel = useMemo(() => {
@@ -1234,14 +1237,20 @@ function PreCheckout() {
   const createBooking = useCallback(async () => {
     setCreating(true); setError("");
     // Usa o que o cliente editou (book); se ainda não inicializou, cai na seleção da URL.
+    // Só é "escolha do cliente" se ele mexeu no seletor da página da viagem ou
+    // editou o resumo aqui. No celular o seletor não existe lá, então volta
+    // sempre o padrão de 1 adulto: sem esta marca, reentrar rebaixaria uma
+    // reserva já preenchida (o servidor devolve a existente sem alterar).
+    const selecaoExplicita = editouAqui || sel.explicit === true;
     const payload = book
       ? {
           trip_id: book.trip_id,
           num_travelers: book.num_travelers,
           selected_optionals: book.selected_optionals,
           tier_breakdown: (book.tier_breakdown || []).map(t => ({ label: t.label, qty: t.qty })),
+          selecao_explicita: selecaoExplicita,
         }
-      : { trip_id: Number(tripId), num_travelers: people, selected_optionals: selOptionals, tier_breakdown: selTiers };
+      : { trip_id: Number(tripId), num_travelers: people, selected_optionals: selOptionals, tier_breakdown: selTiers, selecao_explicita: selecaoExplicita };
     // Sob cotação: cria "interesse" (sem valor) em /bookings/. Os demais roteiros
     // (inclusive whatsapp_only com preço) seguem pelo checkout pago.
     const endpoint = trip?.quote_only ? `/bookings/` : `/payments/checkout`;
@@ -1257,7 +1266,7 @@ function PreCheckout() {
       try { if (trip && payload.trip_id === trip.id) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
       router.replace(`/reservar/${d.booking_code}`);
     } catch { setError("Erro de conexão. Tente novamente."); setCreating(false); }
-  }, [book, tripId, people, selOptionals, selTiers, trip, router]);
+  }, [book, editouAqui, sel, tripId, people, selOptionals, selTiers, trip, router]);
 
   // Já logado → cria a reserva e segue direto (sem passar pelo passo de login).
   const tried = useRef(false);
@@ -1327,7 +1336,7 @@ function PreCheckout() {
                 <div className="flex items-center gap-3 px-5 py-4"><StepBadge n={3} done={false} active={false} /><h2 className="font-bold text-navy-800">Forma de pagamento</h2></div>
               </section>
             </div>
-            <ReservationCard booking={view!} trip={trip} code="" onUpdate={setBook} editable={true} method="pix" installments={1} />
+            <ReservationCard booking={view!} trip={trip} code="" onUpdate={(b) => { setEditouAqui(true); setBook(b); }} editable={true} method="pix" installments={1} />
           </div>
         </div>
       </main>

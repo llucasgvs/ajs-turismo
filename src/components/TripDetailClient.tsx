@@ -1509,6 +1509,10 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   const [sidebarPeople, setSidebarPeople] = useState(1);
   // Quantidade por categoria na lateral (quando a data tem faixas de preço)
   const [sidebarTiers, setSidebarTiers] = useState<Record<string, number>>({});
+  // O cliente realmente mexeu no seletor? No celular ele nem aparece aqui (a
+  // escolha acontece dentro do checkout), então sai sempre o padrão de 1 adulto.
+  // Sem esta marca, voltar por esta página rebaixaria uma reserva já preenchida.
+  const [selecaoExplicita, setSelecaoExplicita] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const dateRowRef = useRef<HTMLDivElement>(null);
@@ -1562,10 +1566,12 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
     const init: Record<string, number> = { [ADULT]: 1 };
     activeTiers.forEach(t => { init[tierLabel(t)] = 0; });
     setSidebarTiers(init);
+    setSelecaoExplicita(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTrip.id]);
 
   const changeSidebarTier = (label: string, delta: number) => {
+    setSelecaoExplicita(true);
     setSidebarTiers(prev => {
       const next = Math.max(0, (prev[label] || 0) + delta);
       const updated = { ...prev, [label]: next };
@@ -1661,10 +1667,10 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
       ? Object.entries(sidebarTiers).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
       : [];
     const people = hasTiers ? Object.values(sidebarTiers).reduce((a, b) => a + b, 0) : sidebarPeople;
-    const sel = encodeURIComponent(JSON.stringify({ people, optionals: selectedOptionals, tiers }));
+    const sel = encodeURIComponent(JSON.stringify({ people, optionals: selectedOptionals, tiers, explicit: selecaoExplicita }));
     showLoading();
     router.push(`/reservar/novo?trip=${selectedTrip.id}&sel=${sel}`);
-  }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals, showLoading]);
+  }, [router, selectedTrip, sidebarTiers, sidebarPeople, selectedOptionals, selecaoExplicita, showLoading]);
 
   // Roteiro sob cotação: sem data/preço. CTA leva direto ao checkout (cadastro
   // + solicitar cotação pelo WhatsApp), usando o placeholder como alvo.
@@ -1999,9 +2005,13 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                         <button
                           key={i}
                           type="button"
-                          onClick={() => setSelectedOptionals(prev =>
-                            isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
-                          )}
+                          onClick={() => {
+                            // Opcional também faz parte da composição da reserva.
+                            setSelecaoExplicita(true);
+                            setSelectedOptionals(prev =>
+                              isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
+                            );
+                          }}
                           className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 sm:px-4 py-3.5 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left active:scale-[0.99] ${
                             isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
                           }`}
@@ -2327,11 +2337,11 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
                           <div className="flex items-center gap-3">
                             <button type="button"
-                              onClick={() => setSidebarPeople(p => Math.max(1, p - 1))}
+                              onClick={() => { setSelecaoExplicita(true); setSidebarPeople(p => Math.max(1, p - 1)); }}
                               className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">−</button>
                             <span className="flex-1 text-center font-bold text-navy-800 text-base">{sidebarPeople} pessoa{sidebarPeople > 1 ? "s" : ""}</span>
                             <button type="button"
-                              onClick={() => setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1))}
+                              onClick={() => { setSelecaoExplicita(true); setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1)); }}
                               className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">+</button>
                           </div>
                         </>
