@@ -9,6 +9,22 @@ import { LoadingProvider } from "@/components/LoadingProvider";
 // aqui mesmo. Serve de base para medir as campanhas do Google Ads.
 const GA_ID = "G-5YSD4T8XW9";
 
+/**
+ * O GA só carrega na produção de verdade.
+ *
+ * Sem isto, TODO deploy de preview manda dados para a mesma propriedade onde
+ * medimos as vendas: cada teste vira visita, evento e funil misturado ao real.
+ * Já tivemos essa dor uma vez, com uma compra de teste de R$ 100 aparecendo
+ * como receita e obrigando a separar joio de trigo na mão.
+ *
+ * A condição é escrita ao contrário de propósito: desliga só quando o ambiente
+ * é COMPROVADAMENTE preview. Se um dia a VERCEL_ENV não vier, a medição de
+ * produção continua funcionando, em vez de sumir em silêncio - perder dado de
+ * venda é pior do que contar uma visita de teste.
+ */
+const GA_ATIVO =
+  process.env.VERCEL_ENV !== "preview" && process.env.NODE_ENV === "production";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -173,8 +189,9 @@ export default function RootLayout({
         {/* Visitas por página (Vercel Analytics). Não usa cookie, então não
             exige aviso de cookies. */}
         <Analytics />
-        {/* Google Analytics 4: base de medição para o Google Ads. */}
-        <GoogleAnalytics gaId={GA_ID} />
+        {/* Google Analytics 4: base de medição para o Google Ads.
+            Fora da produção real nem carrega (ver GA_ATIVO). */}
+        {GA_ATIVO && <GoogleAnalytics gaId={GA_ID} />}
       </body>
     </html>
   );
