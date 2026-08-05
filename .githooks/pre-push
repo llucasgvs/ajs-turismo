@@ -1,13 +1,22 @@
 #!/bin/sh
-# Trava contra push acidental na main.
+# Trava contra push acidental na main + conferência de tipos antes de publicar.
 #
-# Neste projeto, push na main NÃO é "salvar código": é deploy em produção, com
-# clientes comprando do outro lado. O trabalho acontece na branch `dev`, e a
-# main só recebe o que já foi testado.
+# Push na main dispara deploy na Vercel para o site que está vendendo. O
+# trabalho acontece na branch `dev`.
 #
-# Para publicar de verdade, deixe explícito:
+# Para publicar de verdade:
 #
 #     AJS_DEPLOY=1 git push origin main
+#
+# Aí este hook roda o TypeScript antes de deixar subir.
+#
+# Por que só o `tsc` e não o build inteiro: se o build quebrar, a Vercel
+# simplesmente NÃO publica e o site continua no ar com a versão anterior. Erro
+# de tipo é diferente: pode passar e virar defeito na tela do cliente. O `tsc`
+# leva segundos; o build levaria minutos para cobrir o que a Vercel já cobre.
+#
+# Em emergência, `git push --no-verify` pula tudo. É de propósito que seja feio
+# de digitar: quem faz isso está assumindo o risco conscientemente.
 #
 # Instalação (uma vez por clone):
 #     git config core.hooksPath .githooks
@@ -17,24 +26,39 @@ BRANCH_PROTEGIDA="refs/heads/main"
 while read -r _local_ref _local_sha remote_ref _remote_sha; do
     [ "$remote_ref" = "$BRANCH_PROTEGIDA" ] || continue
 
-    if [ "$AJS_DEPLOY" = "1" ]; then
+    if [ "$AJS_DEPLOY" != "1" ]; then
         echo ""
-        echo "  → Publicando na main (AJS_DEPLOY=1). Isso vai para produção."
+        echo "  ┌──────────────────────────────────────────────────────────────┐"
+        echo "  │  PUSH NA MAIN BLOQUEADO                                      │"
+        echo "  └──────────────────────────────────────────────────────────────┘"
+        echo ""
+        echo "  A main faz deploy automático em PRODUÇÃO."
+        echo "  Trabalhe na branch dev e só publique depois de testar."
+        echo ""
+        echo "  Se a intenção é publicar mesmo, repita com:"
+        echo ""
+        echo "      AJS_DEPLOY=1 git push origin main"
+        echo ""
+        exit 1
+    fi
+
+    echo ""
+    echo "  → Publicando na main. Conferindo os tipos antes de deixar subir..."
+    echo ""
+
+    if npx --no-install tsc --noEmit; then
+        echo ""
+        echo "  TypeScript limpo. Publicando em produção."
         echo ""
         exit 0
     fi
 
     echo ""
     echo "  ┌──────────────────────────────────────────────────────────────┐"
-    echo "  │  PUSH NA MAIN BLOQUEADO                                      │"
+    echo "  │  PUBLICAÇÃO CANCELADA: ERRO DE TIPO                          │"
     echo "  └──────────────────────────────────────────────────────────────┘"
     echo ""
-    echo "  A main faz deploy automático em PRODUÇÃO."
-    echo "  Trabalhe na branch dev e só publique depois de testar."
-    echo ""
-    echo "  Se a intenção é publicar mesmo, repita com:"
-    echo ""
-    echo "      AJS_DEPLOY=1 git push origin main"
+    echo "  Nada foi enviado. Corrija os erros acima e tente de novo."
     echo ""
     exit 1
 done
