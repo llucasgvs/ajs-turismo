@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
+import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
 
 const RES = "/admin/reservas";
 
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
         apiFetch(`/bookings/admin/revenue-series?granularity=year`),
         apiFetch(`/bookings/admin/all?booking_status=interesse&limit=6`),
         apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
-        apiFetch(`/trips/admin-list?limit=100`),
+        apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`),
         apiFetch(`/templates/admin-list`),
       ]);
       // Se QUALQUER chamada falhou, não escreve nada: nem na tela, nem no cache.
@@ -150,6 +151,24 @@ export default function AdminDashboard() {
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Voltar para a aba é o momento em que o número velho atrapalha de verdade.
+  // Atualiza em silêncio (sem apagar a tela) e só se a última carga já passou
+  // do TTL, para alternar de aba não virar uma enxurrada de requisições.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - _c.ts < TTL) return;
+      load(true);
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
 
   /* derived */
   const cs = counts?.stats;
@@ -240,7 +259,7 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-6 text-white shadow-card flex flex-col justify-between gap-6">
           <div className="flex-1">
             <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
-            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? "-" : fmtR(curRev)}</p>
+            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? <Skel className="h-10 w-44 bg-white/20" /> : fmtR(curRev)}</p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(monthCount, "venda", "vendas")}</span>
               {!loading && hasPrev && (
@@ -257,7 +276,7 @@ export default function AdminDashboard() {
             <div className="flex items-end justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Lucro presumido <span className="text-navy-400 normal-case">(estimativa)</span></p>
-                <p className="text-2xl sm:text-3xl font-display font-black tabular-nums mt-0.5 text-gold-300 leading-none">{loading ? "-" : fmtR(profit)}</p>
+                <p className="text-2xl sm:text-3xl font-display font-black tabular-nums mt-0.5 text-gold-300 leading-none">{loading ? <Skel className="h-8 w-32 bg-white/20" /> : fmtR(profit)}</p>
               </div>
               <div className="text-right">
                 <p className="text-navy-300 text-[10px] uppercase tracking-wide font-semibold">Margem</p>
@@ -276,9 +295,9 @@ export default function AdminDashboard() {
         </div>
         {/* KPIs de apoio */}
         <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
-          <MiniKpi icon={<CreditCard size={15} />} label="Aguardando pgto" value={loading ? "-" : fmtR(cs?.pending_value ?? 0)} sub={`${counts?.pending ?? 0} a pagar`} href={`${RES}?status=pending`} />
-          <MiniKpi icon={<DollarSign size={15} />} label="Ticket médio" value={loading ? "-" : fmtR(an?.ticket_medio ?? 0)} sub="por venda" />
-          <MiniKpi icon={<Target size={15} />} label="Conversão" value={loading ? "-" : pct(an?.conversao ?? 0)} sub="interesse → venda" />
+          <MiniKpi icon={<CreditCard size={15} />} label="Aguardando pgto" value={fmtR(cs?.pending_value ?? 0)} carregando={loading} sub={`${counts?.pending ?? 0} a pagar`} href={`${RES}?status=pending`} />
+          <MiniKpi icon={<DollarSign size={15} />} label="Ticket médio" value={fmtR(an?.ticket_medio ?? 0)} carregando={loading} sub="por venda" />
+          <MiniKpi icon={<Target size={15} />} label="Conversão" value={pct(an?.conversao ?? 0)} carregando={loading} sub="interesse → venda" />
         </div>
       </div>
 
@@ -288,7 +307,7 @@ export default function AdminDashboard() {
         <Card className="lg:col-span-2 overflow-hidden">
           <CardHead title="Receita confirmada" icon={<TrendingUp size={14} className="text-emerald-500" />}
             action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["year", "month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "year" ? "Anual" : m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
-          {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : (
+          {loading ? <div className="py-6"><SkelGrafico n={12} altura="h-44" /></div> : (
             <div className="px-5 py-5">
               <div className="relative pt-12" onMouseLeave={() => setHoverIdx(null)}>
                 {/* tooltip que SEGUE a barra ativa */}
@@ -335,7 +354,7 @@ export default function AdminDashboard() {
         {/* Receita por categoria */}
         <Card className="overflow-hidden">
           <CardHead title="Receita por categoria" icon={<TrendingUp size={14} className="text-navy-400" />} />
-          {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={20} className="animate-spin text-gray-300" /></div> : (an?.by_category.length ?? 0) === 0 ? <div className="py-14 text-center text-gray-400 text-xs">Sem dados ainda</div> : (
+          {loading ? <div className="py-6"><SkelLinhas n={4} altura="h-9" /></div> : (an?.by_category.length ?? 0) === 0 ? <div className="py-14 text-center text-gray-400 text-xs">Sem dados ainda</div> : (
             <div className="px-5 py-4 space-y-3">
               {an!.by_category.slice(0, 6).map((c) => {
                 const maxCat = Math.max(1, ...an!.by_category.map(x => x.revenue));
@@ -359,7 +378,7 @@ export default function AdminDashboard() {
             {([["rev", "Faturamento"], ["sales", "Vendas"], ["cust", "Clientes"]] as const).map(([k, lbl]) =>
               <button key={k} onClick={() => setRankTab(k)} className={`px-2.5 py-1 rounded-md transition-colors ${rankTab === k ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{lbl}</button>)}
           </div>} />
-        {loading ? <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin text-gray-300" /></div> : rankItems.length === 0 ? <div className="py-12 text-center text-gray-400 text-xs">Sem dados de vendas ainda</div> : (
+        {loading ? <div className="p-5"><SkelLinhas n={5} altura="h-10" /></div> : rankItems.length === 0 ? <div className="py-12 text-center text-gray-400 text-xs">Sem dados de vendas ainda</div> : (
           <div className="px-5 py-4 space-y-3">
             {rankItems.map((it, i) => {
               const body = (
@@ -392,7 +411,7 @@ export default function AdminDashboard() {
         {/* Prioridades */}
         <Card className="overflow-hidden">
           <CardHead title="Prioridades" icon={<AlertTriangle size={14} className="text-amber-500" />} />
-          {loading ? <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin text-gray-300" /></div> : actions.length === 0 ? (
+          {loading ? <div className="p-5"><SkelLinhas n={3} altura="h-12" /></div> : actions.length === 0 ? (
             <div className="py-12 text-center space-y-2"><CheckCircle size={30} className="text-emerald-300 mx-auto" /><p className="text-gray-400 text-sm font-medium">Tudo em dia!</p></div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -415,7 +434,7 @@ export default function AdminDashboard() {
       <Card className="overflow-hidden">
         <CardHead title="Próximas saídas" icon={<Calendar size={14} className="text-navy-400" />}
           action={<Link href="/admin/viagens" className="text-xs text-gold-600 hover:text-gold-500 font-medium flex items-center gap-1">Ver todos <ChevronRight size={11} /></Link>} />
-        {loading ? <div className="flex items-center justify-center py-14"><Loader2 size={22} className="animate-spin text-gray-300" /></div> : upcoming.length === 0 ? <div className="py-14 text-center text-gray-400 text-sm">Nenhuma saída próxima</div> : (
+        {loading ? <div className="p-5"><SkelLinhas n={4} altura="h-14" /></div> : upcoming.length === 0 ? <div className="py-14 text-center text-gray-400 text-sm">Nenhuma saída próxima</div> : (
           <div className="divide-y divide-gray-50 sm:grid sm:grid-cols-2 sm:grid-rows-3 sm:grid-flow-col sm:divide-y-0 sm:gap-x-6">
             {upcoming.map(t => {
               const unlimited = t.total_spots >= 999;  // sentinela de vagas ilimitadas (bate-e-volta)
@@ -449,12 +468,14 @@ export default function AdminDashboard() {
 }
 
 /* ─── Mini KPI ─── */
-function MiniKpi({ icon, label, value, sub, href }: { icon: React.ReactNode; label: string; value: string; sub?: string; href?: string }) {
+function MiniKpi({ icon, label, value, sub, href, carregando }: { icon: React.ReactNode; label: string; value: string; sub?: string; href?: string; carregando?: boolean }) {
   const inner = (
     <div className="bg-white rounded-2xl px-4 py-3.5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col justify-center">
       <div className="flex items-center gap-1.5 text-gray-400 mb-1.5"><span className="text-navy-400">{icon}</span><span className="text-[11px] font-semibold uppercase tracking-wide truncate">{label}</span></div>
-      <p className="text-lg font-black text-navy-900 leading-none tabular-nums">{value}</p>
-      {sub && <p className="text-[10px] text-gray-400 mt-1">{sub}</p>}
+      {carregando
+        ? <Skel className="h-5 w-24" />
+        : <p className="text-lg font-black text-navy-900 leading-none tabular-nums">{value}</p>}
+      {sub && (carregando ? <Skel className="h-2.5 w-16 mt-1.5" /> : <p className="text-[10px] text-gray-400 mt-1">{sub}</p>)}
     </div>
   );
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
@@ -467,7 +488,7 @@ function FollowupList({ title, icon, items, loading, emptyMsg, tone, status }: {
     <Card className="overflow-hidden">
       <CardHead title={title} icon={icon}
         action={items.length > 0 ? <Link href={`${RES}?status=${status}`} className={`text-xs font-black px-2 py-0.5 rounded-full ${tone === "amber" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{items.length}</Link> : undefined} />
-      {loading ? <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin text-gray-300" /></div> : items.length === 0 ? (
+      {loading ? <div className="p-5"><SkelLinhas n={3} altura="h-12" /></div> : items.length === 0 ? (
         <div className="py-10 text-center space-y-1.5"><CheckCircle size={26} className="text-emerald-300 mx-auto" /><p className="text-gray-400 text-xs font-medium">{emptyMsg}</p></div>
       ) : (
         <div className="divide-y divide-gray-50">

@@ -6,6 +6,7 @@ import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText,
 import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
+import { Skel } from "@/components/admin/Skeleton";
 
 const PAGE_SIZE = 25;
 
@@ -1345,7 +1346,7 @@ export default function AdminReservasPage() {
       setTrips(_tripsCache.data);
       return;
     }
-    apiFetch(`/trips/admin-list?limit=100`)
+    apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`)
       .then((r) => r.json())
       .then((d) => {
         const list = d?.items ?? (Array.isArray(d) ? d : []);
@@ -1628,8 +1629,20 @@ export default function AdminReservasPage() {
       {/* Table (desktop) / Cards (mobile) */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-navy-600 border-t-transparent rounded-full animate-spin" />
+          // Esqueleto com a forma da lista: a tabela não some nem a página pula
+          // quando os dados chegam. Uma linha por reserva da página atual.
+          <div className="divide-y divide-gray-50" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-4">
+                <Skel className="h-3.5 w-24 flex-shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <Skel className="h-3.5 w-2/5" />
+                  <Skel className="h-2.5 w-1/4" />
+                </div>
+                <Skel className="hidden md:block h-3.5 w-28 flex-shrink-0" />
+                <Skel className="h-6 w-24 rounded-full flex-shrink-0" />
+              </div>
+            ))}
           </div>
         ) : erroCarga ? (
           <div className="text-center py-16">
