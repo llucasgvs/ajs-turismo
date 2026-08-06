@@ -310,7 +310,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
  *    visitante numa parede. Sem isso, quem não cabe naquele dia vai embora
  *    achando que não há mais viagem, e a agência perde uma venda que existia.
  */
-function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutrasDatas }: {
+function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas }: {
   spots: number;
   dataSaida?: string | null;
   outrasDatas: number;
@@ -318,7 +318,6 @@ function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutr
    *  existem, e "Reserve agora para garantir seu lugar" seria uma afirmação sem
    *  base: pode haver dez datas vazias. Enquanto não sabe, o aviso não conclui. */
   sabeDasDatas: boolean;
-  aoVerOutrasDatas?: () => void;
 }) {
   if (spots <= 0 || spots > 5) return null;
 
@@ -343,15 +342,6 @@ function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutr
         {sabeDasDatas && outrasDatas > 0 && (
           <p className="text-orange-600/90 text-xs mt-0.5">
             {outrasDatas === 1 ? "Há outra data com lugares" : `Há outras ${outrasDatas} datas com lugares`}
-            {aoVerOutrasDatas && (
-              <>
-                {" · "}
-                <button type="button" onClick={aoVerOutrasDatas}
-                  className="underline font-semibold hover:text-orange-800 transition-colors">
-                  ver datas
-                </button>
-              </>
-            )}
           </p>
         )}
       </div>
@@ -1881,9 +1871,6 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                 dataSaida={activeTrip.departure_date}
                 outrasDatas={outrasDatasComVaga}
                 sabeDasDatas={siblingTrips.length > 0}
-                aoVerOutrasDatas={() =>
-                  document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" })
-                }
               />
             </div>
           )}
