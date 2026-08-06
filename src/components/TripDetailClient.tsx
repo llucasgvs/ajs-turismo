@@ -298,14 +298,63 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
 /* ═══════════════════════════════════════════
    3. Scarcity Banner
 ═══════════════════════════════════════════ */
-function ScarcityBanner({ spots }: { spots: number }) {
+/**
+ * Aviso de poucas vagas.
+ *
+ * Duas correções sobre a versão anterior, e as duas nasceram de um caso real:
+ * uma data do Foz ficou com 1 vaga e o texto dizia "Apenas 1 vaga disponível!",
+ * como se o ROTEIRO inteiro estivesse acabando.
+ *
+ * 1. Diz a data. A escassez é daquela saída, não do destino.
+ * 2. Quando existe outra data com lugar, oferece a saída em vez de deixar o
+ *    visitante numa parede. Sem isso, quem não cabe naquele dia vai embora
+ *    achando que não há mais viagem, e a agência perde uma venda que existia.
+ */
+function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutrasDatas }: {
+  spots: number;
+  dataSaida?: string | null;
+  outrasDatas: number;
+  /** As outras datas chegam por uma busca posterior. Antes dela, não sabemos se
+   *  existem, e "Reserve agora para garantir seu lugar" seria uma afirmação sem
+   *  base: pode haver dez datas vazias. Enquanto não sabe, o aviso não conclui. */
+  sabeDasDatas: boolean;
+  aoVerOutrasDatas?: () => void;
+}) {
   if (spots <= 0 || spots > 5) return null;
+
+  const dia = dataSaida
+    ? new Date(dataSaida).toLocaleDateString("pt-BR", {
+        timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit",
+      })
+    : null;
+
+  const quanto = spots === 1
+    ? (dia ? `Última vaga para ${dia}` : "Última vaga nesta data")
+    : (dia ? `Restam ${spots} vagas para ${dia}` : `Restam ${spots} vagas nesta data`);
+
   return (
-    <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3">
-      <AlertTriangle size={18} className="text-orange-500 flex-shrink-0" />
-      <p className="text-orange-700 text-sm font-semibold">
-        Apenas {spots} {spots === 1 ? "vaga disponível" : "vagas disponíveis"}! Reserve agora para garantir seu lugar.
-      </p>
+    <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-start gap-3">
+      <AlertTriangle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <p className="text-orange-700 text-sm font-semibold">
+          {quanto}
+          {sabeDasDatas && outrasDatas === 0 && "! Reserve agora para garantir seu lugar."}
+        </p>
+        {sabeDasDatas && outrasDatas > 0 && (
+          <p className="text-orange-600/90 text-xs mt-0.5">
+            {outrasDatas === 1 ? "Há outra data com lugares" : `Há outras ${outrasDatas} datas com lugares`}
+            {aoVerOutrasDatas && (
+              <>
+                {" · "}
+                <button type="button" onClick={aoVerOutrasDatas}
+                  className="underline font-semibold hover:text-orange-800 transition-colors">
+                  ver datas
+                </button>
+              </>
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -1604,6 +1653,13 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   // Sem data aberta não é "esgotado": não há vaga porque não há saída publicada.
   const sold = !semDatas && (activeTrip.available_spots === 0 || activeTrip.status === "sold_out");
   const lowStock = !sold && activeTrip.available_spots > 0 && activeTrip.available_spots <= 5;
+  // Outras datas do MESMO roteiro que ainda vendem. É o que transforma o aviso
+  // de escassez em caminho, em vez de parede: sem isso o visitante conclui que
+  // a viagem acabou, quando na verdade só aquele dia encheu.
+  const outrasDatasComVaga = siblingTrips.filter(
+    (t) => t.id !== activeTrip.id && t.available_spots > 0
+           && t.status !== "sold_out" && !salesClosed(t.departure_date)
+  ).length;
   const discount = activeTrip.original_price
     ? Math.round((1 - activeTrip.price_per_person / activeTrip.original_price) * 100)
     : null;
@@ -1817,7 +1873,18 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
           {/* Scarcity Banner */}
           {lowStock && !sold && (
             <div className="mb-6">
-              <ScarcityBanner spots={trip.available_spots} />
+              {/* activeTrip, e não trip: o lowStock acima já olha a data
+                  SELECIONADA, e passar `trip` mostrava o número da data
+                  original depois que o cliente trocava de dia. */}
+              <ScarcityBanner
+                spots={activeTrip.available_spots}
+                dataSaida={activeTrip.departure_date}
+                outrasDatas={outrasDatasComVaga}
+                sabeDasDatas={siblingTrips.length > 0}
+                aoVerOutrasDatas={() =>
+                  document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" })
+                }
+              />
             </div>
           )}
 
@@ -2389,7 +2456,10 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
 
                     {lowStock && !sold && (
                       <div className="bg-orange-50 text-orange-700 text-xs font-semibold px-3 py-2 rounded-xl text-center mb-3 border border-orange-100 flex items-center justify-center gap-2">
-                        <AlertTriangle size={13} /> Apenas {activeTrip.available_spots} vagas restantes
+                        <AlertTriangle size={13} />{" "}
+                        {activeTrip.available_spots === 1
+                          ? "Última vaga nesta data"
+                          : `Restam ${activeTrip.available_spots} vagas nesta data`}
                       </div>
                     )}
 
