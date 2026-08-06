@@ -1266,7 +1266,7 @@ function DateSelector({
                       ? "bg-orange-100 text-orange-600"
                       : "bg-gray-100 text-gray-500"
                   }`}>
-                    {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
+                    {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
                   </span>
                 )}
               </div>
@@ -1332,7 +1332,7 @@ function CompactDateSelector({
       <div className="px-5 pt-5 pb-3 flex items-center justify-between">
         <div>
           <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{trips.length} datas disponíveis</p>
+          <p className="text-xs text-gray-400 mt-0.5">{trips.length} {trips.length === 1 ? "data disponível" : "datas disponíveis"}</p>
         </div>
         {hasError && (
           <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
@@ -1383,7 +1383,7 @@ function CompactDateSelector({
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
                         }`}>
-                          {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
+                          {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
                         </span>
                       </>
                     )}
@@ -1955,7 +1955,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                       <InfoStat
                         icon={<Users size={16} className="text-gold-500" />}
                         label="Vagas"
-                        value={sold ? "Esgotado" : isUnlimitedSpots(activeTrip.available_spots) ? "Disponível" : `${activeTrip.available_spots} disponíveis`}
+                        value={sold ? "Esgotado" : isUnlimitedSpots(activeTrip.available_spots) ? "Disponível" : `${activeTrip.available_spots} ${activeTrip.available_spots === 1 ? "disponível" : "disponíveis"}`}
                         valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
                       />
                     </div>
