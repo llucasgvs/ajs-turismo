@@ -310,7 +310,7 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
  *    visitante numa parede. Sem isso, quem não cabe naquele dia vai embora
  *    achando que não há mais viagem, e a agência perde uma venda que existia.
  */
-function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutrasDatas }: {
+function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas }: {
   spots: number;
   dataSaida?: string | null;
   outrasDatas: number;
@@ -318,7 +318,6 @@ function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutr
    *  existem, e "Reserve agora para garantir seu lugar" seria uma afirmação sem
    *  base: pode haver dez datas vazias. Enquanto não sabe, o aviso não conclui. */
   sabeDasDatas: boolean;
-  aoVerOutrasDatas?: () => void;
 }) {
   if (spots <= 0 || spots > 5) return null;
 
@@ -343,15 +342,6 @@ function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas, aoVerOutr
         {sabeDasDatas && outrasDatas > 0 && (
           <p className="text-orange-600/90 text-xs mt-0.5">
             {outrasDatas === 1 ? "Há outra data com lugares" : `Há outras ${outrasDatas} datas com lugares`}
-            {aoVerOutrasDatas && (
-              <>
-                {" · "}
-                <button type="button" onClick={aoVerOutrasDatas}
-                  className="underline font-semibold hover:text-orange-800 transition-colors">
-                  ver datas
-                </button>
-              </>
-            )}
           </p>
         )}
       </div>
@@ -1266,7 +1256,7 @@ function DateSelector({
                       ? "bg-orange-100 text-orange-600"
                       : "bg-gray-100 text-gray-500"
                   }`}>
-                    {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
+                    {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
                   </span>
                 )}
               </div>
@@ -1332,7 +1322,7 @@ function CompactDateSelector({
       <div className="px-5 pt-5 pb-3 flex items-center justify-between">
         <div>
           <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{trips.length} datas disponíveis</p>
+          <p className="text-xs text-gray-400 mt-0.5">{trips.length} {trips.length === 1 ? "data disponível" : "datas disponíveis"}</p>
         </div>
         {hasError && (
           <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
@@ -1383,7 +1373,7 @@ function CompactDateSelector({
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
                         }`}>
-                          {isLow ? `⚠ ${t.available_spots} vagas` : spotsLabel(t.available_spots)}
+                          {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
                         </span>
                       </>
                     )}
@@ -1881,9 +1871,6 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                 dataSaida={activeTrip.departure_date}
                 outrasDatas={outrasDatasComVaga}
                 sabeDasDatas={siblingTrips.length > 0}
-                aoVerOutrasDatas={() =>
-                  document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" })
-                }
               />
             </div>
           )}
@@ -1955,7 +1942,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                       <InfoStat
                         icon={<Users size={16} className="text-gold-500" />}
                         label="Vagas"
-                        value={sold ? "Esgotado" : isUnlimitedSpots(activeTrip.available_spots) ? "Disponível" : `${activeTrip.available_spots} disponíveis`}
+                        value={sold ? "Esgotado" : isUnlimitedSpots(activeTrip.available_spots) ? "Disponível" : `${activeTrip.available_spots} ${activeTrip.available_spots === 1 ? "disponível" : "disponíveis"}`}
                         valueClass={sold ? "text-red-500" : lowStock ? "text-orange-600" : "text-emerald-600"}
                       />
                     </div>
