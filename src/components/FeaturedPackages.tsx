@@ -7,7 +7,7 @@ interface PublicDate {
   id: number;
   departure_date: string;
   price_per_person: number;
-  available_spots: number;
+  available_spots: number | null;
   status: string;
 }
 

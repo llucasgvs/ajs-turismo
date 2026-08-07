@@ -14,8 +14,11 @@ export interface Trip {
   original_price: number | null;
   max_installments: number;
   price_tiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
-  total_spots: number;
-  available_spots: number;
+  // A API pública esconde o estoque: total_spots nunca vem, e available_spots
+  // só vem quando é baixo (ou 0, para "Esgotado"). null significa "tem vaga de
+  // sobra", e não "não sei". Ver app/core/vitrine.py no backend.
+  total_spots?: number | null;
+  available_spots: number | null;
   min_group_size: number;
   includes: string[];
   excludes: string[];

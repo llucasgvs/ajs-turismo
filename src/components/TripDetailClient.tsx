@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed } from "@/lib/format";
+import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed, temVaga, poucasVagas } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
@@ -311,7 +311,9 @@ function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number)
  *    achando que não há mais viagem, e a agência perde uma venda que existia.
  */
 function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas }: {
-  spots: number;
+  /** `null` quando a API não publicou o número por haver vaga de sobra. Aí não
+   *  há escassez para anunciar, e o aviso simplesmente não aparece. */
+  spots: number | null;
   dataSaida?: string | null;
   outrasDatas: number;
   /** As outras datas chegam por uma busca posterior. Antes dela, não sabemos se
@@ -319,7 +321,7 @@ function ScarcityBanner({ spots, dataSaida, outrasDatas, sabeDasDatas }: {
    *  base: pode haver dez datas vazias. Enquanto não sabe, o aviso não conclui. */
   sabeDasDatas: boolean;
 }) {
-  if (spots <= 0 || spots > 5) return null;
+  if (!poucasVagas(spots)) return null;
 
   const dia = dataSaida
     ? new Date(dataSaida).toLocaleDateString("pt-BR", {
@@ -1185,7 +1187,7 @@ function DateSelector({
           const isSold = t.available_spots === 0 || t.status === "sold_out";
           const isClosed = !isSold && salesClosed(t.departure_date);
           const blocked = isSold || isClosed;
-          const isLow = !blocked && t.available_spots > 0 && t.available_spots <= 5;
+          const isLow = !blocked && poucasVagas(t.available_spots);
           const isSelected = selected?.id === t.id;
           const disc = t.original_price
             ? Math.round((1 - t.price_per_person / t.original_price) * 100)
@@ -1343,7 +1345,7 @@ function CompactDateSelector({
                 const isClosed = !isSold && salesClosed(t.departure_date);
                 const blocked = isSold || isClosed;
                 const isSelected = selected?.id === t.id;
-                const isLow = !blocked && t.available_spots > 0 && t.available_spots <= 5;
+                const isLow = !blocked && poucasVagas(t.available_spots);
                 return (
                   <button
                     key={t.id}
@@ -1642,12 +1644,12 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
 
   // Sem data aberta não é "esgotado": não há vaga porque não há saída publicada.
   const sold = !semDatas && (activeTrip.available_spots === 0 || activeTrip.status === "sold_out");
-  const lowStock = !sold && activeTrip.available_spots > 0 && activeTrip.available_spots <= 5;
+  const lowStock = !sold && poucasVagas(activeTrip.available_spots);
   // Outras datas do MESMO roteiro que ainda vendem. É o que transforma o aviso
   // de escassez em caminho, em vez de parede: sem isso o visitante conclui que
   // a viagem acabou, quando na verdade só aquele dia encheu.
   const outrasDatasComVaga = siblingTrips.filter(
-    (t) => t.id !== activeTrip.id && t.available_spots > 0
+    (t) => t.id !== activeTrip.id && temVaga(t.available_spots)
            && t.status !== "sold_out" && !salesClosed(t.departure_date)
   ).length;
   const discount = activeTrip.original_price
@@ -1673,7 +1675,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
         );
         setSiblingTrips(sorted);
         // Auto-seleciona a data mais próxima disponível (com vaga e dentro do prazo de vendas)
-        const nearest = sorted.find(t => t.available_spots > 0 && t.status !== "sold_out" && !salesClosed(t.departure_date)) || sorted[0];
+        const nearest = sorted.find(t => temVaga(t.available_spots) && t.status !== "sold_out" && !salesClosed(t.departure_date)) || sorted[0];
         if (nearest) setSelectedTrip(nearest);
       })
       .catch(() => {});

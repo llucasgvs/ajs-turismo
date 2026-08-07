@@ -39,14 +39,33 @@ export function formatPhone(v?: string | null): string {
 /**
  * Rótulo de vagas. Bate-e-volta / data aberta usam 9999 como "ilimitado":
  * nesses casos mostramos "Vagas disponíveis" em vez do número cru "9999".
+ *
+ * `null` chega quando a API decidiu não publicar o número por haver vaga de
+ * sobra (ver app/core/vitrine.py). Trata igual ao ilimitado: o cliente vê que
+ * tem vaga, sem o número exato. Só a escassez de verdade mostra a quantidade.
  */
 const UNLIMITED_SPOTS = 999;
-export function spotsLabel(n: number): string {
-  if (n >= UNLIMITED_SPOTS) return "Vagas disponíveis";
+export function spotsLabel(n: number | null | undefined): string {
+  if (n == null || n >= UNLIMITED_SPOTS) return "Vagas disponíveis";
   return `${n} vaga${n !== 1 ? "s" : ""}`;
 }
-export function isUnlimitedSpots(n: number): boolean {
-  return n >= UNLIMITED_SPOTS;
+export function isUnlimitedSpots(n: number | null | undefined): boolean {
+  return n == null || n >= UNLIMITED_SPOTS;
+}
+
+/**
+ * Tem vaga? `null` é "sobra vaga", então conta como sim. Só 0 é esgotado.
+ */
+export function temVaga(disponivel: number | null | undefined): boolean {
+  return disponivel == null || disponivel > 0;
+}
+
+/**
+ * Está acabando? Só quando a API publicou um número baixo de verdade. Com
+ * `null` (vaga de sobra) não há escassez para anunciar.
+ */
+export function poucasVagas(disponivel: number | null | undefined): disponivel is number {
+  return disponivel != null && disponivel > 0 && disponivel <= 5;
 }
 
 /**

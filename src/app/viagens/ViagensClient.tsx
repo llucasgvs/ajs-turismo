@@ -43,8 +43,8 @@ interface PublicDate {
   return_date: string;
   price_per_person: number;
   original_price: number | null;
-  available_spots: number;
-  total_spots: number;
+  available_spots: number | null;
+  total_spots?: number | null;
   status: string;
 }
 
