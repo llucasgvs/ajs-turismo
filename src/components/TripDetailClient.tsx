@@ -1232,8 +1232,8 @@ function DateSelector({
               </div>
 
               {/* Price row */}
-              <div className="flex items-end justify-between">
-                <div>
+              <div className="flex items-end justify-between gap-2">
+                <div className="min-w-0">
                   {t.original_price && (
                     <p className="text-[10px] text-gray-400 line-through leading-none">
                       R$ {fmtBRL(t.original_price)}
@@ -1244,7 +1244,7 @@ function DateSelector({
                   ) : isClosed ? (
                     <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
                   ) : (
-                    <span className={`text-base font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
+                    <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
                       R$ {fmtBRL(t.price_per_person)}
                       <span className="text-xs font-normal text-gray-400"> /pessoa</span>
                     </span>
@@ -1253,7 +1253,7 @@ function DateSelector({
 
                 {/* Spots */}
                 {!blocked && (
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
                     isLow
                       ? "bg-orange-100 text-orange-600"
                       : "bg-gray-100 text-gray-500"
@@ -1351,7 +1351,7 @@ function CompactDateSelector({
                     key={t.id}
                     disabled={blocked}
                     onClick={() => !blocked && onSelect(t)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left ${
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,transform,opacity] ${
                       isSelected
                         ? "border-navy-700 bg-navy-50"
                         : blocked
@@ -1359,31 +1359,43 @@ function CompactDateSelector({
                         : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
                     }`}
                   >
-                    <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
-                    <span className={`flex-1 text-sm font-bold ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                      {fmtDay(t.departure_date)}
-                    </span>
-                    {isSold ? (
-                      <span className="text-xs text-gray-400 font-semibold">Esgotado</span>
-                    ) : isClosed ? (
-                      <span className="text-xs text-gray-400 font-semibold">Vendas encerradas</span>
-                    ) : (
-                      <>
-                        <span className={`text-sm font-black ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                          R$ {fmtBRL(t.price_per_person)}
-                        </span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
-                        }`}>
-                          {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
-                        </span>
-                      </>
-                    )}
-                    {isSelected && (
-                      <span className="w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Check size={11} className="text-white" />
+                    {/* Duas linhas, igual ao card de viagem com pernoite. Numa
+                        linha só, data + preço + selo de vagas não cabem num
+                        celular estreito, e o navegador quebrava no meio dos
+                        valores ("23 / de / ago.", "R$ / 216,00"). */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
+                      <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                        {fmtDay(t.departure_date)}
                       </span>
-                    )}
+                      {isSelected && (
+                        <span className="ml-auto w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Check size={11} className="text-white" />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Sem "/pessoa" aqui de propósito: neste card estreito ele
+                        é o que faz o conteúdo estourar num aparelho de 320px, e
+                        o preço por pessoa já aparece na barra fixa de baixo. */}
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      {isSold ? (
+                        <span className="text-sm font-bold text-gray-400">Esgotado</span>
+                      ) : isClosed ? (
+                        <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
+                      ) : (
+                        <>
+                          <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
+                            R$ {fmtBRL(t.price_per_person)}
+                          </span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap overflow-hidden text-ellipsis ${
+                            isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </button>
                 );
               })}
