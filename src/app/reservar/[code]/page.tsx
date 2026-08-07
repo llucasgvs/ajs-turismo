@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
-import { fmtBRL, spotsLabel, salesClosed } from "@/lib/format";
+import { fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
 import { trackPurchaseOnce, trackBeginCheckout } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
@@ -25,7 +25,7 @@ const PLACEHOLDER = "https://images.unsplash.com/photo-1507525428034-b723cf961d3
 interface Trip {
   id: number; template_id: number | null; departure_date: string; return_date: string;
   title?: string | null; destination?: string | null; image_url?: string | null;
-  price_per_person: number; original_price?: number | null; available_spots: number; max_installments: number;
+  price_per_person: number; original_price?: number | null; available_spots: number | null; max_installments: number;
   price_tiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
   optionals: { name: string; price: number }[];
   quote_only?: boolean;
@@ -600,7 +600,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                   <p className="px-3 py-3 text-sm text-gray-400 flex items-center justify-center gap-2"><Loader2 size={13} className="animate-spin" /> Carregando datas…</p>
                 ) : dates.map(d => {
                   const cur = d.departure_date.slice(0, 10) === (booking.trip_departure_date || "").slice(0, 10);
-                  const sold = d.available_spots <= 0;
+                  const sold = !temVaga(d.available_spots);
                   return (
                     <button key={d.id} disabled={sold || cur} onClick={() => changeDate(d.id)}
                       className={`w-full flex items-center justify-between px-3.5 py-3 text-sm text-left transition-colors ${cur ? "bg-navy-50/60" : "hover:bg-gray-50"} ${sold && !cur ? "opacity-40" : ""}`}>
