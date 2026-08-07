@@ -1316,8 +1316,9 @@ function CompactDateSelector({
     const [y, m] = key.split("-");
     return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   };
-  const fmtDay = (d: string) =>
-    new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo",  day: "2-digit", month: "short" });
+  // A data sai por extenso (23/08/2026), igual ao card de viagem com pernoite.
+  // Antes era abreviada e sem ano ("23 de ago."), o que ia ficar ambíguo assim
+  // que entrassem datas de 2027 na mesma lista.
 
   return (
     <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
@@ -1366,7 +1367,7 @@ function CompactDateSelector({
                     <div className="flex items-center gap-2 mb-1.5">
                       <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
                       <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                        {fmtDay(t.departure_date)}
+                        {fmtDate(t.departure_date)}
                       </span>
                       {isSelected && (
                         <span className="ml-auto w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center flex-shrink-0">
