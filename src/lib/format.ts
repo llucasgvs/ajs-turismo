@@ -54,6 +54,47 @@ export function isUnlimitedSpots(n: number | null | undefined): boolean {
 }
 
 /**
+ * O roteiro está marcado como bate-e-volta pela etiqueta do painel?
+ *
+ * Existe para o caso que a data sozinha não resolve: sai 23:45 e volta às 16:00
+ * do dia seguinte, sem dormir em hotel. Pelo calendário são dois dias, e a
+ * página escrevia "1 dia / 1 noite", que é errado para quem dorme no ônibus.
+ *
+ * A etiqueta é a fonte da verdade, e não o número de noites, porque as noites
+ * são recalculadas pela diferença de datas toda vez que o admin edita a data:
+ * um valor corrigido na mão voltaria a ficar errado na primeira edição.
+ *
+ * Comparação frouxa (sem acento, sem caixa, sem espaços das pontas) porque a
+ * etiqueta é texto livre digitado no painel.
+ */
+export function marcadoBateVolta(tag?: string | null): boolean {
+  if (!tag) return false;
+  const limpo = tag
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")   // "bate e vólta" -> "bate e volta"
+    .replace(/[\s-]+/g, " ")          // hífen e espaço repetido viram um espaço
+    .trim()
+    .toLowerCase();
+  return limpo === "bate e volta" || limpo === "bate volta";
+}
+
+/**
+ * Ida e volta no mesmo dia, ou seja, bate-e-volta.
+ *
+ * Comparado no fuso de Brasília: fatiar o ISO cru usaria a data em UTC, que vira
+ * o dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC) e faria um
+ * bate-e-volta parecer viagem de dois dias.
+ *
+ * Serve para não escrever a mesma data duas vezes ("23 de ago. → 23 de ago."),
+ * que ocupa espaço e não informa nada.
+ */
+export function mesmoDia(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const dia = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+  return dia(a) === dia(b);
+}
+
+/**
  * Tem vaga? `null` é "sobra vaga", então conta como sim. Só 0 é esgotado.
  */
 export function temVaga(disponivel: number | null | undefined): boolean {

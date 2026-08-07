@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed, temVaga, poucasVagas } from "@/lib/format";
+import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed, temVaga, poucasVagas, mesmoDia, marcadoBateVolta } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
@@ -1219,16 +1219,21 @@ function DateSelector({
                 ) : null}
               </span>
 
-              {/* Date range */}
+              {/* Date range. No bate-e-volta sai uma data só: repetir a mesma
+                  dos dois lados da seta ocupa espaço e não informa nada. */}
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mb-2 min-w-0 pr-6">
                 <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
                 <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
                   {fmtDate(t.departure_date)}
                 </span>
-                <span className="text-gray-400 text-xs flex-shrink-0">→</span>
-                <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                  {fmtDate(t.return_date)}
-                </span>
+                {!mesmoDia(t.departure_date, t.return_date) && (
+                  <>
+                    <span className="text-gray-400 text-xs flex-shrink-0">→</span>
+                    <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
+                      {fmtDate(t.return_date)}
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Price row */}
@@ -1931,6 +1936,11 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                 ) : (
                   /* Viagem normal: 4 colunas */
                   <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-gray-100 sm:divide-y-0 sm:divide-x sm:divide-gray-100">
+                    {/* A data aparece nas duas colunas, inclusive no bate-e-volta,
+                        onde ela se repete. É de propósito: ver a MESMA data na
+                        saída e no retorno é o que mostra ao cliente que a viagem
+                        vai e volta no mesmo dia. Trocar por horário aqui deixava
+                        essa informação só na coluna "Duração". */}
                     <div className="p-5">
                       <InfoStat icon={<Calendar size={16} className="text-gold-500" />} label="Saída"
                         value={selectedTrip
@@ -1946,6 +1956,11 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                     <div className="p-5">
                       <InfoStat icon={<Clock size={16} className="text-gold-500" />} label="Duração"
                         value={(() => {
+                          // A etiqueta do painel manda: existe roteiro que sai
+                          // 23:45 e volta às 16:00 do dia seguinte sem dormir em
+                          // hotel. Pelo calendário são dois dias, e aqui saía
+                          // "1 dia / 1 noite" para quem dormiu no ônibus.
+                          if (marcadoBateVolta(activeTrip.tag)) return "Bate e volta";
                           const nights = activeTrip.duration_nights;
                           if (nights === 0) return "Bate e volta";
                           const days = calcDays(nights, activeTrip.departure_date);
@@ -2202,6 +2217,12 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                   <h2 className="font-display font-black text-lg text-navy-800 flex items-center gap-2">
                     <Clock size={18} className="text-gold-500" /> Horários de Embarque
                   </h2>
+                  {/* Aqui a data fica sob CADA horário, mesmo no bate-e-volta,
+                      onde ela se repete. É de propósito: este é o bloco que o
+                      cliente confere antes de embarcar, e cada horário tem que
+                      dizer sozinho de que dia é, sem depender de olhar para
+                      cima. Repetir custa pouco; deixar dúvida custa uma pessoa
+                      perdendo o ônibus. */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-navy-50 rounded-xl px-4 py-3">
                       <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Saída</p>
@@ -2309,8 +2330,18 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           {selectedTrip ? (
                             <p className="text-sm font-bold text-navy-800">
                               {new Date(selectedTrip.departure_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short",year:"numeric"})}
-                              {" → "}
-                              {new Date(selectedTrip.return_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short"})}
+                              {/* No bate-e-volta, "· bate e volta" em vez de repetir
+                                  a data. Repetida ficava pior que em outros blocos,
+                                  porque aqui os dois lados usam formatos diferentes
+                                  ("23 de ago. de 2026 → 23 de ago."), o que parecia
+                                  defeito. É a mesma forma já usada no painel do
+                                  cliente, e diz o mesmo dia com todas as letras. */}
+                              {mesmoDia(selectedTrip.departure_date, selectedTrip.return_date)
+                                ? " · bate e volta"
+                                : <>
+                                    {" → "}
+                                    {new Date(selectedTrip.return_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short"})}
+                                  </>}
                             </p>
                           ) : (
                             <p className="text-sm font-bold text-gray-400">Selecione uma data</p>

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment } from "@/lib/format";
+import { fmtBRL, fmtInstallment, mesmoDia } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -74,12 +74,16 @@ interface PublicTemplate {
 const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 const spMonth = (iso: string) => spDay(iso).slice(0, 7);
 
-function fmtDate(d: string) {
+function fmtDate(d: string, mesLongo = false) {
   // Data no fuso de Brasília (fatiar o ISO cru usaria a data em UTC, que vira o
   // dia seguinte em saídas de fim de noite).
+  //
+  // `mesLongo` é para o bate-e-volta, que mostra uma data só: como não precisa
+  // caber ao lado de uma segunda data, o mês vai por extenso ("23 de agosto").
+  // O ano continua entrando sozinho quando a saída não é deste ano.
   const spDay = new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
   const date = new Date(spDay + "T12:00:00");
-  const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
+  const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: mesLongo ? "long" : "short" };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return date.toLocaleDateString("pt-BR", opts);
 }
@@ -590,7 +594,9 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
                       isSoldOut ? "bg-gray-50 opacity-60" : "bg-gray-50"
                     }`}>
                       <span className={`font-semibold ${isSoldOut ? "text-gray-400" : "text-navy-800"}`}>
-                        {fmtDate(d.departure_date)} → {fmtDate(d.return_date)}
+                        {mesmoDia(d.departure_date, d.return_date)
+                          ? fmtDate(d.departure_date, true)
+                          : `${fmtDate(d.departure_date)} → ${fmtDate(d.return_date)}`}
                       </span>
                       {isSoldOut ? (
                         <span className="text-red-400 font-bold text-[10px]">Esgotado</span>
