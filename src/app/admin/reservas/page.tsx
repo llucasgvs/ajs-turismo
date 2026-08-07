@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 import { Skel } from "@/components/admin/Skeleton";
+import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
 const PAGE_SIZE = 25;
 
@@ -444,6 +445,7 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   onClose: () => void;
   onDone: () => void;
 }) {
+  useFecharComEsc(true, onClose);
   const [escolhida, setEscolhida] = useState("");
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -604,6 +606,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
   onTrocarData: (booking: Booking) => void;
   actionLoading: string | null;
 }) {
+  useFecharComEsc(true, onClose);
   const st = statusVisual(booking);
   const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
   const [codeCopied, setCodeCopied] = useState(false);
@@ -624,9 +627,16 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-overlay p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl animate-modal max-h-[92vh] flex flex-col">
+        {/* Alça no topo. No celular a folha ocupa 92% da tela e sobra pouca
+            área para tocar fora dela, então precisa de um alvo visível de
+            "fechar" além do X. */}
+        <button onClick={onClose} aria-label="Fechar"
+          className="sm:hidden w-full pt-3 pb-1.5 flex justify-center flex-shrink-0 active:bg-gray-50 rounded-t-3xl">
+          <span className="h-1.5 w-12 rounded-full bg-gray-300" />
+        </button>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-start justify-between gap-2 px-5 pb-4 pt-2 sm:pt-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             <button onClick={copyCode} className="flex items-center gap-1.5 font-mono text-sm text-navy-700 font-bold hover:text-gold-600 transition-colors group">
               {booking.booking_code}
               {codeCopied ? <CheckCheck size={13} className="text-emerald-500" /> : <Copy size={13} className="text-gray-300 group-hover:text-gold-500 transition-colors" />}
@@ -638,8 +648,11 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             }
             {booking.status === "interesse" && <WaitingBadge createdAt={booking.created_at} />}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors">
-            <X size={18} />
+          {/* flex-shrink-0 e alvo de 40px: com muitos selos o X era espremido
+              pela esquerda e virava difícil de acertar com o dedo. */}
+          <button onClick={onClose} aria-label="Fechar"
+            className="w-10 h-10 -mr-2 -mt-1 flex items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200 text-gray-500 transition-colors flex-shrink-0">
+            <X size={20} />
           </button>
         </div>
 
@@ -891,6 +904,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  useFecharComEsc(true, onClose);
   type Companion = { full_name: string; cpf: string; birth_date: string };
 
   const parsedCompanions: Companion[] = (() => {
@@ -1106,6 +1120,7 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
   onConfirm: () => void;
   loading: boolean;
 }) {
+  useFecharComEsc(true, onClose);
   const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
@@ -1156,6 +1171,7 @@ function RefundConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
   onConfirm: () => void;
   loading: boolean;
 }) {
+  useFecharComEsc(true, onClose);
   const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
@@ -1234,6 +1250,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  useFecharComEsc(true, onClose);
   type Companion = { full_name: string; cpf: string; birth_date: string };
 
   const [templateKey, setTemplateKey] = useState("");

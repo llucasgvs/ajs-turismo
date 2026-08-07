@@ -13,6 +13,7 @@ import { fmtBRL } from "@/lib/format";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { tierLabel } from "@/lib/tiers";
 import DiscountFields from "@/components/admin/DiscountFields";
+import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
 interface TripTemplate {
   id: number;
@@ -388,6 +389,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  useFecharComEsc(true, onClose);
   const dep = splitISO(date.departure_date);
   const ret = splitISO(date.return_date);
   const [price, setPrice] = useState(String(date.price_per_person));
@@ -639,6 +641,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
 function HideModal({ date, onClose, onConfirm, loading }: {
   date: TripDate; onClose: () => void; onConfirm: () => void; loading: boolean;
 }) {
+  useFecharComEsc(true, onClose);
   const sold = date.total_spots - date.available_spots;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
@@ -685,6 +688,7 @@ const WEEK_DAYS = [
 function BulkModal({ templateId, onClose, onDone }: {
   templateId: number; onClose: () => void; onDone: () => void;
 }) {
+  useFecharComEsc(true, onClose);
   const today = new Date().toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
@@ -965,6 +969,7 @@ function BulkModal({ templateId, onClose, onDone }: {
 
 /* ── Drawer com detalhes do roteiro ────────────────────────────────────── */
 function TemplateDrawer({ template, onClose }: { template: TripTemplate; onClose: () => void }) {
+  useFecharComEsc(true, onClose);
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-overlay"

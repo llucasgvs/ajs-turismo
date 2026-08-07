@@ -39,7 +39,15 @@ const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").get
 const daysSince = (d: string) => Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 const todayLabel = () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
-const fmtR = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+/** Dinheiro no painel SEMPRE com centavos: aqui se confere caixa, e "R$ 9.908"
+ *  escondia até 99 centavos por linha, o que não fecha com o extrato.
+ *
+ *  Centavos no mesmo tamanho e na mesma cor do resto, de propósito. Tentamos
+ *  deixá-los menores e mais claros para "não competir", e o efeito foi o
+ *  contrário: qualquer trecho visualmente diferente vira contraste, e contraste
+ *  é justamente o que puxa o olho. Uniforme, eles informam sem chamar. */
+const fmtR = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 const fmtRk = (n: number) => n >= 1000 ? `R$ ${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".", ",")}k` : `R$ ${Math.round(n)}`;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
@@ -301,7 +309,10 @@ export default function AdminDashboard() {
           </div>
         </div>
         {/* KPIs de apoio */}
-        <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
+        {/* No celular vai um por linha: em três colunas sobravam ~110px por
+            card, o rótulo virava "AGUA..." e o valor quebrava no meio. Com
+            centavos o valor ficou ainda mais longo. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3 sm:gap-4">
           <MiniKpi icon={<CreditCard size={15} />} label="Aguardando pgto" value={fmtR(cs?.pending_value ?? 0)} carregando={loading} sub={`${counts?.pending ?? 0} a pagar`} href={`${RES}?status=pending`} />
           <MiniKpi icon={<DollarSign size={15} />} label="Ticket médio" value={fmtR(an?.ticket_medio ?? 0)} carregando={loading} sub="por venda" />
           <MiniKpi icon={<Target size={15} />} label="Conversão" value={pct(an?.conversao ?? 0)} carregando={loading} sub="interesse → venda" />
@@ -476,13 +487,28 @@ export default function AdminDashboard() {
 
 /* ─── Mini KPI ─── */
 function MiniKpi({ icon, label, value, sub, href, carregando }: { icon: React.ReactNode; label: string; value: string; sub?: string; href?: string; carregando?: boolean }) {
+  // Celular: rótulo à esquerda, valor à direita, na linha inteira. Empilhado
+  // num terço da tela o rótulo era cortado ("AGUA...") e o valor quebrava.
+  // A partir de sm volta a ser empilhado, que é como cabe na coluna.
   const inner = (
-    <div className="bg-white rounded-2xl px-4 py-3.5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col justify-center">
-      <div className="flex items-center gap-1.5 text-gray-400 mb-1.5"><span className="text-navy-400">{icon}</span><span className="text-[11px] font-semibold uppercase tracking-wide truncate">{label}</span></div>
-      {carregando
-        ? <Skel className="h-5 w-24" />
-        : <p className="text-lg font-black text-navy-900 leading-none tabular-nums">{value}</p>}
-      {sub && (carregando ? <Skel className="h-2.5 w-16 mt-1.5" /> : <p className="text-[10px] text-gray-400 mt-1">{sub}</p>)}
+    <div className="bg-white rounded-2xl px-4 py-3.5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:justify-center">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 text-gray-400 sm:mb-1.5">
+          <span className="text-navy-400 flex-shrink-0">{icon}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>
+        </div>
+        {sub && (carregando
+          ? <Skel className="h-2.5 w-16 mt-1.5 sm:hidden" />
+          : <p className="text-[10px] text-gray-400 mt-0.5 sm:hidden">{sub}</p>)}
+      </div>
+      <div className="text-right sm:text-left flex-shrink-0 sm:flex-shrink">
+        {carregando
+          ? <Skel className="h-5 w-24" />
+          : <p className="text-lg font-black text-navy-900 leading-none tabular-nums whitespace-nowrap">{value}</p>}
+        {sub && (carregando
+          ? <Skel className="h-2.5 w-16 mt-1.5 hidden sm:block" />
+          : <p className="text-[10px] text-gray-400 mt-1 hidden sm:block">{sub}</p>)}
+      </div>
     </div>
   );
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
