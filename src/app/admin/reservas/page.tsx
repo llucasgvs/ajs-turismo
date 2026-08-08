@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
@@ -10,6 +10,22 @@ import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
 const PAGE_SIZE = 25;
+
+/** Ordem que o backend aplica quando o painel não pede nenhuma.
+ *
+ *  Espelha _ORDEM_PADRAO em app/routers/bookings.py, e serve só para escrever no
+ *  seletor QUAL é o padrão daquela aba. Se mudar lá, mude aqui: fora de sincronia
+ *  o rótulo mente, mas a lista continua certa, porque quem ordena é o servidor.
+ *
+ *  Cada aba responde a uma pergunta diferente: interesses e aguardando é "o que
+ *  chegou agora", confirmadas é "que dinheiro entrou agora", concluídas é
+ *  histórico de viagem. */
+const ORDEM_PADRAO_ROTULO: Record<string, string> = {
+  interesse: "Mais recentes",
+  pending: "Mais recentes",
+  confirmed: "Último pagamento",
+  completed: "Saída mais distante",
+};
 
 // Cache da lista de viagens (dados de referência p/ dropdown + venda externa).
 // Reservas em si NÃO são cacheadas - sempre refrescadas a cada visita.
@@ -1627,6 +1643,10 @@ export default function AdminReservasPage() {
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
   const [tripFilter, setTripFilter] = useState<string>(searchParams.get("trip_id") ?? "");
+  // Ordem escolhida à mão. Vazio = usar o padrão da aba, que o backend decide.
+  // Guardada por aba: quem inverte os interesses para atacar a fila de espera
+  // não quer que as confirmadas mudem junto.
+  const [ordem, setOrdem] = useState<string>("");
   const [erroCarga, setErroCarga] = useState(false);
   // Só as datas que TÊM reserva, já ordenadas por roteiro e depois por saída.
   // Antes o seletor lia /trips/admin-list, que traz todas as 331 datas
@@ -1649,7 +1669,9 @@ export default function AdminReservasPage() {
   }, [search]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [tab, tripFilter, debouncedSearch]);
+  useEffect(() => { setPage(1); }, [tab, tripFilter, debouncedSearch, ordem]);
+  // Trocar de aba zera a escolha: cada aba tem a ordem que responde a pergunta dela.
+  useEffect(() => { setOrdem(""); }, [tab]);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -1674,6 +1696,7 @@ export default function AdminReservasPage() {
       if (tab !== "all") params.set("booking_status", tab);
       if (tripFilter) params.set("trip_id", tripFilter);
       if (debouncedSearch) params.set("search", debouncedSearch);
+      if (ordem) params.set("ordem", ordem);
 
       const res = await apiFetch(`/bookings/admin/all?${params}`);
       if (res.ok) {
@@ -1692,7 +1715,7 @@ export default function AdminReservasPage() {
     } finally {
       if (!silencioso) setLoading(false);
     }
-  }, [page, tab, tripFilter, debouncedSearch]);
+  }, [page, tab, tripFilter, debouncedSearch, ordem]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
@@ -2025,6 +2048,20 @@ export default function AdminReservasPage() {
                   ))}
                 </optgroup>
               ))}
+            </select>
+          </div>
+          {/* Ordenação. A primeira opção é o padrão da aba e diz qual é, para o
+              admin saber o que está vendo sem precisar abrir a lista. */}
+          <div className="relative">
+            <ArrowUpDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <select value={ordem} onChange={(e) => setOrdem(e.target.value)} aria-label="Ordenar reservas"
+              className={`w-full sm:w-auto pl-8 pr-8 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none cursor-pointer ${ordem ? "border-navy-400 bg-navy-50 text-navy-700 font-semibold" : "border-gray-200 text-gray-500"}`}>
+              <option value="">{ORDEM_PADRAO_ROTULO[tab] ?? "Mais recentes"} (padrão)</option>
+              <option value="recentes">Mais recentes</option>
+              <option value="antigas">Mais antigas</option>
+              <option value="pagamento">Último pagamento</option>
+              <option value="saida_proxima">Saída mais próxima</option>
+              <option value="saida_recente">Saída mais distante</option>
             </select>
           </div>
         </div>
