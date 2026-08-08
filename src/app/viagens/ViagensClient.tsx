@@ -585,7 +585,11 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Datas disponíveis</p>
               <div className="space-y-1">
                 {shownDates.map((d) => {
-                  const isSoldOut = d.status === "sold_out";
+                  // Mesma regra da página do roteiro. Olhar só o status deixava
+                  // a data com zero vaga parecendo disponível aqui e esgotada lá
+                  // dentro: o status só vira "sold_out" quando uma VENDA zera a
+                  // última vaga, e não quando o admin zera o número à mão.
+                  const isSoldOut = d.status === "sold_out" || d.available_spots === 0;
                   const isHighlighted = (highlightDate && spDay(d.departure_date) === highlightDate) ||
                                         (highlightMonth && spMonth(d.departure_date) === highlightMonth);
                   return (
