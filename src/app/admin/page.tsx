@@ -215,10 +215,34 @@ export default function AdminDashboard() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [prefsLidas]);
 
+  /** Busca as rotas de valor de UM modo e guarda. Usada pela troca e pelo
+   *  adiantamento. Só as rotas de valor: reservas, viagens e roteiros não
+   *  dependem do modo, e refazê-las era o que fazia a troca demorar. */
+  const buscarModo = useCallback(async (liq: string): Promise<ValoresDoModo | null> => {
+    const R = await Promise.all([
+      apiFetch(`/bookings/admin/stats?liquido=${liq}`),
+      apiFetch(`/bookings/admin/counts?liquido=${liq}`),
+      apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
+      apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
+      apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
+      apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
+    ]);
+    // Mesma regra da carga cheia: se qualquer uma falhou, não devolve nada pela
+    // metade para a tela.
+    if (R.some(r => !r.ok)) return null;
+    const [sD, cD, aD, mD, dD, yD] = await Promise.all(R.map(r => r.json().catch(() => null)));
+    const m: ValoresDoModo = {
+      stats: sD, counts: cD, analytics: aD,
+      sMonth: Array.isArray(mD) ? mD : [], sDay: Array.isArray(dD) ? dD : [],
+      sYear: Array.isArray(yD) ? yD : [], ts: Date.now(),
+    };
+    _modos[liq] = m;
+    return m;
+  }, []);
+
   // Trocar bruto/líquido. Se o modo já foi carregado nesta sessão, os números
-  // trocam na hora, sem nenhuma requisição. Se não, busca só as quatro rotas de
-  // valor: as listas de reservas, viagens e roteiros não dependem do modo, e
-  // refazê-las era o que fazia a troca demorar.
+  // trocam na hora, sem nenhuma requisição.
+  const [trocandoModo, setTrocandoModo] = useState(false);
   const primeiraCarga = useRef(true);
   useEffect(() => {
     // Enquanto as preferências não foram lidas, quem busca é o efeito acima.
@@ -236,39 +260,37 @@ export default function AdminDashboard() {
 
     let cancelado = false;
     (async () => {
-      setRefreshing(true);
+      setTrocandoModo(true);
       try {
-        const R = await Promise.all([
-          apiFetch(`/bookings/admin/stats?liquido=${liq}`),
-          apiFetch(`/bookings/admin/counts?liquido=${liq}`),
-          apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
-          apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
-          apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
-          apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
-        ]);
+        const m = await buscarModo(liq);
         if (cancelado) return;
-        // Mesma regra da carga cheia: se qualquer uma falhou, não escreve nada
-        // pela metade na tela.
-        if (R.some(r => !r.ok)) { setErroCarga(true); return; }
-        const [sD, cD, aD, mD, dD, yD] = await Promise.all(R.map(r => r.json().catch(() => null)));
-        if (cancelado) return;
-        const m: ValoresDoModo = {
-          stats: sD, counts: cD, analytics: aD,
-          sMonth: Array.isArray(mD) ? mD : [], sDay: Array.isArray(dD) ? dD : [],
-          sYear: Array.isArray(yD) ? yD : [], ts: Date.now(),
-        };
-        _modos[liq] = m;
+        if (!m) { setErroCarga(true); return; }
         aplicar(m);
         setErroCarga(false);
       } catch {
         if (!cancelado) setErroCarga(true);
       } finally {
-        if (!cancelado) setRefreshing(false);
+        if (!cancelado) setTrocandoModo(false);
       }
     })();
     return () => { cancelado = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [liquido, prefsLidas]);
+
+  // Adianta o OUTRO modo assim que a página assenta. A primeira troca era a
+  // única lenta, porque só ali as contas ainda não existiam; com isto ela passa
+  // a vir da memória, como todas as seguintes. Roda em silêncio e sem pressa:
+  // se falhar, a troca simplesmente busca na hora, como antes.
+  useEffect(() => {
+    if (!prefsLidas || loading) return;
+    const outro = liquido ? "false" : "true";
+    if (_modos[outro] && Date.now() - _modos[outro].ts < TTL) return;
+    // Espera a tela terminar de montar para não disputar banda com a carga
+    // principal, que é a que o admin está esperando ver.
+    const t = setTimeout(() => { buscarModo(outro).catch(() => { /* sem adiantamento, sem problema */ }); }, 1200);
+    return () => clearTimeout(t);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [prefsLidas, loading, liquido]);
 
   // Voltar para a aba é o momento em que o número velho atrapalha de verdade.
   // Atualiza em silêncio (sem apagar a tela) e só se a última carga já passou
@@ -414,7 +436,14 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-            <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? <Skel className="h-10 w-44 bg-white/20" /> : fmtR(curRev)}</p>
+            {/* O número esmaece e ganha um giro enquanto troca de modo, em vez
+                de ficar parado no valor antigo. O sinal fica AQUI, junto do
+                valor: o do topo da página está longe demais para alguém
+                associar ao número que pediu para mudar. */}
+            <p className={`text-4xl font-display font-black mt-1 tabular-nums flex items-center gap-2.5 transition-opacity ${trocandoModo ? "opacity-50" : ""}`}>
+              {loading ? <Skel className="h-10 w-44 bg-white/20" /> : fmtR(curRev)}
+              {trocandoModo && !loading && <Loader2 size={20} className="text-navy-200 animate-spin flex-shrink-0" />}
+            </p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(vendasPeriodo, "venda", "vendas")}</span>
               {/* A comparação com o mês anterior só faz sentido vendo o mês. */}
