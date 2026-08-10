@@ -76,7 +76,27 @@ type Booking = {
   trip_departure_at?: string | null;
   trip_return_at?: string | null;
   trip_quote_only?: boolean;
+  trip_whatsapp_only?: boolean;
 };
+
+/** Marca a reserva que veio de roteiro sem cartão (só WhatsApp e PIX).
+ *
+ * É um ícone e não um selo escrito de propósito: a lista já tem código,
+ * origem, status e meio de pagamento em cada linha, e mais uma palavra em
+ * todas as linhas desses 12 roteiros cansaria a leitura. Quem precisa da
+ * explicação passa o mouse. */
+function SeloSemCartao({ b }: { b: Booking }) {
+  if (!b.trip_whatsapp_only || b.trip_quote_only) return null;
+  return (
+    <span
+      aria-label="Roteiro sem cartão"
+      title="Roteiro sem cartão no site: só WhatsApp e PIX"
+      className="inline-flex shrink-0 text-emerald-500 align-[-1px]"
+    >
+      <MessageSquare size={11} />
+    </span>
+  );
+}
 
 type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
 
@@ -2145,7 +2165,7 @@ export default function AdminReservasPage() {
                           {b.traveler_phone && <p className="text-xs text-gray-400">{formatPhone(b.traveler_phone)}</p>}
                         </td>
                         <td className="px-4 py-3 align-top">
-                          <p className="text-navy-700 truncate max-w-[200px]">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                          <p className="text-navy-700 max-w-[200px] flex items-center gap-1"><span className="truncate">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</span><SeloSemCartao b={b} /></p>
                           {b.trip_quote_only ? <p className="text-xs text-gray-400">Sob cotação</p> : b.trip_departure_date && <p className="text-xs text-gray-400">{fmtDataHoraViagem(b.trip_departure_at ?? b.trip_departure_date)}</p>}
                         </td>
                         <td className="px-4 py-3 align-top text-center text-gray-600">{b.num_travelers}</td>
@@ -2195,7 +2215,7 @@ export default function AdminReservasPage() {
                             ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
                             : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>}
                         </div>
-                        <p className="font-bold text-navy-800 text-sm leading-snug">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</p>
+                        <p className="font-bold text-navy-800 text-sm leading-snug">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`} <SeloSemCartao b={b} /></p>
                         <p className="text-xs text-gray-500 truncate">{travelerName}</p>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 pt-0.5">
                           <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
