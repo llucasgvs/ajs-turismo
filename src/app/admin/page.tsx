@@ -14,7 +14,7 @@ import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
 const RES = "/admin/reservas";
 
 /* ─── Types ─── */
-type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_revenue: number; month_confirmed: number; pending_interests: number };
+type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_revenue: number; month_confirmed: number; pending_interests: number; month_fee?: number; total_fee?: number };
 type CountStats = { confirmed_revenue: number; pending_value: number; month_count: number; month_value: number };
 type Counts = { interesse: number; pending: number; confirmed: number; completed: number; cancelled: number; refunded: number; all: number; stats: CountStats };
 type RevPoint = { month: string; label: string; revenue: number; count: number };
@@ -128,11 +128,37 @@ export default function AdminDashboard() {
   // cartão 3,12%). Quem soma é o servidor; aqui só pedimos de um jeito ou de outro.
   const [liquido, setLiquido] = useState(false);
   useEffect(() => { const m = Number(localStorage.getItem("ajs_admin_margin")); if (m >= 0 && m <= 100) setMargin(m); }, []);
-  useEffect(() => { setLiquido(localStorage.getItem("ajs_admin_liquido") === "1"); }, []);
+  // As preferências são lidas ANTES da primeira busca. Sem isso havia corrida: o
+  // carregamento inicial saía com o modo padrão enquanto a preferência salva
+  // ainda estava sendo lida, e as duas buscas corriam juntas. A mais lenta
+  // sobrescrevia a outra, então quem tivesse "líquido" salvo podia ver o valor
+  // BRUTO sob o rótulo "líquida" a cada abertura. Número errado com etiqueta
+  // certa é o pior defeito possível num painel de dinheiro.
+  const [prefsLidas, setPrefsLidas] = useState(false);
+  useEffect(() => {
+    setLiquido(localStorage.getItem("ajs_admin_liquido") === "1");
+    setVerTotal(localStorage.getItem("ajs_admin_total") === "1");
+    setPrefsLidas(true);
+  }, []);
   const onLiquido = (v: boolean) => { setLiquido(v); try { localStorage.setItem("ajs_admin_liquido", v ? "1" : "0"); } catch { /* ignore */ } };
   // O `load` roda com dependências vazias (é chamado no mount e ao voltar para a
   // aba). Sem esta referência ele congelaria o modo da primeira montagem, e a
   // atualização silenciosa traria valor BRUTO com o rótulo "líquida" na tela.
+  // Mês x total no card de receita. Só no desktop: no celular já são dois
+  // botões nesse card, e um terceiro deixaria a tela cheia de controle.
+  const [verTotal, setVerTotal] = useState(false);
+  // O alternador mês/total só existe no desktop. Sem isto, uma preferência
+  // marcada no computador deixaria o celular preso em "total", sem botão para
+  // voltar, e ainda contradizendo o título da seção ("Como o mês está indo").
+  const [telaGrande, setTelaGrande] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");   // mesmo ponto do lg:
+    const aplicar = () => setTelaGrande(mq.matches);
+    aplicar();
+    mq.addEventListener("change", aplicar);
+    return () => mq.removeEventListener("change", aplicar);
+  }, []);
+  const onVerTotal = (v: boolean) => { setVerTotal(v); try { localStorage.setItem("ajs_admin_total", v ? "1" : "0"); } catch { /* ignore */ } };
   const modoRef = useRef(false);
   useEffect(() => { modoRef.current = liquido; }, [liquido]);
   const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
@@ -183,7 +209,11 @@ export default function AdminDashboard() {
       setErroCarga(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
-  useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => {
+    if (!prefsLidas) return;
+    load(fresh);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [prefsLidas]);
 
   // Trocar bruto/líquido. Se o modo já foi carregado nesta sessão, os números
   // trocam na hora, sem nenhuma requisição. Se não, busca só as quatro rotas de
@@ -191,6 +221,8 @@ export default function AdminDashboard() {
   // refazê-las era o que fazia a troca demorar.
   const primeiraCarga = useRef(true);
   useEffect(() => {
+    // Enquanto as preferências não foram lidas, quem busca é o efeito acima.
+    if (!prefsLidas) return;
     if (primeiraCarga.current) { primeiraCarga.current = false; return; }
     const liq = liquido ? "true" : "false";
 
@@ -236,7 +268,7 @@ export default function AdminDashboard() {
     })();
     return () => { cancelado = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [liquido]);
+  }, [liquido, prefsLidas]);
 
   // Voltar para a aba é o momento em que o número velho atrapalha de verdade.
   // Atualiza em silêncio (sem apagar a tela) e só se a última carga já passou
@@ -258,7 +290,14 @@ export default function AdminDashboard() {
 
   /* derived */
   const cs = counts?.stats;
-  const curRev = stats?.month_revenue ?? 0;
+  // No desktop o card pode mostrar o total acumulado; no celular é sempre o mês.
+  const totalNaTela = verTotal && telaGrande;
+  const curRev = (totalNaTela ? stats?.total_revenue : stats?.month_revenue) ?? 0;
+  const taxaPeriodo = (totalNaTela ? stats?.total_fee : stats?.month_fee) ?? 0;
+  const vendasPeriodo = (totalNaTela ? stats?.total_confirmed : stats?.month_confirmed) ?? 0;
+  // Só faz sentido no modo líquido, que é o único lugar onde é mostrado: ali
+  // curRev é o líquido, então líquido + taxa é o bruto, e a conta fecha.
+  const pctTaxa = curRev + taxaPeriodo > 0 ? (100 * taxaPeriodo) / (curRev + taxaPeriodo) : 0;
   const prevRev = sMonth.length >= 2 ? sMonth[sMonth.length - 2].revenue : 0;
   const hasPrev = prevRev > 0;
   const delta = hasPrev ? (curRev - prevRev) / prevRev : 0;
@@ -278,7 +317,6 @@ export default function AdminDashboard() {
   const series = chartMode === "day" ? sDay.slice(0, new Date().getDate()) : chartMode === "year" ? sYear : sMonth;
   const maxRev = Math.max(1, ...series.map(s => s.revenue));
 
-  const monthCount = stats?.month_confirmed ?? 0;
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
   // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
   const markup = margin < 100 ? (margin / (100 - margin)) * 100 : null;
@@ -346,34 +384,55 @@ export default function AdminDashboard() {
           <div className="flex-1">
             <div className="flex items-start justify-between gap-3">
               <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">
-                Receita este mês {liquido && <span className="text-gold-300">· líquida</span>}
+                Receita {totalNaTela ? "total" : "este mês"} {liquido && <span className="text-gold-300">· líquida</span>}
               </p>
               {/* Bruto x líquido. O líquido desconta a taxa do Asaas, que é o que
                   separa o que o cliente pagou do que cai na conta. */}
-              <div className="flex bg-white/10 rounded-lg p-0.5 flex-shrink-0" role="group" aria-label="Ver receita bruta ou líquida">
-                <button onClick={() => onLiquido(false)} aria-pressed={!liquido}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${!liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
-                  Bruto
-                </button>
-                <button onClick={() => onLiquido(true)} aria-pressed={liquido}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
-                  Líquido
-                </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Mês x total: escondido no celular de propósito, para não
+                    empilhar três controles num card só. A troca é instantânea,
+                    porque os dois números já vêm na mesma resposta. */}
+                <div className="hidden lg:flex bg-white/10 rounded-lg p-0.5" role="group" aria-label="Ver receita do mês ou total">
+                  <button onClick={() => onVerTotal(false)} aria-pressed={!verTotal}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${!verTotal ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Mês
+                  </button>
+                  <button onClick={() => onVerTotal(true)} aria-pressed={verTotal}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${verTotal ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Total
+                  </button>
+                </div>
+                <div className="flex bg-white/10 rounded-lg p-0.5" role="group" aria-label="Ver receita bruta ou líquida">
+                  <button onClick={() => onLiquido(false)} aria-pressed={!liquido}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${!liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Bruto
+                  </button>
+                  <button onClick={() => onLiquido(true)} aria-pressed={liquido}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Líquido
+                  </button>
+                </div>
               </div>
             </div>
             <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? <Skel className="h-10 w-44 bg-white/20" /> : fmtR(curRev)}</p>
-            {liquido && !loading && (
-              <p className="text-navy-300 text-[11px] mt-1">já sem a taxa do Asaas · balcão e WhatsApp entram cheios, não têm taxa</p>
-            )}
             <div className="flex items-center gap-3 mt-2 text-sm">
-              <span className="text-navy-100">{plw(monthCount, "venda", "vendas")}</span>
-              {!loading && hasPrev && (
+              <span className="text-navy-100">{plw(vendasPeriodo, "venda", "vendas")}</span>
+              {/* A comparação com o mês anterior só faz sentido vendo o mês. */}
+              {!loading && !totalNaTela && hasPrev && (
                 <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                   {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mês anterior
                 </span>
               )}
-              {!loading && !hasPrev && monthCount > 0 && <span className="text-navy-300 text-xs">primeiro mês com vendas registradas</span>}
+              {!loading && !totalNaTela && !hasPrev && vendasPeriodo > 0 && <span className="text-navy-300 text-xs">primeiro mês com vendas registradas</span>}
             </div>
+            {/* A taxa vem DEPOIS da contagem de vendas, para o card ler de cima
+                para baixo: valor, quantas vendas, e então quanto foi embora. */}
+            {liquido && !loading && (
+              <p className="text-navy-300 text-[11px] mt-1.5">
+                já sem a taxa do Asaas: <span className="font-bold text-navy-200">{fmtR(taxaPeriodo)}</span>
+                {taxaPeriodo > 0 && <> ({pctTaxa.toFixed(2).replace(".", ",")}%)</>}
+              </p>
+            )}
           </div>
 
           {/* lucro presumido (estimativa interativa) */}
@@ -397,7 +456,7 @@ export default function AdminDashboard() {
             />
             {/* Diz sobre QUAL receita a margem está sendo aplicada: com o
                 líquido ligado, o lucro presumido já parte do valor sem a taxa. */}
-            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita {liquido ? "líquida" : "bruta"} do mês. Ajuste a margem para a sua realidade. <span className="text-navy-400">· markup {markupLabel}</span></p>
+            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita {liquido ? "líquida" : "bruta"} {totalNaTela ? "acumulada" : "do mês"}. Ajuste a margem para a sua realidade. <span className="text-navy-400">· markup {markupLabel}</span></p>
           </div>
         </div>
         {/* KPIs de apoio */}
