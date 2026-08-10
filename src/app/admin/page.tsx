@@ -98,6 +98,12 @@ type Cache = { stats: Stats | null; counts: Counts | null; analytics: Analytics 
 const _c: Cache = { stats: null, counts: null, analytics: null, sMonth: [], sDay: [], sYear: [], interests: [], pendings: [], trips: [], templates: [], ts: 0 };
 const TTL = 60_000;
 
+/** Só o que muda entre bruto e líquido. Guardado por modo para a troca ser
+ *  instantânea: alternar refazia as 10 chamadas, inclusive listas que não têm
+ *  nada a ver com o modo, e o número demorava a virar na tela. */
+type ValoresDoModo = { stats: Stats | null; counts: Counts | null; analytics: Analytics | null; sMonth: RevPoint[]; sDay: RevPoint[]; sYear: RevPoint[]; ts: number };
+const _modos: Record<string, ValoresDoModo> = {};
+
 export default function AdminDashboard() {
   const fresh = !!_c.stats && (Date.now() - _c.ts) < TTL && _c.ts >= adminDirtyTs();
   const [stats, setStats] = useState<Stats | null>(_c.stats);
@@ -124,10 +130,15 @@ export default function AdminDashboard() {
   useEffect(() => { const m = Number(localStorage.getItem("ajs_admin_margin")); if (m >= 0 && m <= 100) setMargin(m); }, []);
   useEffect(() => { setLiquido(localStorage.getItem("ajs_admin_liquido") === "1"); }, []);
   const onLiquido = (v: boolean) => { setLiquido(v); try { localStorage.setItem("ajs_admin_liquido", v ? "1" : "0"); } catch { /* ignore */ } };
+  // O `load` roda com dependências vazias (é chamado no mount e ao voltar para a
+  // aba). Sem esta referência ele congelaria o modo da primeira montagem, e a
+  // atualização silenciosa traria valor BRUTO com o rótulo "líquida" na tela.
+  const modoRef = useRef(false);
+  useEffect(() => { modoRef.current = liquido; }, [liquido]);
   const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
 
   const load = useCallback(async (silent = false) => {
-    const liq = liquido ? "true" : "false";
+    const liq = modoRef.current ? "true" : "false";
     silent ? setRefreshing(true) : setLoading(true);
     try {
       const R = await Promise.all([
@@ -167,20 +178,63 @@ export default function AdminDashboard() {
       setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV); setSYear(yearV);
       setInterests(intV); setPendings(penV); setTrips(tripsV); setTemplates(tmplV);
       Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
+      _modos[liq] = { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, ts: Date.now() };
     } catch {
       setErroCarga(true);
     } finally { setLoading(false); setRefreshing(false); }
-  }, [liquido]);
+  }, []);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  // Trocar bruto/líquido refaz as contas no servidor. Em silêncio: os números
-  // trocam no lugar, sem piscar o esqueleto por cima de dados que já estavam
-  // certos. Pula a primeira montagem, que o efeito acima já cobre.
+  // Trocar bruto/líquido. Se o modo já foi carregado nesta sessão, os números
+  // trocam na hora, sem nenhuma requisição. Se não, busca só as quatro rotas de
+  // valor: as listas de reservas, viagens e roteiros não dependem do modo, e
+  // refazê-las era o que fazia a troca demorar.
   const primeiraCarga = useRef(true);
   useEffect(() => {
     if (primeiraCarga.current) { primeiraCarga.current = false; return; }
-    _c.ts = 0;            // invalida o cache: ele guarda o modo anterior
-    load(true);
+    const liq = liquido ? "true" : "false";
+
+    const aplicar = (m: ValoresDoModo) => {
+      setStats(m.stats); setCounts(m.counts); setAn(m.analytics);
+      setSMonth(m.sMonth); setSDay(m.sDay); setSYear(m.sYear);
+    };
+
+    const guardado = _modos[liq];
+    if (guardado && Date.now() - guardado.ts < TTL) { aplicar(guardado); return; }
+
+    let cancelado = false;
+    (async () => {
+      setRefreshing(true);
+      try {
+        const R = await Promise.all([
+          apiFetch(`/bookings/admin/stats?liquido=${liq}`),
+          apiFetch(`/bookings/admin/counts?liquido=${liq}`),
+          apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
+          apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
+          apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
+          apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
+        ]);
+        if (cancelado) return;
+        // Mesma regra da carga cheia: se qualquer uma falhou, não escreve nada
+        // pela metade na tela.
+        if (R.some(r => !r.ok)) { setErroCarga(true); return; }
+        const [sD, cD, aD, mD, dD, yD] = await Promise.all(R.map(r => r.json().catch(() => null)));
+        if (cancelado) return;
+        const m: ValoresDoModo = {
+          stats: sD, counts: cD, analytics: aD,
+          sMonth: Array.isArray(mD) ? mD : [], sDay: Array.isArray(dD) ? dD : [],
+          sYear: Array.isArray(yD) ? yD : [], ts: Date.now(),
+        };
+        _modos[liq] = m;
+        aplicar(m);
+        setErroCarga(false);
+      } catch {
+        if (!cancelado) setErroCarga(true);
+      } finally {
+        if (!cancelado) setRefreshing(false);
+      }
+    })();
+    return () => { cancelado = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [liquido]);
 
