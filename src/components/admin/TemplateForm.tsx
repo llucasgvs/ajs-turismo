@@ -49,6 +49,7 @@ interface TemplateFormData {
   is_featured: boolean;
   is_active: boolean;
   whatsapp_only: boolean;
+  allow_pix: boolean;
   quote_only: boolean;
   parent_id: number | null;
   // Saídas diárias
@@ -95,7 +96,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
-  is_featured: false, is_active: true, whatsapp_only: false, quote_only: false, parent_id: null,
+  is_featured: false, is_active: true, whatsapp_only: false, allow_pix: false, quote_only: false, parent_id: null,
   is_open_date: false, open_date_price: "", open_date_max_installments: "12", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -676,6 +677,10 @@ export default function TemplateForm({
             <div className="space-y-4">
               <Toggle label="Reserva só pelo WhatsApp" description="Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui a reserva pelo WhatsApp com a equipe."
                 checked={form.whatsapp_only || form.quote_only} onChange={(v) => set("whatsapp_only", v)} disabled={form.quote_only} />
+              {form.whatsapp_only && !form.quote_only && (
+                <Toggle label="Aceitar PIX à vista mesmo assim" description="Libera só o PIX no site (o cartão continua desligado). A taxa do PIX é R$ 1,89 fixos, contra percentual no cartão. Quem quiser parcelar continua sendo atendido pelo WhatsApp."
+                  checked={form.allow_pix} onChange={(v) => set("allow_pix", v)} />
+              )}
               {!templateId ? (
                 <Toggle label="Sob cotação (sem data/preço)" description="Para roteiros que precisam de orçamento (ex.: cruzeiro). Some preço e datas; mostra 'Sob consulta'. Cliente faz cadastro e solicita a cotação pelo WhatsApp. Definido na criação e não muda depois."
                   checked={form.quote_only} onChange={(v) => set("quote_only", v)} />
