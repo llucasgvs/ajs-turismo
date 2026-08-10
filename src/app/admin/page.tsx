@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Clock, MapPin, ChevronRight, AlertTriangle, CheckCircle, Calendar,
@@ -118,19 +118,25 @@ export default function AdminDashboard() {
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [margin, setMargin] = useState(20); // margem presumida (%), só exibição
+  // Bruto x líquido. Líquido desconta a taxa do Asaas (medido: PIX R$ 1,89 fixo,
+  // cartão 3,12%). Quem soma é o servidor; aqui só pedimos de um jeito ou de outro.
+  const [liquido, setLiquido] = useState(false);
   useEffect(() => { const m = Number(localStorage.getItem("ajs_admin_margin")); if (m >= 0 && m <= 100) setMargin(m); }, []);
+  useEffect(() => { setLiquido(localStorage.getItem("ajs_admin_liquido") === "1"); }, []);
+  const onLiquido = (v: boolean) => { setLiquido(v); try { localStorage.setItem("ajs_admin_liquido", v ? "1" : "0"); } catch { /* ignore */ } };
   const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
 
   const load = useCallback(async (silent = false) => {
+    const liq = liquido ? "true" : "false";
     silent ? setRefreshing(true) : setLoading(true);
     try {
       const R = await Promise.all([
-        apiFetch(`/bookings/admin/stats`),
-        apiFetch(`/bookings/admin/counts`),
-        apiFetch(`/bookings/admin/analytics`),
-        apiFetch(`/bookings/admin/revenue-series?months=6`),
-        apiFetch(`/bookings/admin/revenue-series?granularity=day`),
-        apiFetch(`/bookings/admin/revenue-series?granularity=year`),
+        apiFetch(`/bookings/admin/stats?liquido=${liq}`),
+        apiFetch(`/bookings/admin/counts?liquido=${liq}`),
+        apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
+        apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
         apiFetch(`/bookings/admin/all?booking_status=interesse&limit=6`),
         apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
         apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`),
@@ -164,8 +170,19 @@ export default function AdminDashboard() {
     } catch {
       setErroCarga(true);
     } finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [liquido]);
   useEffect(() => { load(fresh); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Trocar bruto/líquido refaz as contas no servidor. Em silêncio: os números
+  // trocam no lugar, sem piscar o esqueleto por cima de dados que já estavam
+  // certos. Pula a primeira montagem, que o efeito acima já cobre.
+  const primeiraCarga = useRef(true);
+  useEffect(() => {
+    if (primeiraCarga.current) { primeiraCarga.current = false; return; }
+    _c.ts = 0;            // invalida o cache: ele guarda o modo anterior
+    load(true);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [liquido]);
 
   // Voltar para a aba é o momento em que o número velho atrapalha de verdade.
   // Atualiza em silêncio (sem apagar a tela) e só se a última carga já passou
@@ -273,8 +290,27 @@ export default function AdminDashboard() {
         {/* Hero */}
         <div className="lg:col-span-2 bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-6 text-white shadow-card flex flex-col justify-between gap-6">
           <div className="flex-1">
-            <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">Receita este mês</p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">
+                Receita este mês {liquido && <span className="text-gold-300">· líquida</span>}
+              </p>
+              {/* Bruto x líquido. O líquido desconta a taxa do Asaas, que é o que
+                  separa o que o cliente pagou do que cai na conta. */}
+              <div className="flex bg-white/10 rounded-lg p-0.5 flex-shrink-0" role="group" aria-label="Ver receita bruta ou líquida">
+                <button onClick={() => onLiquido(false)} aria-pressed={!liquido}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${!liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                  Bruto
+                </button>
+                <button onClick={() => onLiquido(true)} aria-pressed={liquido}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                  Líquido
+                </button>
+              </div>
+            </div>
             <p className="text-4xl font-display font-black mt-1 tabular-nums">{loading ? <Skel className="h-10 w-44 bg-white/20" /> : fmtR(curRev)}</p>
+            {liquido && !loading && (
+              <p className="text-navy-300 text-[11px] mt-1">já sem a taxa do Asaas · balcão e WhatsApp entram cheios, não têm taxa</p>
+            )}
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(monthCount, "venda", "vendas")}</span>
               {!loading && hasPrev && (
@@ -305,7 +341,9 @@ export default function AdminDashboard() {
               className="mt-3 w-full h-1.5 rounded-full appearance-none cursor-pointer bg-white/15 accent-gold-400"
               style={{ background: `linear-gradient(to right, rgb(212 175 90) ${margin}%, rgba(255,255,255,0.15) ${margin}%)` }}
             />
-            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita do mês. Ajuste a margem para a sua realidade. <span className="text-navy-400">· markup {markupLabel}</span></p>
+            {/* Diz sobre QUAL receita a margem está sendo aplicada: com o
+                líquido ligado, o lucro presumido já parte do valor sem a taxa. */}
+            <p className="text-navy-300 text-[10px] mt-2">Sobre R$ {fmtR(curRev).replace("R$ ", "")} de receita {liquido ? "líquida" : "bruta"} do mês. Ajuste a margem para a sua realidade. <span className="text-navy-400">· markup {markupLabel}</span></p>
           </div>
         </div>
         {/* KPIs de apoio */}
