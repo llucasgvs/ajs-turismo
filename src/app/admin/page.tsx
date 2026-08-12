@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Clock, MapPin, ChevronRight, AlertTriangle, CheckCircle, Calendar,
   Loader2, BookOpen, CreditCard, Camera, TrendingUp, TrendingDown, Trophy, Crown, Target,
-  DollarSign, XCircle, ArrowUpRight,
+  DollarSign, XCircle, ArrowUpRight, Lock,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
@@ -357,7 +357,14 @@ export default function AdminDashboard() {
   const delta = hasPrev ? (curRev - prevRev) / prevRev : 0;
 
   const upcoming = trips.filter(t => {
-    if (!t.departure_date || !t.is_active || !["active", "sold_out"].includes(t.status)) return false;
+    // `completed` entra aqui de propósito. O servidor marca assim toda saída a
+    // menos de 4 dias, para fechar a venda de cima da hora - e a agenda passava
+    // a esconder justamente a semana que mais importa. Medido em produção:
+    // sumiam Gramado com 40 pessoas e Foz com 60, faltando dois dias.
+    // A lista já vem só com partida no futuro (`futuras=true`), então isto não
+    // ressuscita viagem que já aconteceu; a linha ganha a marca "vendas
+    // encerradas" para ninguém confundir com viagem à venda.
+    if (!t.departure_date || !t.is_active || !["active", "sold_out", "completed"].includes(t.status)) return false;
     // Open-date (vagas ilimitadas, todo dia) só entra na agenda se tiver ≥1 viajante pago.
     if (t.total_spots >= 999 && (t.total_spots - t.available_spots) <= 0) return false;
     return true;
@@ -676,7 +683,7 @@ export default function AdminDashboard() {
                 <div key={t.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors sm:border-b sm:border-gray-50">
                   <div className="flex-shrink-0 w-12 text-center">{dep ? <><p className="text-xl font-black text-navy-800 leading-none">{dep.getDate()}</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{dep.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p>{hora(t.departure_date) && <p className="text-[10px] font-bold text-navy-400 tabular-nums mt-0.5">{hora(t.departure_date)}</p>}</> : <span className="text-gray-300 text-xs">-</span>}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2"><p className="font-semibold text-navy-800 text-sm truncate">{t.title}</p>{t.status === "sold_out" && <span className="flex-shrink-0 text-[10px] font-bold bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Esgotado</span>}</div>
+                    <div className="flex items-center gap-2"><p className="font-semibold text-navy-800 text-sm truncate">{t.title}</p>{t.status === "sold_out" && <span className="flex-shrink-0 text-[10px] font-bold bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Esgotado</span>}{t.status === "completed" && <span title="Vendas encerradas: a saída está a menos de 4 dias e o site não vende mais esta data. A viagem acontece normalmente." aria-label="Vendas encerradas" className="flex-shrink-0 inline-flex text-navy-400"><Lock size={11} /></span>}</div>
                     {unlimited ? (
                       <p className="text-[11px] text-gray-400 font-medium mt-1.5">{plw(sold, "vendido", "vendidos")} · vagas livres</p>
                     ) : (
