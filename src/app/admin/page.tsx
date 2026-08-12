@@ -98,6 +98,19 @@ type Cache = { stats: Stats | null; counts: Counts | null; analytics: Analytics 
 const _c: Cache = { stats: null, counts: null, analytics: null, sMonth: [], sDay: [], sYear: [], interests: [], pendings: [], trips: [], templates: [], ts: 0 };
 const TTL = 60_000;
 
+/** Trava de "já tem uma atualização em andamento".
+ *
+ * Voltar para a aba dispara DOIS eventos, `focus` e `visibilitychange`, e os
+ * dois chamam a atualização. A trava de TTL não segurava a segunda porque o
+ * carimbo de horário só é gravado quando a busca termina - e a segunda saía
+ * antes disso. Resultado medido: toda volta para a aba fazia as 8 chamadas em
+ * duplicata, 16 no total.
+ *
+ * Fica fora do componente de propósito, junto do cache: é o mesmo escopo, e um
+ * estado do React não serviria porque as duas chamadas acontecem no mesmo
+ * instante, antes de qualquer re-render. */
+let _emCurso = false;
+
 /** Só o que muda entre bruto e líquido. Guardado por modo para a troca ser
  *  instantânea: alternar refazia as 10 chamadas, inclusive listas que não têm
  *  nada a ver com o modo, e o número demorava a virar na tela. */
@@ -164,10 +177,23 @@ export default function AdminDashboard() {
   const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
 
   const load = useCallback(async (silent = false) => {
+    if (_emCurso) return;   // ver o comentário de `_emCurso`
+    _emCurso = true;
     const liq = modoRef.current ? "true" : "false";
     silent ? setRefreshing(true) : setLoading(true);
     try {
-      const R = await Promise.all([
+      // Voltar para a aba precisa atualizar DINHEIRO, não o catálogo. Roteiros e
+      // datas não mudam sozinhos: quem os altera é o próprio admin, e aí o
+      // `adminDirtyTs` invalida o cache e cai numa carga cheia. Rebuscar essas
+      // duas listas a cada volta custava ~130 KB do banco por atualização, o que
+      // com uma atualização por minuto vira dezenas de MB por dia.
+      // Só reaproveita se JÁ existir lista guardada e se ela não estiver
+      // desatualizada: `adminDirtyTs` é carimbado quando o admin salva roteiro
+      // ou data em qualquer tela, então editar num lugar e voltar para cá
+      // continua buscando de novo.
+      const usarCatalogoDoCache =
+        silent && _c.trips.length > 0 && _c.templates.length > 0 && _c.ts >= adminDirtyTs();
+      const rotas = [
         apiFetch(`/bookings/admin/stats?liquido=${liq}`),
         apiFetch(`/bookings/admin/counts?liquido=${liq}`),
         apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
@@ -176,9 +202,12 @@ export default function AdminDashboard() {
         apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
         apiFetch(`/bookings/admin/all?booking_status=interesse&limit=6`),
         apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
-        apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`),
-        apiFetch(`/templates/admin-list`),
-      ]);
+      ];
+      if (!usarCatalogoDoCache) {
+        rotas.push(apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`));
+        rotas.push(apiFetch(`/templates/admin-list`));
+      }
+      const R = await Promise.all(rotas);
       // Se QUALQUER chamada falhou, não escreve nada: nem na tela, nem no cache.
       // Antes o corpo de erro não passava nas validações abaixo e virava zero e
       // lista vazia, que era gravado em _c com carimbo novo. A montagem seguinte
@@ -199,15 +228,18 @@ export default function AdminDashboard() {
       const yearV = Array.isArray(yD) ? yD : [];
       const intV = Array.isArray(iD?.items) ? iD.items : [];
       const penV = Array.isArray(pD?.items) ? pD.items : [];
-      const tripsV = Array.isArray(tD?.items) ? tD.items : [];
-      const tmplV = Array.isArray(tmD) ? tmD : [];
+      // Quando o catálogo não foi rebuscado, mantém o que já estava na tela.
+      // Nunca cai para lista vazia aqui: vazio apagaria "próximas saídas" numa
+      // atualização silenciosa, que é justamente quando ninguém está olhando.
+      const tripsV = usarCatalogoDoCache ? _c.trips : (Array.isArray(tD?.items) ? tD.items : []);
+      const tmplV = usarCatalogoDoCache ? _c.templates : (Array.isArray(tmD) ? tmD : []);
       setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV); setSYear(yearV);
       setInterests(intV); setPendings(penV); setTrips(tripsV); setTemplates(tmplV);
       Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
       _modos[liq] = { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, ts: Date.now() };
     } catch {
       setErroCarga(true);
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally { _emCurso = false; setLoading(false); setRefreshing(false); }
   }, []);
   useEffect(() => {
     if (!prefsLidas) return;

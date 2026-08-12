@@ -1693,18 +1693,31 @@ export default function AdminReservasPage() {
   // Trocar de aba zera a escolha: cada aba tem a ordem que responde a pergunta dela.
   useEffect(() => { setOrdem(""); }, [tab]);
 
+  // Mesma trava do fetchBookings: voltar para a aba dispara `focus` e
+  // `visibilitychange`, e sem isto o contador era pedido duas vezes.
+  const contandoAgora = useRef(false);
+
   const fetchCounts = useCallback(async () => {
+    if (contandoAgora.current) return;
+    contandoAgora.current = true;
     try {
       const res = await apiFetch(`/bookings/admin/counts`);
       if (res.ok) { setCounts(await res.json()); setCountsCarregou(true); }
     } catch { /* ignore */ }
+    finally { contandoAgora.current = false; }
   }, []);
 
   // Quando foi a última busca que deu certo. Segura o gatilho de voltar à aba
   // para trocar de janela rápido não virar uma requisição a cada alt-tab.
   const ultimaCarga = useRef(0);
+  // Trava de busca em andamento. Voltar para a aba dispara `focus` E
+  // `visibilitychange`, e `ultimaCarga` só é carimbado quando a resposta chega -
+  // então a segunda saía antes e tudo era pedido em duplicata.
+  const emCurso = useRef(false);
 
   const fetchBookings = useCallback(async (silencioso = false) => {
+    if (emCurso.current) return;
+    emCurso.current = true;
     // Em silêncio a lista fica na tela e só troca de conteúdo quando chega a
     // resposta. Sem isso, voltar para a aba piscaria o esqueleto por cima de
     // dados que já estavam certos.
@@ -1733,6 +1746,7 @@ export default function AdminReservasPage() {
     } catch {
       setErroCarga(true);
     } finally {
+      emCurso.current = false;
       if (!silencioso) setLoading(false);
     }
   }, [page, tab, tripFilter, debouncedSearch, ordem]);
