@@ -9,6 +9,7 @@ import {
   Clock, ClipboardList, DollarSign, Save, Copy,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { SUGESTOES_FAIXA, type SugestaoFaixa } from "@/lib/faixas";
 import { fmtBRL } from "@/lib/format";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { tierLabel } from "@/lib/tiers";
@@ -62,7 +63,6 @@ interface TripDate {
   hidden_at: string | null;
 }
 
-const TIER_SUGGESTIONS = ["Criança", "Bebê", "Idoso", "Estudante"];
 
 interface Counts {
   all: number; active: number; sold_out: number; hidden: number; completed: number;
@@ -194,7 +194,10 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
       .finally(() => setLoading(false));
   }, [open, templateId, defaultTiers]);
 
-  const addTier = (nome = "") => setTiers((t) => [...t, { name: nome, age_range: "", price: "", original_price: "", occupies_seat: true }]);
+  const addTier = (sug?: SugestaoFaixa) => setTiers((t) => [...t, {
+    name: sug?.rotulo ?? "", age_range: sug?.faixa ?? "", price: sug?.preco ?? "",
+    original_price: "", occupies_seat: sug?.ocupaPoltrona ?? true,
+  }]);
   const setTier = (i: number, k: keyof TierForm, v: string | boolean) =>
     setTiers((t) => t.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const delTier = (i: number) => setTiers((t) => t.filter((_, j) => j !== i));
@@ -254,10 +257,10 @@ function TiersPanel({ templateId, defaultTiers, onSaved }: {
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">1. Defina as faixas</p>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {TIER_SUGGESTIONS.filter((s) => !tiers.some((t) => t.name.trim().toLowerCase() === s.toLowerCase())).map((s) => (
-                <button key={s} type="button" onClick={() => addTier(s)}
+              {SUGESTOES_FAIXA.filter((s) => !tiers.some((t) => t.name.trim().toLowerCase() === s.rotulo.toLowerCase())).map((s) => (
+                <button key={s.rotulo} type="button" onClick={() => addTier(s)}
                   className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
-                  <Plus size={10} /> {s}
+                  <Plus size={10} /> {s.rotulo}
                 </button>
               ))}
             </div>
@@ -410,8 +413,14 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const addTier = (name = "") => setTiers(prev =>
-    prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name) ? prev : [...prev, { name, age_range: "", price: "", original_price: "", occupies_seat: true }]);
+  const addTier = (sug?: SugestaoFaixa) => setTiers(prev => {
+    const name = sug?.rotulo ?? "";
+    if (name && prev.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) return prev;
+    return [...prev, {
+      name, age_range: sug?.faixa ?? "", price: sug?.preco ?? "",
+      original_price: "", occupies_seat: sug?.ocupaPoltrona ?? true,
+    }];
+  });
   const removeTier = (i: number) => setTiers(prev => prev.filter((_, idx) => idx !== i));
   const updateTier = (i: number, key: "name" | "age_range" | "price" | "original_price" | "occupies_seat", value: string | boolean) =>
     setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [key]: value } : t));
@@ -563,10 +572,10 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Valores por idade</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {TIER_SUGGESTIONS.filter(s => !tiers.some(t => t.name.trim().toLowerCase() === s.toLowerCase())).map(s => (
-                <button key={s} type="button" onClick={() => addTier(s)}
+              {SUGESTOES_FAIXA.filter(s => !tiers.some(t => t.name.trim().toLowerCase() === s.rotulo.toLowerCase())).map(s => (
+                <button key={s.rotulo} type="button" onClick={() => addTier(s)}
                   className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
-                  <Plus size={10} /> {s}
+                  <Plus size={10} /> {s.rotulo}
                 </button>
               ))}
             </div>

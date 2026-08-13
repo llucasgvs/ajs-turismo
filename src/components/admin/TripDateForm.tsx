@@ -7,12 +7,13 @@ import Link from "next/link";
 import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
+import { SUGESTOES_FAIXA, type SugestaoFaixa } from "@/lib/faixas";
 
 /* ── types ── */
 interface PriceTierInput { name: string; age_range: string; price: string; original_price: string; occupies_seat: boolean }
 
-// Sugestões rápidas de categoria (clique adiciona já com o nome)
-const TIER_SUGGESTIONS = ["Criança", "Bebê", "Idoso", "Estudante"];
+// Sugestões rápidas de categoria: o clique já preenche o que a faixa costuma
+// ter (ver `lib/faixas`). Continua tudo editável antes de salvar.
 
 interface TripDateFormData {
   dep_date: string;   // "YYYY-MM-DD"
@@ -411,10 +412,17 @@ export default function TripDateForm({
     setForm(f => ({ ...f, [key]: value }));
 
   // Faixas de preço (ex: criança)
-  const addTier = (name = "") => setForm(f =>
-    f.price_tiers.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase() && name)
-      ? f
-      : { ...f, price_tiers: [...f.price_tiers, { name, age_range: "", price: "", original_price: "", occupies_seat: true }] });
+  const addTier = (sug?: SugestaoFaixa) => setForm(f => {
+    const name = sug?.rotulo ?? "";
+    if (name && f.price_tiers.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) return f;
+    return { ...f, price_tiers: [...f.price_tiers, {
+      name,
+      age_range: sug?.faixa ?? "",
+      price: sug?.preco ?? "",
+      original_price: "",
+      occupies_seat: sug?.ocupaPoltrona ?? true,
+    }] };
+  });
   const removeTier = (i: number) => setForm(f => ({ ...f, price_tiers: f.price_tiers.filter((_, idx) => idx !== i) }));
   const updateTier = (i: number, key: keyof PriceTierInput, value: string | boolean) =>
     setForm(f => ({ ...f, price_tiers: f.price_tiers.map((t, idx) => idx === i ? { ...t, [key]: value } : t) }));
@@ -625,10 +633,10 @@ export default function TripDateForm({
 
             {/* Sugestões rápidas (preenchem o nome) */}
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {TIER_SUGGESTIONS.filter(s => !form.price_tiers.some(t => t.name.trim().toLowerCase() === s.toLowerCase())).map(s => (
-                <button key={s} type="button" onClick={() => addTier(s)}
+              {SUGESTOES_FAIXA.filter(s => !form.price_tiers.some(t => t.name.trim().toLowerCase() === s.rotulo.toLowerCase())).map(s => (
+                <button key={s.rotulo} type="button" onClick={() => addTier(s)}
                   className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-navy-300 hover:bg-navy-50 transition-colors">
-                  <Plus size={11} /> {s}
+                  <Plus size={11} /> {s.rotulo}
                 </button>
               ))}
             </div>
