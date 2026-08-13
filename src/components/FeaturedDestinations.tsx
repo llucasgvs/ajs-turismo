@@ -15,6 +15,8 @@ interface PublicTemplate {
   quote_only?: boolean;
   short_description: string | null;
   price_from: number;
+  /** Preço "de", quando a data tem promoção. Sem ele não há desconto a mostrar. */
+  original_price_from?: number | null;
 }
 
 export default function FeaturedDestinations({ templates: raw }: { templates: PublicTemplate[] }) {
@@ -39,7 +41,16 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 stagger-in">
-          {templates.map((tmpl) => (
+          {templates.map((tmpl) => {
+            // `round` e não `floor`, pelo mesmo cálculo de `FeaturedPackages` e
+            // da lista de viagens. Arredondar para baixo parecia mais honesto,
+            // mas 216/240 dá 0,8999... em ponto flutuante e um desconto exato de
+            // 10% virava "-9% OFF" - menor do que é, e diferente do que a mesma
+            // viagem mostra em /viagens. Site que se contradiz custa confiança.
+            const desconto = tmpl.original_price_from && tmpl.original_price_from > tmpl.price_from
+              ? Math.round((1 - tmpl.price_from / tmpl.original_price_from) * 100)
+              : 0;
+            return (
             <Link
               key={tmpl.id}
               href={`/viagens/${tmpl.slug ?? tmpl.first_trip_id}`}
@@ -57,6 +68,18 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                 {tmpl.tag && (
                   <div className="absolute top-3 left-3">
                     <span className="badge">{tmpl.tag}</span>
+                  </div>
+                )}
+
+                {/* Desconto: mesmo selo verde de `FeaturedPackages` e da lista de
+                    viagens, para o cliente reconhecer a promoção em qualquer
+                    tela. Fica à direita porque a tag já ocupa a esquerda.
+                    Só aparece quando a DATA tem preço "de" cadastrado. */}
+                {desconto > 0 && (
+                  <div className="absolute top-3 right-3">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500 text-white">
+                      -{desconto}% OFF
+                    </span>
                   </div>
                 )}
 
@@ -82,6 +105,13 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                       </>
                     ) : (
                       <>
+                        {/* O "de" riscado é o que dá tamanho ao desconto: o selo
+                            diz o percentual, esta linha mostra quanto economiza. */}
+                        {desconto > 0 && (
+                          <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
+                            R$ {fmtBRL(tmpl.original_price_from as number)}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-400 mb-0.5">A partir de</p>
                         <p className="text-navy-600 font-black text-xl">
                           R$ {fmtBRL(tmpl.price_from)}
@@ -98,7 +128,8 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                 </div>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
 
         <div className="text-center mt-10">
