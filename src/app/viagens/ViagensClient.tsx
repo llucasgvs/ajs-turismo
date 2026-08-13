@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment, mesmoDia } from "@/lib/format";
+import { fmtBRL, fmtInstallment, mesmoDia, semAcento } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -187,9 +187,11 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
   useEffect(() => {
     let result = templates;
     if (search) {
-      const q = search.toLowerCase();
+      // Compara sem acento dos dois lados: quem procura "gramado" ou "foz do
+      // iguacu" no celular encontra igual a quem digita com acento.
+      const q = semAcento(search);
       result = result.filter(
-        (t) => t.title.toLowerCase().includes(q) || t.destination.toLowerCase().includes(q)
+        (t) => semAcento(t.title).includes(q) || semAcento(t.destination).includes(q)
       );
     }
     if (selectedDate) {

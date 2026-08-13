@@ -120,3 +120,23 @@ export function salesClosed(departureISO?: string | null): boolean {
   if (isNaN(dep)) return false;
   return dep <= Date.now() + BOOKING_CUTOFF_DAYS * 86400000;
 }
+
+/**
+ * Texto pronto para comparação de busca: minúsculas, sem acento e sem espaço
+ * sobrando.
+ *
+ * Existe porque ninguém digita acento procurando viagem no celular. Sem isto,
+ * "gramado" não achava "GRAMADO e CANELA", "foz do iguacu" não achava "FOZ DO
+ * IGUAÇU" e "sao luis" não achava "São Luis do Purunã" - a pessoa concluía que
+ * a AJS não tem o destino e ia embora.
+ *
+ * `normalize("NFD")` separa a letra do acento e o replace remove os acentos,
+ * que no Unicode ficam na faixa 0300-036F.
+ */
+export function semAcento(texto: string | null | undefined): string {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
