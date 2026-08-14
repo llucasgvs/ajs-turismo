@@ -3,11 +3,16 @@
 import { useState } from "react";
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react";
 
+// As saídas são todas de Curitiba, então o cliente mora aqui ou na região. Tinha
+// gente de São Paulo, Belo Horizonte, Recife e Brasília, o que não fecha com um
+// roteiro rodoviário saindo do Paraná: quem é de Recife não pega ônibus em
+// Curitiba. Ao acrescentar depoimento, mantenha a cidade dentro do raio de quem
+// consegue embarcar, e o destino igual a um que exista no catálogo.
 const testimonials = [
   {
     id: 1,
     name: "Maria Silva",
-    location: "São Paulo, SP",
+    location: "Curitiba, PR",
     avatar: "MS",
     avatarColor: "bg-navy-600",
     trip: "Maceió, AL",
@@ -18,7 +23,7 @@ const testimonials = [
   {
     id: 2,
     name: "João Pereira",
-    location: "Belo Horizonte, MG",
+    location: "São José dos Pinhais, PR",
     avatar: "JP",
     avatarColor: "bg-gold-500",
     trip: "Gramado, RS",
@@ -29,7 +34,7 @@ const testimonials = [
   {
     id: 3,
     name: "Ana Carolina",
-    location: "Recife, PE",
+    location: "Colombo, PR",
     avatar: "AC",
     avatarColor: "bg-sky-dark",
     trip: "Rio de Janeiro, RJ",
@@ -40,12 +45,14 @@ const testimonials = [
   {
     id: 4,
     name: "Carlos Mendes",
-    location: "Brasília, DF",
+    location: "Araucária, PR",
     avatar: "CM",
     avatarColor: "bg-navy-700",
-    trip: "Fortaleza + Natal",
+    // Era "Fortaleza + Natal", que não existe no catálogo. Trocado por um
+    // roteiro real, e o texto reescrito junto porque citava as dunas de Natal.
+    trip: "Foz do Iguaçu, PR",
     rating: 5,
-    text: "Viagem do nordeste foi sensacional! O pacote completo valeu muito a pena. As dunas de Natal e as praias de Fortaleza são maravilhosas. A equipe da AJS foi prestativa em todos os momentos.",
+    text: "As Cataratas valem cada minuto de estrada! O pacote completo compensou muito. Ainda deu tempo de conhecer o lado argentino, e a equipe da AJS foi prestativa em todos os momentos.",
     date: "Dezembro 2024",
   },
   {
