@@ -805,6 +805,29 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
       const ce = ageError(compCat(i), c.birth_date, `Acompanhante ${i + 1}`);
       if (ce) return setError(ce);
     }
+
+    // Duas pessoas não podem dividir um CPF. Aconteceu de verdade: um cliente
+    // repetiu o próprio CPF no acompanhante, e o segundo passageiro foi para a
+    // lista de embarque com documento que não é dele.
+    //
+    // O servidor também recusa, e é ele quem manda. Esta checagem existe só
+    // para o cliente descobrir aqui, no campo, em vez de preencher tudo e levar
+    // um erro depois de enviar.
+    const docs = [
+      { quem: "o seu", cpf: onlyDigits(cpf) },
+      ...companions.map((c, i) => ({ quem: `o do acompanhante ${i + 1}`, cpf: onlyDigits(c.cpf) })),
+    ];
+    for (let i = 0; i < docs.length; i++) {
+      for (let j = i + 1; j < docs.length; j++) {
+        if (docs[i].cpf && docs[i].cpf === docs[j].cpf) {
+          return setError(
+            `O mesmo CPF está em dois passageiros (${docs[i].quem} e ${docs[j].quem}). ` +
+            "Cada pessoa precisa do próprio CPF."
+          );
+        }
+      }
+    }
+
     // Padroniza a capitalização dos nomes antes de salvar.
     const fn = titleName(fullName);
     const comps = companions.map(c => ({ ...c, full_name: titleName(c.full_name) }));

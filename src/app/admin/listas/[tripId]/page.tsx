@@ -167,21 +167,48 @@ export default function ListaEmbarquePage() {
             cadastrar 1 nome - nem o formulário, nem o schema, nem o endpoint
             conferem a contagem. Por isso o texto aponta para esse caminho, em
             vez de sugerir que o cliente errou. */}
-        {dados.avisos.length > 0 && (
-          <div className="nao-imprimir bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5">
-            <p className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
-              <AlertTriangle size={16} />
-              A folha vai sair com menos nomes do que passageiros
-            </p>
-            {dados.avisos.map((a, i) => (
-              <p key={i} className="text-amber-700 text-sm">{a}</p>
-            ))}
-            <p className="text-amber-600 text-xs pt-1">
-              Costuma ser venda de balcão cadastrada sem os acompanhantes. Complete
-              em Reservas para todo mundo constar.
-            </p>
-          </div>
-        )}
+        {dados.avisos.length > 0 && (() => {
+          // Os avisos são de dois tipos e pedem ações diferentes, então cada um
+          // ganha a própria explicação. Um bloco genérico deixaria o dono sem
+          // saber o que fazer com o que leu.
+          const doc = dados.avisos.filter((a) => a.startsWith("CPF "));
+          const nomes = dados.avisos.filter((a) => !a.startsWith("CPF "));
+          return (
+            <div className="nao-imprimir space-y-3">
+              {nomes.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1.5">
+                  <p className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                    <AlertTriangle size={16} />
+                    A folha vai sair com menos nomes do que passageiros
+                  </p>
+                  {nomes.map((a, i) => (
+                    <p key={i} className="text-amber-700 text-sm">{a}</p>
+                  ))}
+                  <p className="text-amber-600 text-xs pt-1">
+                    Costuma ser venda de balcão cadastrada sem os acompanhantes. Complete
+                    em Reservas para todo mundo constar.
+                  </p>
+                </div>
+              )}
+
+              {doc.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-1.5">
+                  <p className="flex items-center gap-2 text-red-800 font-semibold text-sm">
+                    <AlertTriangle size={16} />
+                    Duas pessoas com o mesmo CPF
+                  </p>
+                  {doc.map((a, i) => (
+                    <p key={i} className="text-red-700 text-sm">{a}</p>
+                  ))}
+                  <p className="text-red-600 text-xs pt-1">
+                    Um dos dois está com documento que não é dele e pode ser barrado no
+                    embarque. Confirme com o cliente e corrija em Reservas antes de imprimir.
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* `.card` dá o raio e a sombra da casa. O `hover:shadow-card` anula de
             propósito a variação de sombra que a classe traz no hover: aqui a
