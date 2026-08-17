@@ -73,13 +73,24 @@ export default function ListaEmbarquePage() {
   const [dados, setDados] = useState<Lista | null>(null);
   const [erro, setErro] = useState("");
 
-  // Troca o título enquanto esta tela está aberta e devolve o original ao sair,
-  // senão a aba do painel fica com o nome de uma lista que não está mais na tela.
+  // Duas coisas enquanto esta tela está aberta, e as duas desfeitas ao sair:
+  //
+  // O título vira o nome do arquivo que o navegador sugere ao salvar em PDF.
+  // Ao sair, volta o original, senão a aba fica com o nome de uma lista que já
+  // não está na tela.
+  //
+  // A marca `folha-aberta` no <html> é o que liga as regras de impressão do
+  // globals.css. Sem ela, aquelas regras valeriam para o site inteiro e um
+  // cliente imprimindo a página de uma viagem perderia menu e rodapé.
   useEffect(() => {
     if (!dados) return;
     const original = document.title;
     document.title = nomeDoArquivo(dados.viagem.titulo, dados.viagem.saida);
-    return () => { document.title = original; };
+    document.documentElement.classList.add("folha-aberta");
+    return () => {
+      document.title = original;
+      document.documentElement.classList.remove("folha-aberta");
+    };
   }, [dados]);
 
   useEffect(() => {

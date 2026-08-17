@@ -306,40 +306,63 @@ button:not(:disabled):not(.no-press):active {
 .img-fade.is-loaded { opacity: 1; }
 
 /* ── Impressão: a folha que sai do painel ──────────────────────────────── */
-/* Hoje só a lista de embarque imprime, mas as regras são genéricas de
-   propósito: qualquer tela do painel pode marcar `.nao-imprimir` no que é de
-   navegação e `.folha` no que é conteúdo. */
+/* TUDO aqui é escopado por `.folha-aberta`, marca que a página da lista põe no
+   <html> enquanto está na tela e tira ao sair.
+
+   Sem o escopo, estas regras valeriam para o site inteiro: um cliente
+   imprimindo a página de uma viagem perderia menu, rodapé e o espaçamento do
+   corpo. Ninguém veria isso no navegador, e é justamente por isso que passaria
+   despercebido até alguém reclamar de uma impressão estranha.
+
+   Marcar no <html> e não no <body> porque o Next controla as classes do body. */
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
+  .folha-aberta { --folha: 1; }
 
-  aside, nav, header, footer, .nao-imprimir { display: none !important; }
+  html.folha-aberta { }
+  html.folha-aberta body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
 
-  body, main, .folha {
+  html.folha-aberta aside,
+  html.folha-aberta nav,
+  html.folha-aberta header,
+  html.folha-aberta footer,
+  html.folha-aberta .nao-imprimir { display: none !important; }
+
+  html.folha-aberta main {
+    display: block !important;
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
   }
-  main { display: block !important; }
-  .folha { border: 0 !important; }
+
+  html.folha-aberta .folha {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    /* O navegador remove cor de fundo ao imprimir, para economizar tinta. Aqui
+       a listra zebrada e a faixa do cabeçalho são funcionais: é o que impede o
+       olho de trocar de linha no meio da leitura. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 
   /* Repete o cabeçalho da tabela em toda página. Sem isto, da segunda folha em
      diante ninguém sabe qual coluna é qual. */
-  .folha thead { display: table-header-group; }
+  html.folha-aberta .folha thead { display: table-header-group; }
 
   /* Impede que uma linha seja partida pela quebra de página, o que deixaria
      meio nome em cada folha. */
-  .folha tr { break-inside: avoid; page-break-inside: avoid; }
+  html.folha-aberta .folha tr { break-inside: avoid; page-break-inside: avoid; }
 
   /* Na tela as bordas são cinza-claro; no papel some. */
-  .folha th, .folha td { border: 1px solid #999 !important; }
-
-  /* O navegador remove cor de fundo ao imprimir, para economizar tinta. Aqui a
-     listra zebrada e a faixa do cabeçalho da tabela são funcionais - é o que
-     impede o olho de trocar de linha no meio da leitura - então pedimos para
-     manter. Vale só dentro da folha, não na página inteira. */
-  .folha { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  html.folha-aberta .folha th,
+  html.folha-aberta .folha td { border: 1px solid #999 !important; }
 }
+
+/* `@page` não aceita seletor, então fica fora do bloco escopado. Retrato com
+   margem é o padrão de qualquer impressão de documento, e não muda nada para
+   quem imprime uma página do site. */
+@page { size: A4 portrait; margin: 12mm; }
 
 /* ── Acessibilidade: respeita quem prefere menos movimento ─────────────── */
 @media (prefers-reduced-motion: reduce) {
