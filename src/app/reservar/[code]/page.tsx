@@ -278,9 +278,15 @@ function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text
         <input type={type} inputMode={inputMode} value={value} placeholder={placeholder}
           onChange={e => onChange(e.target.value)} onBlur={() => setTouched(true)}
           className={`${FIELD} ${border} ${show && showIcon ? "pr-9" : ""}`} />
+        {/* Os dois estados são ÍCONE, do mesmo tamanho. Antes o erro era o
+            caractere "!", que carrega as métricas da fonte (linha de base,
+            ascendente) e por isso nunca centraliza igual a um SVG, por mais
+            `leading-none` que se ponha. */}
         {show && showIcon && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 reveal-soft">
-            {valid ? <Check size={15} className="text-emerald-500" /> : <span className="text-red-500 font-bold text-sm leading-none">!</span>}
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 reveal-soft leading-[0]">
+            {valid
+              ? <Check size={15} className="text-emerald-500" />
+              : <AlertCircle size={15} className="text-red-500" />}
           </span>
         )}
       </div>
@@ -778,6 +784,26 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
   const [saving, setSaving] = useState(false);
   const setComp = (i: number, f: keyof Companion, v: string) => setCompanions(prev => prev.map((c, idx) => idx === i ? { ...c, [f]: v } : c));
 
+  /** Este CPF já está em outro passageiro desta reserva?
+   *
+   *  `dono` é -1 para o titular e o índice do acompanhante para os demais, para
+   *  o campo não se comparar consigo mesmo.
+   *
+   *  Alimenta o `validate` do VInput, exatamente como a data faz com a faixa de
+   *  idade: a borda fica vermelha e a mensagem aparece embaixo do campo assim
+   *  que o cliente sai dele. Antes, o CPF repetido ganhava o mesmo check verde
+   *  de um CPF certo, e o erro só aparecia ao clicar em continuar. */
+  const cpfEmOutroPassageiro = (valor: string, dono: number) => {
+    const meu = onlyDigits(valor);
+    if (meu.length !== 11) return false;   // incompleto: quem reclama é a validação de CPF
+    const outros = [
+      ...(dono === -1 ? [] : [onlyDigits(cpf)]),
+      ...companions.filter((_, i) => i !== dono).map(c => onlyDigits(c.cpf)),
+    ];
+    return outros.includes(meu);
+  };
+  const ERRO_CPF_REPETIDO = "Este CPF já está em outro passageiro.";
+
   // Categoria de cada viajante (titular = 0). Derivada das faixas escolhidas no card.
   const cats = useMemo(() => {
     const tiers = booking.tier_breakdown || [];
@@ -865,7 +891,10 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
             {/* No celular cada campo ocupa a linha inteira: em duas colunas o CPF
                 e o telefone nao cabiam e o numero aparecia cortado. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="CPF" req><VInput value={cpf} onChange={v => setCpf(maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
+              <Field label="CPF" req><VInput value={cpf} onChange={v => setCpf(maskCPF(v))}
+                validate={v => vCpf(v) && !cpfEmOutroPassageiro(v, -1)}
+                errorMsg={cpfEmOutroPassageiro(cpf, -1) ? ERRO_CPF_REPETIDO : "CPF inválido."}
+                placeholder="000.000.000-00" inputMode="numeric" /></Field>
               <Field label="Telefone" req><VInput value={phone} onChange={v => setPhone(maskPhone(v))} validate={vPhone} errorMsg="Telefone incompleto." placeholder="(00) 00000-0000" inputMode="numeric" /></Field>
             </div>
             {/* Sem hint: a faixa ja aparece na etiqueta do topo deste mesmo card. */}
@@ -878,7 +907,10 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
               <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex flex-wrap items-center gap-x-1.5 gap-y-1.5"><Users size={13} className="shrink-0" /> Acompanhante {i + 1} {compCat(i) && <span className="normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{compCat(i)}</span>}</p>
               <Field label="Nome completo" req><VInput value={c.full_name} onChange={v => setComp(i, "full_name", v)} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Nome completo" /></Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="CPF" req><VInput value={c.cpf} onChange={v => setComp(i, "cpf", maskCPF(v))} validate={vCpf} errorMsg="CPF inválido." placeholder="000.000.000-00" inputMode="numeric" /></Field>
+                <Field label="CPF" req><VInput value={c.cpf} onChange={v => setComp(i, "cpf", maskCPF(v))}
+                  validate={v => vCpf(v) && !cpfEmOutroPassageiro(v, i)}
+                  errorMsg={cpfEmOutroPassageiro(c.cpf, i) ? ERRO_CPF_REPETIDO : "CPF inválido."}
+                  placeholder="000.000.000-00" inputMode="numeric" /></Field>
                 <Field label="Data de nascimento" req><VInput value={c.birth_date} onChange={v => setComp(i, "birth_date", v)} validate={v => !!v && !ageError(compCat(i), v, "")} errorMsg={compCat(i) ? `A idade não corresponde à faixa ${compCat(i)}.` : undefined} type="date" showIcon={false} /></Field>
               </div>
             </div>
