@@ -305,6 +305,42 @@ button:not(:disabled):not(.no-press):active {
 }
 .img-fade.is-loaded { opacity: 1; }
 
+/* ── Impressão: a folha que sai do painel ──────────────────────────────── */
+/* Hoje só a lista de embarque imprime, mas as regras são genéricas de
+   propósito: qualquer tela do painel pode marcar `.nao-imprimir` no que é de
+   navegação e `.folha` no que é conteúdo. */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  aside, nav, header, footer, .nao-imprimir { display: none !important; }
+
+  body, main, .folha {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  main { display: block !important; }
+  .folha { border: 0 !important; }
+
+  /* Repete o cabeçalho da tabela em toda página. Sem isto, da segunda folha em
+     diante ninguém sabe qual coluna é qual. */
+  .folha thead { display: table-header-group; }
+
+  /* Impede que uma linha seja partida pela quebra de página, o que deixaria
+     meio nome em cada folha. */
+  .folha tr { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Na tela as bordas são cinza-claro; no papel some. */
+  .folha th, .folha td { border: 1px solid #999 !important; }
+
+  /* O navegador remove cor de fundo ao imprimir, para economizar tinta. Aqui a
+     listra zebrada e a faixa do cabeçalho da tabela são funcionais - é o que
+     impede o olho de trocar de linha no meio da leitura - então pedimos para
+     manter. Vale só dentro da folha, não na página inteira. */
+  .folha { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
 /* ── Acessibilidade: respeita quem prefere menos movimento ─────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
