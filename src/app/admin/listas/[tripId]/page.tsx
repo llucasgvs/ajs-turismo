@@ -255,14 +255,25 @@ export default function ListaEmbarquePage() {
                   arredondamento de subpixel da impressão elas não encostam - a
                   linha vertical da direita sai picotada no PDF. Colapsando, as
                   bordas viram uma linha só e contínua. */}
-              <table className="w-full text-sm border-collapse">
+              {/* `table-fixed` com larguras declaradas.
+
+                  No padrão (largura automática) o navegador reparte a tabela
+                  conforme o conteúdo: bastava UM nome longo para a coluna Nome
+                  crescer, espremer as outras e quebrar o CPF de todo mundo em
+                  duas linhas. Três das quatro colunas têm largura conhecida e
+                  constante - CPF são sempre 14 caracteres, data 10, idade no
+                  máximo 3 - então elas ficam fixas e só o nome cede.
+
+                  `min-w` para que em tela estreita a tabela role no contêiner
+                  em vez de esmagar as colunas. */}
+              <table className="w-full text-sm border-collapse table-fixed min-w-[580px]">
                 <thead>
                   <tr className="bg-gray-50 text-left text-gray-600">
-                    <th className="px-4 py-2.5 font-semibold w-10">#</th>
-                    <th className="px-4 py-2.5 font-semibold">Nome</th>
-                    <th className="px-4 py-2.5 font-semibold">CPF</th>
-                    <th className="px-4 py-2.5 font-semibold">Nascimento</th>
-                    <th className="px-4 py-2.5 font-semibold text-center w-16">Idade</th>
+                    <th className="px-3 py-2.5 font-semibold w-[7%]">#</th>
+                    <th className="px-3 py-2.5 font-semibold w-[45%]">Nome</th>
+                    <th className="px-3 py-2.5 font-semibold w-[22%]">CPF</th>
+                    <th className="px-3 py-2.5 font-semibold w-[18%]">Nascimento</th>
+                    <th className="px-3 py-2.5 font-semibold text-center w-[8%]">Idade</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -271,8 +282,11 @@ export default function ListaEmbarquePage() {
                     // troca de linha no meio do caminho e lê o CPF de outra
                     // pessoa. É a razão de manifesto de embarque ser listrado.
                     <tr key={`${p.reserva}-${p.n}`} className="border-t border-gray-100 even:bg-gray-50/70">
-                      <td className="px-4 py-2.5 text-gray-400">{p.n}</td>
-                      <td className="px-4 py-2.5 font-medium text-navy-800">
+                      <td className="px-3 py-2.5 text-gray-400 align-top tabular-nums">{p.n}</td>
+                      {/* `align-top`: quando um nome quebra em duas linhas, os
+                          demais campos da linha ficam alinhados pelo topo, e não
+                          centralizados no meio do vão. */}
+                      <td className="px-3 py-2.5 font-medium text-navy-800 align-top break-words">
                         {p.nome}
                         {/* Discreto de propósito: quem confere na porta procura
                             nome, e a nota não pode competir com ele. Só aparece
@@ -284,9 +298,16 @@ export default function ListaEmbarquePage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-gray-700 tabular-nums">{p.cpf || "-"}</td>
-                      <td className="px-4 py-2.5 text-gray-700 tabular-nums">{nascimentoBR(p.nascimento)}</td>
-                      <td className="px-4 py-2.5 text-center text-gray-700">
+                      {/* `whitespace-nowrap`: documento nunca pode quebrar no
+                          meio. CPF partido em duas linhas é erro de leitura na
+                          conferência, não questão de estética. */}
+                      <td className="px-3 py-2.5 text-gray-700 tabular-nums align-top whitespace-nowrap">
+                        {p.cpf || "-"}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-700 tabular-nums align-top whitespace-nowrap">
+                        {nascimentoBR(p.nascimento)}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-gray-700 tabular-nums align-top">
                         {p.idade ?? "-"}
                       </td>
                     </tr>
