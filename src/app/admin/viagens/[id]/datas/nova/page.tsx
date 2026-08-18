@@ -28,6 +28,8 @@ export default function NovaDatum() {
   const dupId = searchParams.get("dup");
   const [templateTitle, setTemplateTitle] = useState("");
   const [templateDurationNights, setTemplateDurationNights] = useState<number | undefined>();
+  // Catálogo de opcionais do roteiro: a data só sobrescreve o PREÇO deles.
+  const [templateOptionals, setTemplateOptionals] = useState<{ name: string; price: number }[]>([]);
   const [defaults, setDefaults] = useState<TripDateDefaults | undefined>();
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +40,7 @@ export default function NovaDatum() {
     ]).then(([tmpl, datesData]) => {
       if (tmpl?.title) setTemplateTitle(tmpl.title);
       if (tmpl?.duration_nights != null) setTemplateDurationNights(tmpl.duration_nights);
+      if (Array.isArray(tmpl?.optionals)) setTemplateOptionals(tmpl.optionals);
 
       const items: Array<{
         id: number;
@@ -87,6 +90,7 @@ export default function NovaDatum() {
       templateId={parseInt(id)}
       templateTitle={templateTitle}
       templateDurationNights={templateDurationNights}
+      templateOptionals={templateOptionals}
       defaults={defaults}
     />
   );

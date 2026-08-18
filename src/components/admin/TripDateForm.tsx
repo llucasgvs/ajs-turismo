@@ -26,6 +26,9 @@ interface TripDateFormData {
   total_spots: number;
   available_spots: number;
   price_tiers: PriceTierInput[];
+  /** nome do opcional -> preço NESTA data. String porque "" (usa o do roteiro)
+   *  e "0" (de graça nesta data) são coisas diferentes. */
+  optionals: Record<string, string>;
 }
 
 const EMPTY: TripDateFormData = {
@@ -34,6 +37,7 @@ const EMPTY: TripDateFormData = {
   price_per_person: "", original_price: "",
   max_installments: 12, total_spots: 30, available_spots: 30,
   price_tiers: [],
+  optionals: {},
 };
 
 interface TripDateInitialData {
@@ -45,6 +49,7 @@ interface TripDateInitialData {
   total_spots?: number;
   available_spots?: number;
   price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
+  optionals?: { name?: string; price?: number }[];
 }
 
 /** ISO UTC → { date: "YYYY-MM-DD", time: "HH:MM" } em SP */
@@ -325,6 +330,7 @@ interface TripDateDefaults {
   dep_time?: string; // "HH:MM"
   ret_time?: string; // "HH:MM"
   price_tiers?: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
+  optionals?: { name?: string; price?: number }[];
 }
 
 /* ── Main form ── */
@@ -334,6 +340,7 @@ export default function TripDateForm({
   initialData,
   templateTitle,
   templateDurationNights,
+  templateOptionals,
   defaults,
 }: {
   templateId: number;
@@ -341,6 +348,8 @@ export default function TripDateForm({
   initialData?: TripDateInitialData;
   templateTitle?: string;
   templateDurationNights?: number;
+  /** Opcionais cadastrados no ROTEIRO. A data só sobrescreve o preço deles. */
+  templateOptionals?: { name: string; price: number }[];
   defaults?: TripDateDefaults;
 }) {
   const router = useRouter();
@@ -366,6 +375,11 @@ export default function TripDateForm({
     original_price: initialData?.original_price != null
       ? String(initialData.original_price)
       : (d?.original_price != null ? String(d.original_price) : ""),
+    // Sobrescrita de preço por opcional. Vazio = usa o preço do roteiro, e é
+    // por isso que o valor é string: "" e "0" são coisas diferentes aqui.
+    optionals: Object.fromEntries(
+      (initialData?.optionals ?? []).map((o: { name?: string; price?: number }) => [String(o.name ?? ""), String(o.price ?? "")])
+    ) as Record<string, string>,
     price_tiers: (initialData?.price_tiers ?? d?.price_tiers ?? []).map((t) => ({
       name: t.name ?? t.label ?? "", age_range: t.age_range ?? "", price: String(t.price),
       original_price: t.original_price ? String(t.original_price) : "",
@@ -478,6 +492,11 @@ export default function TripDateForm({
       total_spots: form.total_spots,
       available_spots: form.available_spots,
       price_tiers: form.price_tiers.map((t) => ({ name: t.name.trim(), age_range: t.age_range.trim(), price: parseFloat(t.price), original_price: parseFloat(t.original_price) || null, occupies_seat: t.occupies_seat })),
+      // Só vai o que foi realmente preenchido. Campo em branco não entra, e aí
+      // o preço do roteiro continua valendo - que é o padrão.
+      optionals: Object.entries(form.optionals)
+        .filter(([, v]) => String(v).trim() !== "" && !Number.isNaN(parseFloat(String(v))))
+        .map(([name, v]) => ({ name, price: parseFloat(String(v)) })),
     };
     try {
       const url = tripId
@@ -620,6 +639,49 @@ export default function TripDateForm({
             <DiscountFields price={form.price_per_person} original={form.original_price}
               onOriginal={(v) => set("original_price", v)} />
           </div>
+
+          {/* Preço de opcional NESTA data.
+              Só aparece quando o roteiro tem opcionais cadastrados: a data
+              sobrescreve o preço deles, nunca cria item novo. O catálogo mora
+              no roteiro, senão ninguém sabe mais onde procurar. */}
+          {(templateOptionals ?? []).length > 0 && (
+            <div className="mt-5 pt-5 border-t border-gray-100">
+              <label className="block text-sm font-medium text-navy-700 mb-1">
+                Opcionais nesta data <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                Deixe em branco para usar o preço do roteiro. Preencha só quando esta
+                data custar diferente.
+              </p>
+
+              <div className="space-y-2">
+                {(templateOptionals ?? []).map((o) => {
+                  const nome = String(o.name ?? "");
+                  const atual = form.optionals[nome] ?? "";
+                  return (
+                    <div key={nome} className="flex items-center gap-3">
+                      <span className="flex-1 min-w-0 text-sm text-navy-800 truncate">{nome}</span>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        roteiro: R$ {Number(o.price ?? 0).toFixed(2).replace(".", ",")}
+                      </span>
+                      <div className="relative w-32 flex-shrink-0">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                        <input
+                          type="number" min="0" step="0.01" inputMode="decimal"
+                          placeholder="padrão"
+                          value={atual}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, optionals: { ...f.optionals, [nome]: e.target.value } }))
+                          }
+                          className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-navy-200 focus:border-navy-300 outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Valores por idade (faixas) */}
           <div className="mt-5 pt-5 border-t border-gray-100">

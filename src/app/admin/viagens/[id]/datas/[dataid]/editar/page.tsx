@@ -10,6 +10,8 @@ export default function EditarDatum() {
   const { id, dataid } = useParams<{ id: string; dataid: string }>();
   const [tripDate, setTripDate] = useState<Record<string, unknown> | null>(null);
   const [templateTitle, setTemplateTitle] = useState("");
+  // Catálogo de opcionais do roteiro: a data só sobrescreve o PREÇO deles.
+  const [templateOptionals, setTemplateOptionals] = useState<{ name: string; price: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -20,6 +22,7 @@ export default function EditarDatum() {
     ])
       .then(([tmpl, datesData]) => {
         if (tmpl.title) setTemplateTitle(tmpl.title);
+        if (Array.isArray(tmpl.optionals)) setTemplateOptionals(tmpl.optionals);
         const found = datesData.items?.find((d: { id: number }) => d.id === parseInt(dataid));
         if (found) setTripDate(found);
         else setError("Data não encontrada.");
@@ -45,6 +48,7 @@ export default function EditarDatum() {
       templateId={parseInt(id)}
       tripId={parseInt(dataid)}
       templateTitle={templateTitle}
+      templateOptionals={templateOptionals}
       initialData={tripDate as Parameters<typeof TripDateForm>[0]["initialData"]}
     />
   );
