@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
+import { valorNaData } from "@/lib/tiers";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
@@ -99,7 +100,7 @@ function SeloSemCartao({ b }: { b: Booking }) {
   );
 }
 
-type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string };
+type Trip = { id: number; title: string; destination: string; price_per_person: number; available_spots: number; departure_date: string | null; return_date: string | null; template_id: number | null; is_active?: boolean; status?: string; price_tiers?: { name?: string; age_range?: string; label?: string; price: number }[] };
 
 type TripFiltro = { trip_id: number; roteiro: string; departure_date: string | null; quote_only?: boolean; total: number };
 
@@ -508,9 +509,12 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   const alvo = opcoes.find((t) => String(t.id) === escolhida);
   const alvoFechado = !!alvo && (alvo.status ?? "active") === "completed";
 
-  // Comparação só para AVISAR. A conta oficial é a do servidor, e ela usa as
-  // faixas de idade da data nova; aqui o preço por pessoa já cobre o caso comum.
-  const custoNaNova = alvo ? (Number(alvo.price_per_person) || 0) * booking.num_travelers : null;
+  // Comparação só para AVISAR. A conta oficial continua sendo a do servidor;
+  // esta é o espelho dela, em `src/lib/tiers.ts`.
+  const custoNaNova = useMemo(
+    () => (alvo ? valorNaData(booking, alvo, QUARTO_SINGLE) : null),
+    [alvo, booking],
+  );
   const diferenca = custoNaNova === null ? null : Math.round((pago - custoNaNova) * 100) / 100;
   const diverge = diferenca !== null && Math.abs(diferenca) >= 0.01;
 
@@ -590,11 +594,9 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
                 <AlertTriangle size={12} /> Data fechada para vendas
               </p>
               <p className="text-sm text-navy-800 mt-1.5">
-                Esta saída já entrou no prazo de encerramento, então o site não vende mais para
-                ela. A viagem acontece normalmente e tem{" "}
-                <span className="font-bold">{spotsLabel(alvo!.available_spots)}</span> — mover a
-                reserva para cá é seguro, mas confirme com a operação que dá tempo de incluir
-                {" "}{plural(booking.num_travelers, "a pessoa", "as pessoas")} na lista de embarque.
+                O site não vende mais para esta saída, mas a viagem acontece normalmente e tem{" "}
+                <span className="font-bold">{spotsLabel(alvo!.available_spots)}</span>. Confirme
+                com a operação que ainda dá tempo de entrar na lista de embarque.
               </p>
               <label className="flex items-start gap-2 mt-3 cursor-pointer">
                 <input type="checkbox" checked={cienteFechada} disabled={salvando}
