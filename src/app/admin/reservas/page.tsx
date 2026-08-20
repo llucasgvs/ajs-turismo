@@ -872,10 +872,10 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
         {/* Actions */}
         {canAct && (
           <div className="p-4 border-t border-gray-100 flex gap-2">
-            {booking.status === "interesse" && (
+            {["interesse", "pending"].includes(booking.status) && (
               <button onClick={() => { onConfirm(booking.booking_code); onClose(); }} disabled={isLoading}
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
-                <Check size={14} /> Confirmar
+                <Check size={14} /> {booking.status === "pending" ? "Marcar paga" : "Confirmar"}
               </button>
             )}
             <button onClick={() => { onEdit(booking); onClose(); }} disabled={isLoading}
@@ -1214,6 +1214,70 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
               className="flex-1 bg-red-500 hover:bg-red-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
               {loading ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
               Cancelar reserva
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Marcar Pago Modal ─── */
+// Só aparece para reserva em "aguardando pagamento". O interesse confirma
+// direto, porque ali nunca houve tentativa de pagamento pelo site.
+function MarcarPagoModal({ booking, trip, onClose, onConfirm, loading }: {
+  booking: Booking;
+  trip: Trip | undefined;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  useFecharComEsc(true, onClose);
+  const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl animate-modal">
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center">
+              <Check size={26} className="text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-navy-800 text-lg">Marcar como paga?</h3>
+              <p className="text-gray-400 text-sm mt-1">
+                Esta reserva ficou aguardando pagamento pelo site.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
+            <p className="font-mono text-xs text-gray-400">{booking.booking_code}</p>
+            <p className="font-bold text-navy-800">{travelerName}</p>
+            {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
+            <p className="text-xs text-gray-400">
+              R$ {fmtBRL(booking.final_amount)} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          <div className="bg-gold-50 border border-gold-200 rounded-xl p-3.5">
+            <p className="text-xs text-navy-700 leading-relaxed">
+              Use apenas se o dinheiro <strong>já foi recebido por fora do site</strong> (link de
+              outro banco, transferência, presencial). A venda é fechada e{" "}
+              <strong>{booking.num_travelers} vaga{booking.num_travelers !== 1 ? "s são baixadas" : " é baixada"}</strong>.
+              Se ainda houver PIX em aberto, o cliente pode acabar pagando duas vezes.
+            </p>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+              Voltar
+            </button>
+            <button onClick={onConfirm} disabled={loading}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              Marcar paga
             </button>
           </div>
         </div>
@@ -1681,6 +1745,7 @@ export default function AdminReservasPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [pagoTarget, setPagoTarget] = useState<Booking | null>(null);
   const [trocaTarget, setTrocaTarget] = useState<Booking | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
@@ -1818,17 +1883,28 @@ export default function AdminReservasPage() {
       .catch(() => {});
   }, []);
 
-  const confirm = async (code: string) => {
-    // Used only from BookingDetailModal (no price adjust)
+  // Fecha a venda sem ajuste de preço. Serve para o interesse e para a reserva
+  // que ficou em aguardando pagamento e foi paga por fora do site.
+  // Devolve se deu certo: o modal de "marcar como pago" só fecha no sucesso.
+  const confirm = async (code: string): Promise<boolean> => {
     setActionLoading(code);
     try {
-      await apiFetch(`/bookings/${code}/confirm`, {
+      const res = await apiFetch(`/bookings/${code}/confirm`, {
         method: "POST",
         body: JSON.stringify({}),
       });
+      // A API recusa por motivo real (vaga que acabou, reserva já cancelada
+      // pela expiração de 48h). Engolir isso deixava o admin achando que
+      // confirmou.
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        alert(e.detail || "Não foi possível confirmar a reserva.");
+        return false;
+      }
       invalidateAdminCache();
       fetchBookings();
       fetchCounts();
+      return true;
     } finally {
       setActionLoading(null);
     }
@@ -1855,6 +1931,20 @@ export default function AdminReservasPage() {
 
   const promptCancel = (booking: Booking) => {
     setCancelTarget(booking);
+  };
+
+  // O interesse fecha direto; o aguardando pagamento passa pelo aviso, porque
+  // ali pode existir cobrança em aberto do lado do cliente.
+  const pedirConfirmacao = (booking: Booking) => {
+    if (booking.status === "pending") setPagoTarget(booking);
+    else confirm(booking.booking_code);
+  };
+
+  const executeMarcarPago = async () => {
+    if (!pagoTarget) return;
+    // Fecha só no sucesso: se a API recusar, o admin lê o motivo e o modal
+    // continua ali com o contexto na tela.
+    if (await confirm(pagoTarget.booking_code)) setPagoTarget(null);
   };
 
   const executeCancel = async () => {
@@ -1913,10 +2003,11 @@ export default function AdminReservasPage() {
     const sizing = compact ? "w-[30px] h-[30px] justify-center shrink-0" : "px-2.5 py-1.5";
     return (
       <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
-        {b.status === "interesse" && (
-          <button onClick={() => confirm(b.booking_code)} disabled={isLoading} title="Confirmar"
+        {["interesse", "pending"].includes(b.status) && (
+          <button onClick={() => pedirConfirmacao(b)} disabled={isLoading}
+            title={b.status === "pending" ? "Marcar como paga (recebida por fora do site)" : "Confirmar"}
             className={`flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
-            <Check size={13} />{!compact && " Confirmar"}
+            <Check size={13} />{!compact && (b.status === "pending" ? " Marcar paga" : " Confirmar")}
           </button>
         )}
         {actionable && (
@@ -1980,6 +2071,16 @@ export default function AdminReservasPage() {
         />
       )}
 
+      {pagoTarget && (
+        <MarcarPagoModal
+          booking={pagoTarget}
+          trip={tripMap[pagoTarget.trip_id]}
+          onClose={() => setPagoTarget(null)}
+          onConfirm={executeMarcarPago}
+          loading={actionLoading === pagoTarget.booking_code}
+        />
+      )}
+
       {refundTarget && (
         <RefundConfirmModal
           booking={refundTarget}
@@ -1995,7 +2096,7 @@ export default function AdminReservasPage() {
           booking={selectedBooking}
           trip={tripMap[selectedBooking.trip_id]}
           onClose={() => setSelectedBooking(null)}
-          onConfirm={(code) => { confirm(code); setSelectedBooking(null); }}
+          onConfirm={() => { pedirConfirmacao(selectedBooking); setSelectedBooking(null); }}
           onEdit={(b) => { setSelectedBooking(null); setEditTarget(b); }}
           onCancel={(b) => { setSelectedBooking(null); promptCancel(b); }}
           onRefund={(b) => { setSelectedBooking(null); setRefundTarget(b); }}
