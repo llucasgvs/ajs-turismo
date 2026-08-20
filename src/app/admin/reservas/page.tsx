@@ -6,6 +6,7 @@ import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText,
 import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
+import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
@@ -781,12 +782,34 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               )}
               {booking.selected_optionals && booking.selected_optionals.length > 0 && (
                 <div className="space-y-1 border-t border-gray-100 pt-2">
-                  {booking.selected_optionals.map((o, i) => (
-                    <div key={i} className="flex justify-between text-gold-700">
-                      <span>+ {o.name} <span className="text-gray-400 text-xs">({booking.num_travelers}×)</span></span>
-                      <span>R$ {fmtBRL(o.price * booking.num_travelers)}</span>
-                    </div>
-                  ))}
+                  {(() => {
+                    // Adulto = quem paga o valor cheio. Mesma definição do backend,
+                    // e é ela que decide o multiplicador do quarto.
+                    const adultos = booking.tier_breakdown?.length
+                      ? booking.tier_breakdown
+                          .filter(t => t.price >= (booking.price_per_person ?? 0))
+                          .reduce((s, t) => s + t.qty, 0)
+                      : booking.num_travelers;
+                    return booking.selected_optionals!.map((o, i) => {
+                      // O quarto multiplica por ADULTO; o resto, por pessoa. Esta
+                      // linha usava `num_travelers` fixo, então numa reserva de
+                      // 1 adulto + 1 criança mostrava "(2×) R$ 1.800,00" para um
+                      // quarto de R$ 900 - e a soma das linhas não fechava com o
+                      // total. O valor COBRADO sempre esteve certo; era só a
+                      // exibição do painel.
+                      const vezes = multiplicadorOpcional(
+                        { name: o.name, price: o.price, por_adulto: o.name === QUARTO_SINGLE },
+                        booking.num_travelers,
+                        adultos,
+                      );
+                      return (
+                        <div key={i} className="flex justify-between text-gold-700">
+                          <span>+ {o.name} <span className="text-gray-400 text-xs">({vezes}×)</span></span>
+                          <span>R$ {fmtBRL(o.price * vezes)}</span>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
               {booking.discount_amount > 0 && (

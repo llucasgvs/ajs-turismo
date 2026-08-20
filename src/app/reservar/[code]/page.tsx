@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
+import { totalOpcionais, quartoObrigatorio, multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
 import { trackPurchaseOnce, trackBeginCheckout } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
@@ -27,8 +28,10 @@ interface Trip {
   title?: string | null; destination?: string | null; image_url?: string | null;
   price_per_person: number; original_price?: number | null; available_spots: number | null; max_installments: number;
   price_tiers: { name?: string; age_range?: string; price: number; original_price?: number | null; occupies_seat?: boolean; label?: string }[];
-  optionals: { name: string; price: number }[];
+  optionals: { name: string; price: number; description?: string }[];
   quote_only?: boolean;
+  /** Viagem com hotel: liga a regra do quarto para quem viaja só com criança. */
+  tem_hospedagem?: boolean;
 }
 interface Booking {
   booking_code: string; trip_id: number; final_amount: number; total_amount: number;
@@ -388,6 +391,26 @@ function BookingCheckout({ code }: { code: string }) {
     })();
   }, [code]);
 
+  // Recarrega a viagem quando a reserva MUDA DE DATA.
+  //
+  // Preço de opcional é por data (ver core/opcionais.py). Sem recarregar, o
+  // catálogo continuava com os preços da data ANTIGA: a tela mostrava um valor
+  // e o servidor, que lê a data nova, cobrava outro. Antes de o preço variar por
+  // data isso não aparecia, porque o opcional custava o mesmo em todas.
+  //
+  // O `trip.id` na condição evita refazer a busca no primeiro carregamento, que
+  // o efeito acima já faz.
+  useEffect(() => {
+    const tid = booking?.trip_id;
+    if (!tid || !trip || trip.id === tid) return;
+    let vivo = true;
+    fetch(`${API}/trips/${tid}`)
+      .then(t => (t.ok ? t.json() : null))
+      .then(j => { if (vivo && j) setTrip(j); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [booking?.trip_id, trip]);
+
   // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
   // Etapa 2 do funil: entrou no checkout (reserva aberta, ainda não paga).
@@ -485,7 +508,34 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     else init[ADULT] = booking.num_travelers;
     return init;
   });
+  // `opts` guarda só o que o CLIENTE escolheu. O quarto obrigatório é derivado
+  // por cima, nunca gravado aqui: assim ele não fica preso no estado quando
+  // deixa de ser obrigatório, e some sozinho ao entrar o segundo adulto - que é
+  // o que a frase na tela promete.
   const [opts, setOpts] = useState<Set<string>>(new Set((booking.selected_optionals || []).map(o => o.name)));
+  const totalPessoasAqui = hasTiers ? Object.values(tierCounts).reduce((a, b) => a + b, 0) : people;
+  const adultosAqui = hasTiers ? (tierCounts[ADULT] ?? 0) : totalPessoasAqui;
+  const quartoTravado = quartoObrigatorio(trip?.tem_hospedagem, adultosAqui, totalPessoasAqui);
+  /** O que realmente vai ser cobrado: escolha do cliente + o quarto quando obrigatório. */
+  const optsEfetivos = quartoTravado ? new Set([...opts, QUARTO_SINGLE]) : opts;
+
+  // INVARIANTE: enquanto o quarto é obrigatório, ele NÃO pode estar em `opts`.
+  //
+  // `opts` guarda só escolha do cliente; o obrigatório é derivado. Sem isto, o
+  // quarto que o SERVIDOR já tinha posto em `selected_optionals` entrava em
+  // `opts` no primeiro render e nunca mais saía - então acrescentar um adulto
+  // ou tirar a criança deixava o quarto selecionado e cobrando, que é o
+  // defeito. Mantendo `opts` limpo, ele some sozinho quando a regra para de
+  // valer, e volta sozinho quando ela volta.
+  useEffect(() => {
+    if (quartoTravado && opts.has(QUARTO_SINGLE)) {
+      setOpts(prev => {
+        const limpo = new Set(prev);
+        limpo.delete(QUARTO_SINGLE);
+        return limpo;
+      });
+    }
+  }, [quartoTravado, opts]);
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
 
@@ -495,15 +545,31 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     const priceOf = (label: string) =>
       label === ADULT ? (trip.price_per_person ?? 0) : (trip.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person ?? 0);
     const tier_breakdown = hasTiers ? Object.entries(tiers).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty })) : [];
-    const selected_optionals = trip.optionals.filter(o => optNames.has(o.name));
     const total = hasTiers ? Object.values(tiers).reduce((a, b) => a + b, 0) : num;
+    // Adulto = quem NÃO caiu numa faixa com desconto. Mesma definição do
+    // backend, e é o que decide o multiplicador do quarto.
+    const adultosDaSelecao = hasTiers ? (tiers[ADULT] ?? 0) : total;
+
+    // A regra é recalculada a partir dos argumentos, NUNCA do `quartoTravado` de
+    // fora. Aquele reflete o estado ANTIGO no instante desta chamada: ao tirar a
+    // criança ou pôr o segundo adulto, ele ainda valia `true` e o quarto seguia
+    // sendo enviado ao servidor - que cobrava o que recebeu. Aparecia
+    // desmarcado na tela e cobrado no total, e com dois adultos virava DOIS
+    // quartos, porque o quarto multiplica por adulto.
+    const quartoAgora = quartoObrigatorio(trip?.tem_hospedagem, adultosDaSelecao, total);
+    // `optNames` é escolha do cliente e, pela invariante, nunca contém o quarto
+    // enquanto ele é obrigatório. Quando NÃO é, o adulto sozinho pode escolhê-lo
+    // por conta própria - e aí ele entra por este caminho, como qualquer outro.
+    const selected_optionals = trip.optionals.filter(
+      o => optNames.has(o.name) || (quartoAgora && o.name === QUARTO_SINGLE)
+    );
 
     // Atualização otimista: o resumo (valor, opcionais, total) muda na hora,
     // sem esperar o round-trip do PATCH. O servidor reconcilia ao responder.
     const base = hasTiers
       ? tier_breakdown.reduce((s, t) => s + t.qty * priceOf(t.label), 0)
       : total * (trip.price_per_person || 0);
-    const optionals_amount = selected_optionals.reduce((s, o) => s + o.price, 0) * total;
+    const optionals_amount = totalOpcionais(selected_optionals, total, adultosDaSelecao);
     onUpdate({
       ...booking,
       num_travelers: total,
@@ -512,6 +578,20 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       final_amount: base + optionals_amount,
       selected_optionals,
       tier_breakdown: tier_breakdown.map(t => ({ label: t.label, qty: t.qty, price: priceOf(t.label) })),
+      // ZERA as opções de parcelamento, em vez de manter as antigas.
+      //
+      // Quem calcula parcelamento é o servidor, e a resposta ainda não chegou.
+      // Mantendo a lista velha, o Total do cartão (que lê `opt.total`) mostrava
+      // o valor de ANTES dos opcionais - R$ 699,90 numa reserva de R$ 1.939,90 -
+      // enquanto o servidor cobraria o valor certo. Tela e cobrança divergindo,
+      // e com o cliente vendo MENOS do que pagaria.
+      //
+      // Zerada, o Total cai em `final_amount`, que acabou de ser recalculado
+      // aqui e está certo. As parcelas voltam quando o PATCH responde.
+      //
+      // A janela persistia quando a resposta falhava ou era descartada pela
+      // guarda de ordem, e por isso era intermitente e difícil de reproduzir.
+      installment_options: [],
     });
 
     // Pré-login (sem code): edição local, sem servidor - o preço é recalculado
@@ -549,22 +629,39 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     if (!trip) return;
     setEditDate(false);
     const tier_breakdown = hasTiers ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty })) : [];
-    const selected_optionals = trip.optionals.filter(o => opts.has(o.name));
+    const selected_optionals = trip.optionals.filter(o => optsEfetivos.has(o.name));
     const total = hasTiers ? Object.values(tierCounts).reduce((a, b) => a + b, 0) : people;
+    // Mesma definição de adulto do backend: quem não caiu em faixa com desconto.
+    const adultosDaSelecao = hasTiers ? (tierCounts[ADULT] ?? 0) : total;
 
     // Otimista: a data (e o preço, quando não há faixas) muda na hora - sem isso
     // a lista fecha e nada parece acontecer por 1-2s até o PATCH responder.
     const target = dates.find(d => d.id === tid);
     if (target) {
       const newPrice = target.price_per_person ?? trip.price_per_person ?? 0;
-      const optionals_amount = selected_optionals.reduce((s, o) => s + o.price, 0) * total;
+      const optionals_amount = totalOpcionais(selected_optionals, total, adultosDaSelecao);
       const base = hasTiers ? booking.total_amount : total * newPrice;
       onUpdate({
         ...booking,
         trip_id: tid,
         trip_departure_date: target.departure_date,
         trip_return_date: target.return_date ?? null,
-        ...(hasTiers ? {} : { total_amount: base, optionals_amount, final_amount: base + optionals_amount }),
+        // O valor otimista SÓ entra quando não há opcional escolhido.
+        //
+        // Preço de opcional é por data, e o catálogo em memória ainda é o da
+        // data ANTIGA neste instante. Calcular com ele mostraria um número que
+        // o servidor não vai cobrar. Sem opcional não há esse risco: o preço da
+        // viagem vem do `target`, que é a data nova.
+        //
+        // Com opcional, o resumo segura o valor anterior por um instante até o
+        // PATCH responder - preferível a piscar um valor errado.
+        ...(hasTiers || selected_optionals.length > 0
+          ? {}
+          : { total_amount: base, optionals_amount, final_amount: base + optionals_amount }),
+        // Mesma razão do outro update otimista: trocar de data muda o preço, e
+        // manter o parcelamento antigo faria o Total do cartão mostrar o valor
+        // da data anterior. Zerado, ele cai em `final_amount` até o PATCH voltar.
+        installment_options: [],
       });
     }
     // Pré-login (sem code): só a atualização otimista acima.
@@ -661,12 +758,64 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             <p className="text-xs font-semibold text-gray-500 mb-2">Opcionais (por pessoa)</p>
             <div className="space-y-2">
               {trip.optionals.map(o => {
-                const on = opts.has(o.name);
+                // Obrigatório não é opcional: fica marcado, não clicável, e
+                // rotulado como incluído. Antes dava para desmarcar na tela e o
+                // servidor cobrava assim mesmo - tela e cobrança divergiam.
+                const travado = quartoTravado && o.name === QUARTO_SINGLE;
+                const on = travado || opts.has(o.name);
                 return (
-                  <button key={o.name} onClick={() => toggleOpt(o.name)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-colors text-left ${on ? "border-gold-400 bg-gold-50/60" : "border-gray-200 hover:border-gray-300"}`}>
-                    <span className="text-sm text-navy-800">{o.name}</span>
-                    <span className="flex items-center gap-2"><span className="text-sm font-semibold text-navy-700">+ R$ {fmtBRL(o.price)}</span><span className={`w-4 h-4 rounded border flex items-center justify-center ${on ? "bg-gold-500 border-gold-500" : "border-gray-300"}`}>{on && <Check size={11} className="text-white" />}</span></span>
-                  </button>
+                  // O item e a explicação ficam no MESMO bloco. Antes o aviso
+                  // morava no topo da seção, longe do que explicava, e era preciso
+                  // procurar a ligação entre os dois.
+                  // Obrigatório usa o MESMO dourado de selecionado: ele está
+                  // selecionado. Quem diz que não é escolha é a etiqueta
+                  // "incluído" e o botão não clicar - cor nova só repetiria isso
+                  // e acrescentaria vocabulário à tela.
+                  <div key={o.name} className={`rounded-xl border-2 overflow-hidden transition-colors ${
+                    on ? "border-gold-400 bg-gold-50/60" : "border-gray-200 hover:border-gray-300"}`}>
+                    <button disabled={travado}
+                      onClick={() => { if (!travado) toggleOpt(o.name); }}
+                      className="w-full flex items-start gap-3 px-3 py-2.5 text-left disabled:cursor-default">
+                      {/* `min-w-0` deixa o nome longo quebrar dentro da própria
+                          coluna, em vez de empurrar o preço para fora. */}
+                      <span className="flex-1 min-w-0 text-sm text-navy-800 leading-snug">
+                        {o.name}
+                        {/* O que o item inclui. Fica aqui, na hora de ESCOLHER,
+                            e não no detalhamento do total - lá embaixo o cliente
+                            só confere valor, e o nome basta. */}
+                        {o.description && (
+                          <span className="block text-xs text-gray-500 leading-snug mt-0.5 font-normal">
+                            {o.description}
+                          </span>
+                        )}
+                      </span>
+                      {/* `whitespace-nowrap` e `shrink-0`: o preço nunca quebra em
+                          "+ R$" numa linha e "210,00" na outra, que era o efeito
+                          dos nomes compridos. */}
+                      <span className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-sm font-semibold text-navy-700 whitespace-nowrap">
+                          + R$ {fmtBRL(o.price)}
+                        </span>
+                        <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          on ? "bg-gold-500 border-gold-500" : "border-gray-300"}`}>
+                          {on && <Check size={11} className="text-white" />}
+                        </span>
+                      </span>
+                    </button>
+
+                    {/* Uma frase só, em vez de etiqueta + texto dizendo o mesmo em
+                        dois lugares. Ela responde na ordem: o QUE é (obrigatório),
+                        QUANDO (um adulto e criança), POR QUE (quarto não dividido)
+                        e COMO SAIR - esta última como instrução, não como "o valor
+                        sai", que não dizia sai para onde. */}
+                    {travado && (
+                      <p className="px-3 pb-2.5 -mt-0.5 text-[11px] text-gold-800 leading-snug">
+                        <strong className="font-semibold">Obrigatório com apenas um adulto e criança:</strong>{" "}
+                        o quarto não é dividido com outros passageiros.
+                        <span className="text-gray-600"> Inclua um segundo adulto e este valor deixa de ser cobrado.</span>
+                      </p>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -713,7 +862,25 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                   <span className="shrink-0 whitespace-nowrap">{orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * booking.num_travelers)}</s>}R$ {fmtBRL(booking.total_amount)}</span>
                 </div>
               )}
-              {booking.optionals_amount > 0 && <div className="flex justify-between text-gold-700"><span>Opcionais</span><span>+ R$ {fmtBRL(booking.optionals_amount)}</span></div>}
+              {/* Uma linha POR opcional, no mesmo padrão das faixas ("1× Adulto").
+                  A linha única "Opcionais" só mostrava a soma: com transfer por
+                  pessoa e quarto por adulto na mesma conta, era impossível saber
+                  de onde vinha o valor - e o quarto obrigatório desaparecia dentro
+                  do total sem se identificar. */}
+              {(booking.selected_optionals || []).map(o => {
+                const vezes = multiplicadorOpcional(
+                  { name: o.name, price: o.price, por_adulto: o.name === QUARTO_SINGLE },
+                  booking.num_travelers,
+                  adultosAqui,
+                );
+                if (vezes <= 0) return null;
+                return (
+                  <div key={o.name} className="flex justify-between gap-2 text-gold-700">
+                    <span className="min-w-0 truncate">{vezes}× {o.name}</span>
+                    <span className="shrink-0 whitespace-nowrap">+ R$ {fmtBRL(o.price * vezes)}</span>
+                  </div>
+                );
+              })}
               {savings > 0 && <div className="flex justify-between text-emerald-600 font-semibold"><span>Você economiza</span><span>− R$ {fmtBRL(savings)}</span></div>}
             </div>
           );
@@ -1344,11 +1511,23 @@ function PreCheckout() {
     const priceForLabel = (label: string) => label === ADULT ? trip.price_per_person : (trip.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip.price_per_person);
     const tier_breakdown = selTiers.map(t => ({ label: t.label, qty: t.qty, price: priceForLabel(t.label) }));
     const base = hasTiers ? tier_breakdown.reduce((s, t) => s + t.qty * t.price, 0) : people * trip.price_per_person;
-    const optionals_amount = selOptionals.reduce((s, o) => s + o.price * people, 0);
+    const adultosDoResumo = hasTiers
+      ? selTiers.filter(t => t.label === ADULT).reduce((s, t) => s + t.qty, 0)
+      : people;
+    // Mesma regra do checkout e do servidor: um adulto com criança leva o quarto
+    // junto. Sem isto, o resumo desta tela mostraria um total e a reserva nasceria
+    // com outro assim que fosse criada.
+    const quartoAqui = quartoObrigatorio(trip.tem_hospedagem, adultosDoResumo, people);
+    const quartoDoRoteiro = (trip.optionals ?? []).find(o => o.name === QUARTO_SINGLE);
+    const opcionaisEfetivos = quartoAqui && quartoDoRoteiro
+        && !selOptionals.some(o => o.name === QUARTO_SINGLE)
+      ? [...selOptionals, quartoDoRoteiro]
+      : selOptionals;
+    const optionals_amount = totalOpcionais(opcionaisEfetivos, people, adultosDoResumo);
     return {
       booking_code: "", trip_id: trip.id, final_amount: base + optionals_amount, total_amount: base,
       optionals_amount, num_travelers: people, status: "pending",
-      selected_optionals: selOptionals, tier_breakdown,
+      selected_optionals: opcionaisEfetivos, tier_breakdown,
       trip_title: trip.title || undefined, trip_destination: trip.destination || undefined,
       trip_departure_date: trip.departure_date, trip_return_date: trip.return_date,
       trip_image_url: trip.image_url || undefined,

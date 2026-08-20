@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL, salesClosed } from "@/lib/format";
+import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
 interface StoredUser { full_name: string; email: string; is_admin: boolean }
@@ -19,6 +20,9 @@ interface Booking {
   price_per_person: number; final_amount: number; base_amount?: number; status: string; created_at: string;
   traveler_name?: string | null; payment_method?: string | null; installments?: number;
   selected_optionals?: Optional[]; travelers_info?: string | null;
+  /** Necessário para saber quantos pagam valor cheio: é isso que decide o
+   *  multiplicador do quarto (por adulto, não por pessoa). */
+  tier_breakdown?: { label: string; price: number; qty: number }[];
   trip_title?: string; trip_destination?: string; trip_departure_date?: string;
   trip_return_date?: string; trip_departure_at?: string; trip_return_at?: string; trip_image_url?: string;
   trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
@@ -186,7 +190,25 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
         {/* Extras comprados */}
         {opts.length > 0 && (
           <VBlock icon={<Sparkles size={13} className="text-gold-500" />} title="Extras comprados">
-            <ul className="space-y-1">{opts.map((o, i) => <li key={i} className="flex items-start justify-between gap-3 text-sm"><span className="text-gray-600 min-w-0">{o.name}</span><span className="text-gray-400 shrink-0 whitespace-nowrap">R$ {fmtBRL(o.price * b.num_travelers)}</span></li>)}</ul>
+            <ul className="space-y-1">{opts.map((o, i) => {
+              // O quarto multiplica por ADULTO; o resto, por pessoa. Fixar em
+              // `num_travelers` mostrava o dobro numa reserva de 1 adulto + 1
+              // criança - e o cliente via na própria reserva um valor que não
+              // fecha com o que pagou.
+              const adultos = b.tier_breakdown?.length
+                ? b.tier_breakdown.filter(t => t.price >= (b.price_per_person ?? 0)).reduce((s, t) => s + t.qty, 0)
+                : b.num_travelers;
+              const vezes = multiplicadorOpcional(
+                { name: o.name, price: o.price, por_adulto: o.name === QUARTO_SINGLE },
+                b.num_travelers, adultos,
+              );
+              return (
+                <li key={i} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-gray-600 min-w-0">{vezes}× {o.name}</span>
+                  <span className="text-gray-400 shrink-0 whitespace-nowrap">R$ {fmtBRL(o.price * vezes)}</span>
+                </li>
+              );
+            })}</ul>
           </VBlock>
         )}
 

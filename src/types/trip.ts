@@ -22,10 +22,14 @@ export interface Trip {
   min_group_size: number;
   includes: string[];
   excludes: string[];
-  optionals: { name: string; price: number }[];
+  /** `description`: o que o item inclui. Existe para o NOME poder ser curto. */
+  optionals: { name: string; price: number; description?: string }[];
   itinerary: { day?: number; title: string; description?: string; items?: string[] }[];
   departure_locations: string[];
   required_documents: string | null;
+  /** Viagem com hotel. Declarado no roteiro: não dá para deduzir das datas,
+   *  porque existe bate-volta que sai à noite e volta no dia seguinte. */
+  tem_hospedagem?: boolean;
   whatsapp_only?: boolean;
   quote_only?: boolean;
   slug?: string | null;

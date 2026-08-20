@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
+import { totalOpcionais, quartoObrigatorio, multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { fmtBRL, fmtInstallment, spotsLabel, isUnlimitedSpots, salesClosed, temVaga, poucasVagas, mesmoDia, marcadoBateVolta } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
@@ -92,6 +93,9 @@ function buildWhatsAppMessage(
   note: string, bookingCode: string,
   optionals: { name: string; price: number }[],
   baseTotal?: number, tierSummary?: { label: string; qty: number; price: number }[],
+  /** Quantos pagam valor cheio. Decide o multiplicador do quarto; sem isso a
+   *  mensagem levaria o dobro numa reserva de 1 adulto + 1 criança. */
+  adultos: number = people,
 ) {
   const fmt = (d: string) => { if (!d) return "-"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; };
   // Total da passagem: por faixa (se houver) ou preço único
@@ -121,8 +125,14 @@ function buildWhatsAppMessage(
   msg += `*Passagem:* R$ ${fmtBRL(passagem)}`;
   if (optionals.length > 0) {
     msg += `\n*Opcionais selecionados:*`;
-    optionals.forEach(o => { msg += `\n   - ${o.name}: R$ ${fmtBRL(o.price * people)} (${people}x R$ ${fmtBRL(o.price)})`; });
-    msg += `\n*Total com opcionais:* R$ ${fmtBRL(passagem + optsTotal * people)}`;
+    // Mesma regra do preço: o quarto é por adulto, o resto por pessoa. A
+    // mensagem vai para a equipe fechar a venda, então o valor tem que bater
+    // com o que o cliente viu na tela.
+    optionals.forEach(o => {
+      const vezes = multiplicadorOpcional({ name: o.name, price: o.price, por_adulto: o.name === QUARTO_SINGLE }, people, adultos);
+      msg += `\n   - ${o.name}: R$ ${fmtBRL(o.price * vezes)} (${vezes}x R$ ${fmtBRL(o.price)})`;
+    });
+    msg += `\n*Total com opcionais:* R$ ${fmtBRL(passagem + totalOpcionais(optionals, people, adultos))}`;
   }
   if (note) msg += `\n\nObservacao: ${note}`;
   return msg;
@@ -721,7 +731,29 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
   const baseTotal = hasTiers
     ? travelerCats.reduce((s, label) => s + priceForLabel(label), 0)
     : people * trip.price_per_person;
-  const optionalsTotal = selectedOptionals.reduce((s, o) => s + o.price * people, 0);
+  // Adulto = quem NÃO caiu numa faixa com desconto (mesma definição do backend).
+  const adultos = hasTiers ? travelerCats.filter(l => l === ADULT).length : people;
+
+  // Um adulto com criança não divide quarto com desconhecido: o single entra
+  // sozinho e não sai. O servidor faz o mesmo e é ele quem manda; isto existe
+  // para o cliente VER o valor certo antes de enviar, e entender por quê.
+  const quartoTravado = quartoObrigatorio(trip.tem_hospedagem, adultos, people);
+  const quartoDoRoteiro = (trip.optionals ?? []).find(o => o.name === QUARTO_SINGLE);
+  const opcionaisEfetivos = quartoTravado && quartoDoRoteiro
+      && !selectedOptionals.some(o => o.name === QUARTO_SINGLE)
+    ? [...selectedOptionals, quartoDoRoteiro]
+    : selectedOptionals;
+
+  // Mesma invariante do checkout: enquanto o quarto é obrigatório ele NÃO fica
+  // na escolha do cliente, só é derivado. Assim ele some ao entrar o segundo
+  // adulto ou ao sair a criança, e volta sozinho quando a regra volta a valer.
+  useEffect(() => {
+    if (quartoTravado && selectedOptionals.some(o => o.name === QUARTO_SINGLE)) {
+      setSelectedOptionals(prev => prev.filter(o => o.name !== QUARTO_SINGLE));
+    }
+  }, [quartoTravado, selectedOptionals]);
+
+  const optionalsTotal = totalOpcionais(opcionaisEfetivos, people, adultos);
   const grandTotal = baseTotal + optionalsTotal;
 
   const errorRef = useRef<HTMLDivElement>(null);
@@ -790,7 +822,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
     num_travelers: people,
     companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })),
     notes: note || undefined,
-    selected_optionals: selectedOptionals,
+    selected_optionals: opcionaisEfetivos,
     tier_breakdown: hasTiers
       ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
       : [],
@@ -845,7 +877,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       const bookingRes = await fetch(`${API}/bookings/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined, selected_optionals: selectedOptionals, tier_breakdown: tierBreakdown }),
+        body: JSON.stringify({ trip_id: trip.id, num_travelers: people, companions: companions.map(c => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date })), notes: note || undefined, selected_optionals: opcionaisEfetivos, tier_breakdown: tierBreakdown }),
       });
       if (!bookingRes.ok) {
         const err = await bookingRes.json();
@@ -856,7 +888,7 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
       const tierSummary = hasTiers
         ? Object.entries(tierCounts).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty, price: priceForLabel(label) }))
         : undefined;
-      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, selectedOptionals, hasTiers ? baseTotal : undefined, tierSummary);
+      const msg = buildWhatsAppMessage(trip, { ...user, full_name: fullName }, phone, cpf, birthDate, people, companions, note, booking.booking_code, opcionaisEfetivos, hasTiers ? baseTotal : undefined, tierSummary, adultos);
       const waUrl = `https://wa.me/5541998348766?text=${encodeURIComponent(msg)}`;
       onClose();
       // Redireciona para o WhatsApp direto na mesma aba - evita bloqueio de popup após async
@@ -931,28 +963,58 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
               </p>
               <div className="space-y-2">
                 {trip.optionals.map((opt, i) => {
-                  const isSelected = selectedOptionals.some(o => o.name === opt.name);
+                  const travado = quartoTravado && opt.name === QUARTO_SINGLE;
+                  const isSelected = travado || selectedOptionals.some(o => o.name === opt.name);
                   return (
-                    <button key={i} type="button"
-                      onClick={() => setSelectedOptionals(prev =>
-                        isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
-                      )}
-                      className={`w-full flex items-center gap-3 rounded-xl border-2 px-3 py-3 transition-[color,background-color,border-color,box-shadow,transform,opacity] text-left active:scale-[0.98] ${
-                        isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300"
-                      }`}
-                    >
-                      <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
-                      }`}>
-                        {isSelected && <Check size={11} className="text-white" />}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
-                        <span className={`inline-flex items-center mt-1 text-xs font-black px-2 py-0.5 rounded-full ${isSelected ? "bg-amber-200 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
-                          + R$ {fmtBRL(opt.price)}/pessoa
+                    // Item e explicação no MESMO bloco: o aviso morava no topo da
+                    // seção, longe do que explicava, e era preciso procurar a
+                    // ligação entre os dois.
+                    <div key={i} className={`rounded-xl border-2 overflow-hidden transition-[color,background-color,border-color] ${
+                      isSelected ? "border-amber-400 bg-amber-50" : "border-gray-200 hover:border-amber-300"
+                    }`}>
+                      <button type="button" disabled={travado}
+                        onClick={() => { if (travado) return; setSelectedOptionals(prev =>
+                          isSelected ? prev.filter(o => o.name !== opt.name) : [...prev, opt]
+                        ); }}
+                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-transform active:scale-[0.98] disabled:active:scale-100 disabled:cursor-default"
+                      >
+                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
+                        }`}>
+                          {isSelected && <Check size={11} className="text-white" />}
                         </span>
-                      </span>
-                    </button>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-gray-700 leading-tight">
+                            {opt.name}
+                          </span>
+                          {/* A descrição fica AQUI, onde há espaço, e não dentro do
+                              nome. Antes o que o item inclui vinha no próprio nome,
+                              com até 106 caracteres, e ocupava 4 linhas no resumo
+                              apertado do checkout. */}
+                          {opt.description && (
+                            <span className="block text-xs text-gray-500 leading-snug mt-0.5">
+                              {opt.description}
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center mt-1 text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap ${
+                            isSelected ? "bg-amber-200 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+                            + R$ {fmtBRL(opt.price)}{travado ? "" : "/pessoa"}
+                          </span>
+                        </span>
+                      </button>
+
+                      {/* Uma frase só, em vez de etiqueta + texto dizendo o mesmo em
+                          dois lugares. Responde na ordem: o QUE é, QUANDO, POR QUE
+                          e COMO SAIR - a última como instrução, não como "o valor
+                          sai", que não dizia sai para onde. */}
+                      {travado && (
+                        <p className="px-3 pb-2.5 -mt-1 text-[11px] text-amber-800 leading-snug">
+                          <strong className="font-semibold">Obrigatório com apenas um adulto e criança:</strong>{" "}
+                          o quarto não é dividido com outros passageiros.
+                          <span className="text-gray-600"> Inclua um segundo adulto e este valor deixa de ser cobrado.</span>
+                        </p>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -1065,12 +1127,20 @@ function BookingModal({ trip, user, onClose, selectedOptionals: initialOptionals
                 <span className="font-bold text-navy-700 text-sm">R$ {fmtBRL(people * trip.price_per_person)}</span>
               </div>
             )}
-            {selectedOptionals.map((opt) => (
-              <div key={opt.name} className="flex items-center justify-between text-amber-700">
-                <span className="text-xs font-medium">{people} × {opt.name}</span>
-                <span className="text-xs font-bold">+ R$ {fmtBRL(opt.price * people)}</span>
-              </div>
-            ))}
+            {opcionaisEfetivos.map((opt) => {
+              // O quarto multiplica por ADULTO; o resto, por pessoa. Fixar em
+              // `people` mostrava o dobro numa reserva de 1 adulto + 1 criança.
+              const vezes = multiplicadorOpcional(
+                { name: opt.name, price: opt.price, por_adulto: opt.name === QUARTO_SINGLE },
+                people, adultos,
+              );
+              return (
+                <div key={opt.name} className="flex items-center justify-between text-amber-700">
+                  <span className="text-xs font-medium">{vezes} × {opt.name}</span>
+                  <span className="text-xs font-bold">+ R$ {fmtBRL(opt.price * vezes)}</span>
+                </div>
+              );
+            })}
             <div className="flex items-center justify-between pt-1 border-t border-navy-200">
               <span className="text-sm text-navy-700 font-semibold">Total</span>
               <span className="font-black text-navy-800 text-lg">R$ {fmtBRL(grandTotal)}</span>
@@ -2107,6 +2177,10 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           </span>
                           <span className="flex-1 min-w-0">
                             <span className="block text-sm font-medium text-gray-700 leading-tight">{opt.name}</span>
+                            {/* Descrição aqui, onde há espaço - o nome fica curto. */}
+                            {opt.description && (
+                              <span className="block text-xs text-gray-500 leading-snug mt-0.5">{opt.description}</span>
+                            )}
                             <span className={`inline-flex items-center mt-1 text-xs font-black px-2 py-0.5 rounded-full ${isSelected ? "bg-amber-200 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
                               + R$ {fmtBRL(opt.price)}/pessoa
                             </span>

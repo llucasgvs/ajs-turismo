@@ -7,6 +7,10 @@ import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check, Copy 
 import { apiFetch, getToken } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 
+/** Espelha QUARTO_SINGLE em app/core/opcionais.py. O backend reconhece o
+ *  opcional por este nome; mudar aqui sem mudar lá quebra a regra. */
+const QUARTO_SINGLE = "Quarto single - De solteiro";
+
 interface ItinerarySection {
   title: string;
   items: string[];
@@ -42,7 +46,14 @@ interface TemplateFormData {
   image_url: string;
   includes: string[];
   excludes: string[];
-  optionals: { name: string; price: string }[];
+  /** `por_adulto`: cobra uma vez por adulto (quarto), em vez de por pessoa. */
+  /** `description`: o que o item inclui. Existe para o NOME poder ser curto -
+   *  havia opcional com 106 caracteres, que era descrição disfarçada de nome
+   *  e ocupava 4 linhas no resumo do checkout. */
+  optionals: { name: string; price: string; description?: string; por_adulto?: boolean }[];
+  tem_hospedagem: boolean;
+  /** Preço do quarto single. Só usado quando `tem_hospedagem`. */
+  quarto_single: string;
   itinerary: ItinerarySection[];
   departure_locations: string[];
   gallery: string[];
@@ -96,6 +107,7 @@ const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
   short_description: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
+  tem_hospedagem: false, quarto_single: "",
   is_featured: false, is_active: true, whatsapp_only: false, allow_pix: false, quote_only: false, parent_id: null,
   is_open_date: false, open_date_price: "", open_date_max_installments: "12", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
@@ -117,7 +129,16 @@ export default function TemplateForm({
     optionals: (initialData?.optionals ?? []).map((o) => ({
       name: String(o.name ?? ""),
       price: String((o as { name: string; price: number | string }).price ?? ""),
+      description: String((o as { description?: string }).description ?? ""),
+      por_adulto: !!(o as { por_adulto?: boolean }).por_adulto,
     })),
+    tem_hospedagem: !!(initialData as { tem_hospedagem?: boolean } | undefined)?.tem_hospedagem,
+    // O preço do quarto vive dentro de `optionals`; o campo da tela é só a
+    // porta de entrada dele.
+    quarto_single: String(
+      ((initialData?.optionals ?? []) as unknown as { name?: string; price?: number }[])
+        .find((o) => String(o.name ?? "").trim().toLowerCase() === QUARTO_SINGLE.toLowerCase())?.price ?? ""
+    ),
     // normaliza itinerário: suporta formato antigo {day,title,description} e novo {title,items}
     itinerary: normalizeItinerary((initialData?.itinerary as unknown[]) ?? []),
     departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
@@ -232,9 +253,18 @@ export default function TemplateForm({
         { method: templateId ? "PUT" : "POST", body: JSON.stringify({
           ...form,
           // converte price de string para number antes de enviar
-          optionals: form.optionals
-            .filter(o => o.name.trim())
-            .map(o => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
+          tem_hospedagem: form.tem_hospedagem,
+          // O quarto single não é digitado na lista de opcionais: ele entra aqui,
+          // a partir do campo próprio, já com a marca que o faz ser cobrado por
+          // adulto. Assim o dono responde uma pergunta e não precisa saber da
+          // mecânica.
+          optionals: (() => {
+            const base = form.optionals
+              .filter(o => o.name.trim() && o.name.trim().toLowerCase() !== QUARTO_SINGLE.toLowerCase())
+              .map(o => ({ name: o.name.trim(), price: parseFloat(o.price) || 0, description: (o.description ?? '').trim() || undefined, por_adulto: !!o.por_adulto }));
+            if (!form.tem_hospedagem) return base;
+            return [...base, { name: QUARTO_SINGLE, price: parseFloat(form.quarto_single) || 0, por_adulto: true }];
+          })(),
           // converte open_date campos de string para number
           open_date_price: form.open_date_price ? parseFloat(form.open_date_price) : null,
           open_date_max_installments: Math.max(1, Math.min(parseInt(form.open_date_max_installments) || 12, 12)),
@@ -589,22 +619,32 @@ export default function TemplateForm({
             })()}
           </Section>
 
-          <Section title="Opcionais (cliente escolhe)" action={parent && <PullBtn onClick={() => set("optionals", ((parent.optionals as { name: string; price: number | string }[]) ?? []).map(o => ({ name: String(o.name ?? ""), price: String(o.price ?? "") })))} />}>
+          <Section title="Opcionais (cliente escolhe)" action={parent && <PullBtn onClick={() => set("optionals", ((parent.optionals as { name: string; price: number | string; por_adulto?: boolean }[]) ?? []).map(o => ({ name: String(o.name ?? ""), price: String(o.price ?? ""), por_adulto: !!o.por_adulto })))} />}>
             <p className="text-xs text-gray-400 mb-3">
               O cliente poderá selecionar esses itens ao fazer a reserva. O valor é por pessoa.
             </p>
             <div className="space-y-2">
               {form.optionals.map((opt, i) => (
-                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                  <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full flex-shrink-0">
-                    R$ {parseFloat(opt.price || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </span>
-                  <p className="flex-1 text-sm text-gray-700 truncate">{opt.name}</p>
-                  <button type="button"
-                    onClick={() => setForm(f => ({ ...f, optionals: f.optionals.filter((_, j) => j !== i) }))}
-                    className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
-                    <X size={14} />
-                  </button>
+                <div key={i} className="bg-gray-50 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                      R$ {parseFloat(opt.price || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                    <p className="flex-1 text-sm text-gray-700 truncate">{opt.name}</p>
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, optionals: f.optionals.filter((_, j) => j !== i) }))}
+                      className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {/* A descrição existe para o NOME poder ser curto. Sem ela, o que
+                      o item inclui acabava dentro do próprio nome, e um deles tinha
+                      106 caracteres - ocupava 4 linhas no resumo do checkout. */}
+                  <input
+                    className="mt-1.5 w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-600 focus:ring-2 focus:ring-navy-200 focus:border-navy-300 outline-none"
+                    value={opt.description ?? ""}
+                    onChange={e => setForm(f => ({ ...f, optionals: f.optionals.map((o, j) => j === i ? { ...o, description: e.target.value } : o) }))}
+                    placeholder="O que inclui (opcional). Ex: Bar de Gelo, Museu de cera, Show de motos" />
                 </div>
               ))}
               <div className="flex gap-2 pt-1">
@@ -675,6 +715,32 @@ export default function TemplateForm({
         <div className="space-y-6">
           <Section title="Reserva e pagamento">
             <div className="space-y-4">
+              {/* Uma pergunta com significado óbvio, em vez de uma marca técnica
+                  em cada opcional. Marcando, o quarto single vira obrigatório e o
+                  sistema cuida do resto: ele entra nos opcionais, é cobrado por
+                  adulto (criança divide o quarto dos pais) e vale para a regra de
+                  quem viaja só com criança. */}
+              <Toggle label="Tem hospedagem" description="Viagem com hotel. Não dá para deduzir das datas: existe bate-volta que sai à noite e volta no dia seguinte. Marcando, informe o valor do quarto single."
+                checked={form.tem_hospedagem} onChange={(v) => set("tem_hospedagem", v)} />
+              {form.tem_hospedagem && (
+                <div className="pl-1">
+                  <label className="block text-sm font-medium text-navy-700 mb-1">
+                    Quarto single - De solteiro <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Cobrado uma vez por adulto, não por criança. O cliente pode escolher,
+                    e passa a ser automático quando um adulto viaja só com criança.
+                  </p>
+                  <div className="relative w-40">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                    <input type="number" min="0" step="0.01" inputMode="decimal"
+                      value={form.quarto_single}
+                      onChange={(e) => set("quarto_single", e.target.value)}
+                      className="input-field w-full pl-9 py-2 text-sm" />
+                  </div>
+                </div>
+              )}
+
               <Toggle label="Reserva só pelo WhatsApp" description="Desliga o pagamento online (PIX/cartão) deste roteiro. O cliente conclui a reserva pelo WhatsApp com a equipe."
                 checked={form.whatsapp_only || form.quote_only} onChange={(v) => set("whatsapp_only", v)} disabled={form.quote_only} />
               {form.whatsapp_only && !form.quote_only && (
