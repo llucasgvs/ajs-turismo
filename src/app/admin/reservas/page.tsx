@@ -872,10 +872,23 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
         {/* Actions */}
         {canAct && (
           <div className="p-4 border-t border-gray-100 flex gap-2">
-            {["interesse", "pending"].includes(booking.status) && (
+            {/* Confirmar interesse é do dia a dia: continua sendo a ação
+                principal, sólida e ocupando espaço. */}
+            {booking.status === "interesse" && (
               <button onClick={() => { onConfirm(booking.booking_code); onClose(); }} disabled={isLoading}
                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 text-sm">
-                <Check size={14} /> {booking.status === "pending" ? "Marcar paga" : "Confirmar"}
+                <Check size={14} /> Confirmar
+              </button>
+            )}
+            {/* Marcar paga é raro - só quando o cliente não conseguiu pagar no
+                site. Discreto e do mesmo tamanho dos secundários, para não
+                competir com o resto nem convidar a clique distraído. */}
+            {booking.status === "pending" && (
+              <button onClick={() => { onConfirm(booking.booking_code); onClose(); }} disabled={isLoading}
+                title="Marcar como paga (recebida por fora do site)"
+                className="flex items-center justify-center gap-1.5 border border-emerald-300 text-emerald-600 hover:bg-emerald-50 font-bold py-3 px-3 sm:px-4 rounded-xl transition-colors disabled:opacity-50 text-sm whitespace-nowrap">
+                <Check size={14} />
+                <span className="hidden sm:inline">Marcar paga</span>
               </button>
             )}
             <button onClick={() => { onEdit(booking); onClose(); }} disabled={isLoading}
@@ -1229,11 +1242,14 @@ function MarcarPagoModal({ booking, trip, onClose, onConfirm, loading }: {
   booking: Booking;
   trip: Trip | undefined;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (paymentMethod: string) => void;
   loading: boolean;
 }) {
   useFecharComEsc(true, onClose);
   const travelerName = booking.traveler_name || `Usuário #${booking.user_id}`;
+  // Transferência é o padrão porque é o caso que trouxe esta tela: cliente que
+  // não conseguiu pagar no site e pagou por link de outro banco.
+  const [pagamento, setPagamento] = useState(booking.payment_method || "transfer");
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -1260,6 +1276,15 @@ function MarcarPagoModal({ booking, trip, onClose, onConfirm, loading }: {
             </p>
           </div>
 
+          <div>
+            <label className="block text-xs font-bold text-navy-700 mb-1.5">Como o pagamento foi recebido?</label>
+            <select value={pagamento} onChange={(e) => setPagamento(e.target.value)} disabled={loading}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-navy-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:opacity-60">
+              {Object.entries(PAYMENT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <p className="text-[11px] text-gray-400 mt-1.5">Fica gravado na reserva junto com a confirmação.</p>
+          </div>
+
           <div className="bg-gold-50 border border-gold-200 rounded-xl p-3.5">
             <p className="text-xs text-navy-700 leading-relaxed">
               Use apenas se o dinheiro <strong>já foi recebido por fora do site</strong> (link de
@@ -1270,12 +1295,12 @@ function MarcarPagoModal({ booking, trip, onClose, onConfirm, loading }: {
           </div>
 
           <div className="flex gap-2 pt-1">
-            <button onClick={onClose}
-              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+            <button onClick={onClose} disabled={loading}
+              className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60 text-sm">
               Voltar
             </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+            <button onClick={() => onConfirm(pagamento)} disabled={loading}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
               {loading ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
               Marcar paga
             </button>
@@ -1886,12 +1911,13 @@ export default function AdminReservasPage() {
   // Fecha a venda sem ajuste de preço. Serve para o interesse e para a reserva
   // que ficou em aguardando pagamento e foi paga por fora do site.
   // Devolve se deu certo: o modal de "marcar como pago" só fecha no sucesso.
-  const confirm = async (code: string): Promise<boolean> => {
+  const confirm = async (code: string, paymentMethod?: string): Promise<boolean> => {
     setActionLoading(code);
     try {
       const res = await apiFetch(`/bookings/${code}/confirm`, {
         method: "POST",
-        body: JSON.stringify({}),
+        // Sem forma de pagamento a API preserva a que já estava gravada.
+        body: JSON.stringify(paymentMethod ? { payment_method: paymentMethod } : {}),
       });
       // A API recusa por motivo real (vaga que acabou, reserva já cancelada
       // pela expiração de 48h). Engolir isso deixava o admin achando que
@@ -1940,11 +1966,11 @@ export default function AdminReservasPage() {
     else confirm(booking.booking_code);
   };
 
-  const executeMarcarPago = async () => {
+  const executeMarcarPago = async (paymentMethod: string) => {
     if (!pagoTarget) return;
     // Fecha só no sucesso: se a API recusar, o admin lê o motivo e o modal
     // continua ali com o contexto na tela.
-    if (await confirm(pagoTarget.booking_code)) setPagoTarget(null);
+    if (await confirm(pagoTarget.booking_code, paymentMethod)) setPagoTarget(null);
   };
 
   const executeCancel = async () => {
@@ -2003,11 +2029,13 @@ export default function AdminReservasPage() {
     const sizing = compact ? "w-[30px] h-[30px] justify-center shrink-0" : "px-2.5 py-1.5";
     return (
       <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
-        {["interesse", "pending"].includes(b.status) && (
-          <button onClick={() => pedirConfirmacao(b)} disabled={isLoading}
-            title={b.status === "pending" ? "Marcar como paga (recebida por fora do site)" : "Confirmar"}
+        {/* Fechar venda de reserva em aguardando pagamento mora SÓ no modal de
+            detalhe: na lista, ao lado dos outros ícones, é fácil clicar na
+            linha errada e baixar vaga de quem não pagou. */}
+        {b.status === "interesse" && (
+          <button onClick={() => confirm(b.booking_code)} disabled={isLoading} title="Confirmar"
             className={`flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
-            <Check size={13} />{!compact && (b.status === "pending" ? " Marcar paga" : " Confirmar")}
+            <Check size={13} />{!compact && " Confirmar"}
           </button>
         )}
         {actionable && (
