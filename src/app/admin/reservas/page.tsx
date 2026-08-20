@@ -487,6 +487,7 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [cienteFechada, setCienteFechada] = useState(false);
   const motivoOk = motivo.trim().length >= 3;
 
   const pago = Number(booking.final_amount) || 0;
@@ -497,12 +498,15 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
     .filter((t) => t.id !== booking.trip_id)
     .filter((t) => booking.trip_template_id == null || t.template_id === booking.trip_template_id)
     // Espelha as travas do servidor, para o seletor não oferecer o que vai ser
-    // recusado: só data ativa (oculta, esgotada, concluída e cancelada ficam de
-    // fora), ainda por vir e com lugar suficiente.
-    .filter((t) => t.is_active !== false && (t.status ?? "active") === "active")
+    // recusado: oculta, esgotada e cancelada ficam de fora sempre. `completed`
+    // entra porque junta duas coisas: viagem que já aconteceu (barrada logo
+    // abaixo pela data) e data que só fechou para venda por estar dentro do
+    // prazo - essa ainda sai, e o admin pode mover reserva para lá.
+    .filter((t) => t.is_active !== false && ["active", "completed"].includes(t.status ?? "active"))
     .filter((t) => !t.departure_date || new Date(t.departure_date).getTime() > agora)
     .filter((t) => (t.available_spots ?? 0) >= poltronas);
   const alvo = opcoes.find((t) => String(t.id) === escolhida);
+  const alvoFechado = !!alvo && (alvo.status ?? "active") === "completed";
 
   // Comparação só para AVISAR. A conta oficial é a do servidor, e ela usa as
   // faixas de idade da data nova; aqui o preço por pessoa já cobre o caso comum.
@@ -513,11 +517,18 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   const trocar = async () => {
     if (!alvo) { setErro("Escolha a nova data."); return; }
     if (!motivoOk) { setErro("Escreva o motivo da troca."); return; }
+    if (alvoFechado && !cienteFechada) { setErro("Confirme que entendeu que esta data já está fechada."); return; }
     setSalvando(true); setErro("");
     try {
       const res = await apiFetch(`/bookings/${booking.booking_code}/trocar-data`, {
         method: "POST",
-        body: JSON.stringify({ trip_id: alvo.id, motivo: motivo.trim() }),
+        body: JSON.stringify({
+          trip_id: alvo.id,
+          motivo: motivo.trim(),
+          // Só vai marcado quando a data escolhida está mesmo fechada: o
+          // servidor exige a marca, e mandar sempre esvaziaria a trava.
+          ...(alvoFechado ? { permitir_data_fechada: true } : {}),
+        }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -553,22 +564,48 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">Nova data</label>
-            <select value={escolhida} onChange={(e) => setEscolhida(e.target.value)}
+            {/* Trocar de data zera a confirmação: marcar para uma saída e
+                mudar para outra não pode carregar o consentimento junto. */}
+            <select value={escolhida} onChange={(e) => { setEscolhida(e.target.value); setCienteFechada(false); }}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-400">
               <option value="">Selecione...</option>
               {opcoes.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.departure_date ? fmtDataHoraViagem(t.departure_date) : "sem data"} · R$ {fmtBRL(t.price_per_person)} · {spotsLabel(t.available_spots)}
+                  {(t.status ?? "active") === "completed" ? " · FECHADA para vendas" : ""}
                 </option>
               ))}
             </select>
             {opcoes.length === 0 && (
               <p className="text-xs text-amber-600 mt-1.5">
-                Nenhuma outra data disponível neste roteiro. A lista mostra só datas ativas, ainda
-                por vir e com {plural(poltronas, "lugar livre", "lugares livres")}.
+                Nenhuma outra data disponível neste roteiro. A lista mostra só datas ainda por vir
+                e com {plural(poltronas, "lugar livre", "lugares livres")}.
               </p>
             )}
           </div>
+
+          {alvoFechado && (
+            <div className="rounded-xl border border-gold-300 bg-gold-50 px-3.5 py-3">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-gold-800 uppercase tracking-wide">
+                <AlertTriangle size={12} /> Data fechada para vendas
+              </p>
+              <p className="text-sm text-navy-800 mt-1.5">
+                Esta saída já entrou no prazo de encerramento, então o site não vende mais para
+                ela. A viagem acontece normalmente e tem{" "}
+                <span className="font-bold">{spotsLabel(alvo!.available_spots)}</span> — mover a
+                reserva para cá é seguro, mas confirme com a operação que dá tempo de incluir
+                {" "}{plural(booking.num_travelers, "a pessoa", "as pessoas")} na lista de embarque.
+              </p>
+              <label className="flex items-start gap-2 mt-3 cursor-pointer">
+                <input type="checkbox" checked={cienteFechada} disabled={salvando}
+                  onChange={(e) => setCienteFechada(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gold-400 text-gold-600 focus:ring-gold-400" />
+                <span className="text-xs text-navy-700 font-semibold">
+                  Entendi que esta data já está fechada e quero mover mesmo assim.
+                </span>
+              </label>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">
@@ -622,7 +659,7 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
             className="flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
             Voltar
           </button>
-          <button onClick={trocar} disabled={salvando || !alvo || !motivoOk}
+          <button onClick={trocar} disabled={salvando || !alvo || !motivoOk || (alvoFechado && !cienteFechada)}
             className="flex-1 flex items-center justify-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
             {salvando ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Trocar data
           </button>
