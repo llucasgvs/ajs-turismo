@@ -1036,6 +1036,17 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Preço em texto: o campo aceita digitação parcial ("267," ) sem virar 0.
+  const [opcionais, setOpcionais] = useState<{ name: string; price: string }[]>(
+    (booking.selected_optionals ?? []).map((o) => ({ name: o.name, price: String(o.price ?? "") })),
+  );
+
+  const addOpcional = (name = "") =>
+    setOpcionais((prev) => [...prev, { name, price: "" }]);
+  const updateOpcional = (i: number, campo: "name" | "price", valor: string) =>
+    setOpcionais((prev) => prev.map((o, idx) => (idx === i ? { ...o, [campo]: valor } : o)));
+  const removeOpcional = (i: number) =>
+    setOpcionais((prev) => prev.filter((_, idx) => idx !== i));
 
   const changePeople = (n: number) => {
     const clamped = Math.max(1, n);
@@ -1053,8 +1064,33 @@ function EditBookingModal({ booking, onClose, onSaved }: {
 
   const priceNum = parseFloat(price) || 0;
   const discNum = parseFloat(discount) || 0;
-  const total = priceNum * people - discNum;
-  const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0) || people !== booking.num_travelers;
+
+  // Reserva com faixas de idade tem o total vindo DAS FAIXAS, não do preço
+  // único: é assim que o servidor calcula. Enquanto isto era ignorado aqui, o
+  // campo de preço aceitava um valor novo, não mudava nada e ainda guardava a
+  // divergência em silêncio.
+  const temFaixas = !!booking.tier_breakdown?.length;
+  const baseTotal = temFaixas
+    ? booking.tier_breakdown!.reduce((s, t) => s + (Number(t.price) || 0) * (Number(t.qty) || 0), 0)
+    : priceNum * people;
+  // Adulto = faixa que paga o valor cheio. Mesma definição do servidor.
+  const adultosEdit = temFaixas
+    ? booking.tier_breakdown!.reduce((s, t) => s + ((Number(t.price) || 0) >= priceNum ? Number(t.qty) || 0 : 0), 0)
+    : people;
+  const opcionaisTotal = opcionais.reduce(
+    (s, o) => s + (parseFloat(o.price) || 0) * (o.name === QUARTO_SINGLE ? adultosEdit : people),
+    0,
+  );
+  const total = baseTotal + opcionaisTotal - discNum;
+
+  const opcionaisOriginais = JSON.stringify(
+    (booking.selected_optionals ?? []).map((o) => ({ name: o.name, price: Number(o.price) || 0 })),
+  );
+  const opcionaisAgora = JSON.stringify(
+    opcionais.map((o) => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
+  );
+  const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0)
+    || people !== booking.num_travelers || opcionaisAgora !== opcionaisOriginais;
 
   const PAYMENT_LABEL: Record<string, string> = {
     whatsapp: "Presencial / WhatsApp", pix: "PIX", transfer: "Transferência", credit_card: "Cartão de crédito",
@@ -1067,8 +1103,14 @@ function EditBookingModal({ booking, onClose, onSaved }: {
       const res = await apiFetch(`/bookings/${booking.booking_code}/edit`, {
         method: "PATCH",
         body: JSON.stringify({
-          price_per_person: priceNum !== booking.price_per_person ? priceNum : undefined,
+          // Com faixas o preço único não entra na conta, e o campo está
+          // desabilitado: não mandar evita gravar divergência à toa.
+          price_per_person: !temFaixas && priceNum !== booking.price_per_person ? priceNum : undefined,
           discount_amount: discNum,
+          // Linha em branco não vira opcional de R$ 0 na reserva.
+          selected_optionals: opcionais
+            .filter((o) => o.name.trim().length >= 2)
+            .map((o) => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
           payment_method: paymentMethod,
           notes: notes || null,
           traveler_phone: phone || undefined,
@@ -1107,9 +1149,16 @@ function EditBookingModal({ booking, onClose, onSaved }: {
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
                 <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${priceNum !== booking.price_per_person ? "border-amber-300 bg-amber-50" : "border-gray-200"}`} />
+                  disabled={temFaixas}
+                  title={temFaixas ? "Reserva com faixas de idade: o valor vem das faixas" : undefined}
+                  className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${!temFaixas && priceNum !== booking.price_per_person ? "border-amber-300 bg-amber-50" : "border-gray-200"}`} />
               </div>
-              {priceNum !== booking.price_per_person && <p className="text-[10px] text-amber-600 mt-1">Original: R$ {fmtBRL(booking.price_per_person)}</p>}
+              {/* O campo aceitava valor novo e não mudava nada, porque com
+                  faixas o total vem delas. Desabilitado com a explicação é
+                  melhor que um campo que finge funcionar. */}
+              {temFaixas
+                ? <p className="text-[10px] text-gray-400 mt-1">O valor vem das faixas de idade.</p>
+                : priceNum !== booking.price_per_person && <p className="text-[10px] text-amber-600 mt-1">Original: R$ {fmtBRL(booking.price_per_person)}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Desconto <span className="text-gray-400 font-normal normal-case">(R$)</span></label>
@@ -1200,10 +1249,76 @@ function EditBookingModal({ booking, onClose, onSaved }: {
             </div>
           </div>
 
+          {/* Opcionais */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Opcionais</label>
+            <div className="space-y-2">
+              {opcionais.map((o, i) => (
+                <div key={i} className="flex gap-2">
+                  <input
+                    type="text" value={o.name} list="opcionais-conhecidos" placeholder="Nome do opcional"
+                    onChange={(e) => updateOpcional(i, "name", e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                  <div className="relative w-28 shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold">R$</span>
+                    <input
+                      type="number" min="0" step="0.01" value={o.price} placeholder="0"
+                      onChange={(e) => updateOpcional(i, "price", e.target.value)}
+                      className="w-full pl-8 pr-2 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                  </div>
+                  <button type="button" onClick={() => removeOpcional(i)} title="Remover"
+                    className="shrink-0 px-2.5 border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 rounded-xl transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <datalist id="opcionais-conhecidos"><option value={QUARTO_SINGLE} /></datalist>
+            <div className="flex gap-2 mt-2">
+              <button type="button" onClick={() => addOpcional()}
+                className="flex items-center gap-1 text-xs font-bold text-navy-600 hover:text-navy-800 border border-navy-200 hover:bg-navy-50 rounded-lg px-2.5 py-1.5 transition-colors">
+                <Plus size={12} /> Opcional
+              </button>
+              {!opcionais.some((o) => o.name === QUARTO_SINGLE) && (
+                // Atalho porque o nome precisa bater EXATO para o quarto
+                // multiplicar por adulto em vez de por pessoa.
+                <button type="button" onClick={() => addOpcional(QUARTO_SINGLE)}
+                  className="flex items-center gap-1 text-xs font-bold text-gold-700 hover:text-gold-800 border border-gold-200 hover:bg-gold-50 rounded-lg px-2.5 py-1.5 transition-colors">
+                  <Plus size={12} /> Quarto single
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5">
+              O quarto single multiplica por adulto; os demais, por pessoa.
+            </p>
+          </div>
+
           {/* Total */}
-          <div className={`rounded-xl px-4 py-3 flex items-center justify-between text-sm ${changed ? "bg-amber-50 border border-amber-200" : "bg-navy-50"}`}>
-            <span className="text-gray-500">{people} × R$ {fmtBRL(priceNum)}{discNum > 0 ? ` − R$ ${fmtBRL(discNum)}` : ""}</span>
-            <span className="font-black text-navy-800 text-base">R$ {fmtBRL(total)}</span>
+          <div className={`rounded-xl px-4 py-3 space-y-1 text-sm ${changed ? "bg-amber-50 border border-amber-200" : "bg-navy-50"}`}>
+            <div className="flex items-center justify-between text-gray-500">
+              <span>
+                {temFaixas
+                  ? booking.tier_breakdown!.filter((t) => t.qty > 0).map((t) => `${t.qty} × ${t.label}`).join(", ")
+                  : `${people} × R$ ${fmtBRL(priceNum)}`}
+              </span>
+              <span>R$ {fmtBRL(baseTotal)}</span>
+            </div>
+            {opcionaisTotal > 0 && (
+              <div className="flex items-center justify-between text-gray-500">
+                <span>Opcionais</span>
+                <span>R$ {fmtBRL(opcionaisTotal)}</span>
+              </div>
+            )}
+            {discNum > 0 && (
+              <div className="flex items-center justify-between text-emerald-600">
+                <span>Desconto</span>
+                <span>− R$ {fmtBRL(discNum)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-1 border-t border-black/5">
+              <span className="text-gray-500 font-semibold">Total</span>
+              <span className="font-black text-navy-800 text-base">R$ {fmtBRL(total)}</span>
+            </div>
           </div>
         </div>
 
