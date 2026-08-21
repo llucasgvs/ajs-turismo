@@ -115,7 +115,18 @@ let _emCurso = false;
  *  instantânea: alternar refazia as 10 chamadas, inclusive listas que não têm
  *  nada a ver com o modo, e o número demorava a virar na tela. */
 type ValoresDoModo = { stats: Stats | null; counts: Counts | null; analytics: Analytics | null; sMonth: RevPoint[]; sDay: RevPoint[]; sYear: RevPoint[]; ts: number };
+// Guardado por MODO, e modo agora tem dois eixos: bruto/líquido e tudo/só site.
+// A chave composta mantém os quatro conjuntos separados; misturar os dois eixos
+// numa chave só devolveria número de um modo pedindo outro.
 const _modos: Record<string, ValoresDoModo> = {};
+
+const chaveModo = (liquido: boolean, soSite: boolean) => `${liquido}|${soSite}`;
+
+/** Query string das rotas de valor a partir da chave do modo. */
+const paramsDoModo = (chave: string) => {
+  const [liq, site] = chave.split("|");
+  return `liquido=${liq}&so_site=${site}`;
+};
 
 export default function AdminDashboard() {
   const fresh = !!_c.stats && (Date.now() - _c.ts) < TTL && _c.ts >= adminDirtyTs();
@@ -140,6 +151,11 @@ export default function AdminDashboard() {
   // Bruto x líquido. Líquido desconta a taxa do Asaas (medido: PIX R$ 1,89 fixo,
   // cartão 3,12%). Quem soma é o servidor; aqui só pedimos de um jeito ou de outro.
   const [liquido, setLiquido] = useState(false);
+  // Tudo x só site. "Só site" mostra apenas a receita que entrou por PIX ou
+  // cartão pelo próprio site, deixando de fora a venda fechada no WhatsApp,
+  // presencial ou por link de outro banco. Quem separa é o servidor, pelo id da
+  // cobrança do Asaas; aqui só pedimos de um jeito ou de outro.
+  const [soSite, setSoSite] = useState(false);
   useEffect(() => { const m = Number(localStorage.getItem("ajs_admin_margin")); if (m >= 0 && m <= 100) setMargin(m); }, []);
   // As preferências são lidas ANTES da primeira busca. Sem isso havia corrida: o
   // carregamento inicial saía com o modo padrão enquanto a preferência salva
@@ -150,10 +166,12 @@ export default function AdminDashboard() {
   const [prefsLidas, setPrefsLidas] = useState(false);
   useEffect(() => {
     setLiquido(localStorage.getItem("ajs_admin_liquido") === "1");
+    setSoSite(localStorage.getItem("ajs_admin_so_site") === "1");
     setVerTotal(localStorage.getItem("ajs_admin_total") === "1");
     setPrefsLidas(true);
   }, []);
   const onLiquido = (v: boolean) => { setLiquido(v); try { localStorage.setItem("ajs_admin_liquido", v ? "1" : "0"); } catch { /* ignore */ } };
+  const onSoSite = (v: boolean) => { setSoSite(v); try { localStorage.setItem("ajs_admin_so_site", v ? "1" : "0"); } catch { /* ignore */ } };
   // O `load` roda com dependências vazias (é chamado no mount e ao voltar para a
   // aba). Sem esta referência ele congelaria o modo da primeira montagem, e a
   // atualização silenciosa traria valor BRUTO com o rótulo "líquida" na tela.
@@ -172,14 +190,19 @@ export default function AdminDashboard() {
     return () => mq.removeEventListener("change", aplicar);
   }, []);
   const onVerTotal = (v: boolean) => { setVerTotal(v); try { localStorage.setItem("ajs_admin_total", v ? "1" : "0"); } catch { /* ignore */ } };
-  const modoRef = useRef(false);
-  useEffect(() => { modoRef.current = liquido; }, [liquido]);
+  // Guarda a CHAVE do modo (os dois eixos). O `load` roda com dependências
+  // vazias, então sem esta referência ele congelaria o modo da primeira
+  // montagem e a atualização silenciosa traria número de um modo sob o rótulo
+  // de outro.
+  const modoRef = useRef(chaveModo(false, false));
+  useEffect(() => { modoRef.current = chaveModo(liquido, soSite); }, [liquido, soSite]);
   const onMargin = (v: number) => { setMargin(v); try { localStorage.setItem("ajs_admin_margin", String(v)); } catch { /* ignore */ } };
 
   const load = useCallback(async (silent = false) => {
     if (_emCurso) return;   // ver o comentário de `_emCurso`
     _emCurso = true;
-    const liq = modoRef.current ? "true" : "false";
+    const modo = modoRef.current;
+    const qs = paramsDoModo(modo);
     silent ? setRefreshing(true) : setLoading(true);
     try {
       // Voltar para a aba precisa atualizar DINHEIRO, não o catálogo. Roteiros e
@@ -194,12 +217,12 @@ export default function AdminDashboard() {
       const usarCatalogoDoCache =
         silent && _c.trips.length > 0 && _c.templates.length > 0 && _c.ts >= adminDirtyTs();
       const rotas = [
-        apiFetch(`/bookings/admin/stats?liquido=${liq}`),
-        apiFetch(`/bookings/admin/counts?liquido=${liq}`),
-        apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
-        apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
-        apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
-        apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
+        apiFetch(`/bookings/admin/stats?${qs}`),
+        apiFetch(`/bookings/admin/counts?${qs}`),
+        apiFetch(`/bookings/admin/analytics?${qs}`),
+        apiFetch(`/bookings/admin/revenue-series?months=6&${qs}`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=day&${qs}`),
+        apiFetch(`/bookings/admin/revenue-series?granularity=year&${qs}`),
         apiFetch(`/bookings/admin/all?booking_status=interesse&limit=6`),
         apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
       ];
@@ -236,7 +259,7 @@ export default function AdminDashboard() {
       setStats(statsV); setCounts(countsV); setAn(anV); setSMonth(monthV); setSDay(dayV); setSYear(yearV);
       setInterests(intV); setPendings(penV); setTrips(tripsV); setTemplates(tmplV);
       Object.assign(_c, { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, interests: intV, pendings: penV, trips: tripsV, templates: tmplV, ts: Date.now() });
-      _modos[liq] = { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, ts: Date.now() };
+      _modos[modo] = { stats: statsV, counts: countsV, analytics: anV, sMonth: monthV, sDay: dayV, sYear: yearV, ts: Date.now() };
     } catch {
       setErroCarga(true);
     } finally { _emCurso = false; setLoading(false); setRefreshing(false); }
@@ -250,14 +273,15 @@ export default function AdminDashboard() {
   /** Busca as rotas de valor de UM modo e guarda. Usada pela troca e pelo
    *  adiantamento. Só as rotas de valor: reservas, viagens e roteiros não
    *  dependem do modo, e refazê-las era o que fazia a troca demorar. */
-  const buscarModo = useCallback(async (liq: string): Promise<ValoresDoModo | null> => {
+  const buscarModo = useCallback(async (modo: string): Promise<ValoresDoModo | null> => {
+    const qs = paramsDoModo(modo);
     const R = await Promise.all([
-      apiFetch(`/bookings/admin/stats?liquido=${liq}`),
-      apiFetch(`/bookings/admin/counts?liquido=${liq}`),
-      apiFetch(`/bookings/admin/analytics?liquido=${liq}`),
-      apiFetch(`/bookings/admin/revenue-series?months=6&liquido=${liq}`),
-      apiFetch(`/bookings/admin/revenue-series?granularity=day&liquido=${liq}`),
-      apiFetch(`/bookings/admin/revenue-series?granularity=year&liquido=${liq}`),
+      apiFetch(`/bookings/admin/stats?${qs}`),
+      apiFetch(`/bookings/admin/counts?${qs}`),
+      apiFetch(`/bookings/admin/analytics?${qs}`),
+      apiFetch(`/bookings/admin/revenue-series?months=6&${qs}`),
+      apiFetch(`/bookings/admin/revenue-series?granularity=day&${qs}`),
+      apiFetch(`/bookings/admin/revenue-series?granularity=year&${qs}`),
     ]);
     // Mesma regra da carga cheia: se qualquer uma falhou, não devolve nada pela
     // metade para a tela.
@@ -268,7 +292,7 @@ export default function AdminDashboard() {
       sMonth: Array.isArray(mD) ? mD : [], sDay: Array.isArray(dD) ? dD : [],
       sYear: Array.isArray(yD) ? yD : [], ts: Date.now(),
     };
-    _modos[liq] = m;
+    _modos[modo] = m;
     return m;
   }, []);
 
@@ -280,21 +304,21 @@ export default function AdminDashboard() {
     // Enquanto as preferências não foram lidas, quem busca é o efeito acima.
     if (!prefsLidas) return;
     if (primeiraCarga.current) { primeiraCarga.current = false; return; }
-    const liq = liquido ? "true" : "false";
+    const modo = chaveModo(liquido, soSite);
 
     const aplicar = (m: ValoresDoModo) => {
       setStats(m.stats); setCounts(m.counts); setAn(m.analytics);
       setSMonth(m.sMonth); setSDay(m.sDay); setSYear(m.sYear);
     };
 
-    const guardado = _modos[liq];
+    const guardado = _modos[modo];
     if (guardado && Date.now() - guardado.ts < TTL) { aplicar(guardado); return; }
 
     let cancelado = false;
     (async () => {
       setTrocandoModo(true);
       try {
-        const m = await buscarModo(liq);
+        const m = await buscarModo(modo);
         if (cancelado) return;
         if (!m) { setErroCarga(true); return; }
         aplicar(m);
@@ -307,7 +331,7 @@ export default function AdminDashboard() {
     })();
     return () => { cancelado = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [liquido, prefsLidas]);
+  }, [liquido, soSite, prefsLidas]);
 
   // Adianta o OUTRO modo assim que a página assenta. A primeira troca era a
   // única lenta, porque só ali as contas ainda não existiam; com isto ela passa
@@ -315,14 +339,18 @@ export default function AdminDashboard() {
   // se falhar, a troca simplesmente busca na hora, como antes.
   useEffect(() => {
     if (!prefsLidas || loading) return;
-    const outro = liquido ? "false" : "true";
+    // Adianta só o outro bruto/líquido, mantendo o eixo tudo/só site. Com dois
+    // eixos são quatro modos, e adiantar os três restantes seriam 18 requisições
+    // a cada abertura do painel - caro demais para o egress do banco. O
+    // tudo/só site busca na hora da primeira troca e fica guardado depois.
+    const outro = chaveModo(!liquido, soSite);
     if (_modos[outro] && Date.now() - _modos[outro].ts < TTL) return;
     // Espera a tela terminar de montar para não disputar banda com a carga
     // principal, que é a que o admin está esperando ver.
     const t = setTimeout(() => { buscarModo(outro).catch(() => { /* sem adiantamento, sem problema */ }); }, 1200);
     return () => clearTimeout(t);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [prefsLidas, loading, liquido]);
+  }, [prefsLidas, loading, liquido, soSite]);
 
   // Voltar para a aba é o momento em que o número velho atrapalha de verdade.
   // Atualiza em silêncio (sem apagar a tela) e só se a última carga já passou
@@ -445,7 +473,9 @@ export default function AdminDashboard() {
           <div className="flex-1">
             <div className="flex items-start justify-between gap-3">
               <p className="text-navy-200 text-xs font-semibold uppercase tracking-wide">
-                Receita {totalNaTela ? "total" : "este mês"} {liquido && <span className="text-gold-300">· líquida</span>}
+                {/* O rótulo diz o modo. Número filtrado sob rótulo genérico é
+                    o defeito mais caro que este painel pode ter. */}
+                Receita {totalNaTela ? "total" : "este mês"} {liquido && <span className="text-gold-300">· líquida</span>}{soSite && <span className="text-gold-300"> · só site</span>}
               </p>
               {/* Bruto x líquido. O líquido desconta a taxa do Asaas, que é o que
                   separa o que o cliente pagou do que cai na conta. */}
@@ -471,6 +501,20 @@ export default function AdminDashboard() {
                   <button onClick={() => onLiquido(true)} aria-pressed={liquido}
                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${liquido ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
                     Líquido
+                  </button>
+                </div>
+                {/* Só no desktop, como o mês/total: no celular este card já tem
+                    dois grupos de botão, e um terceiro entope a tela. */}
+                <div className="hidden lg:flex bg-white/10 rounded-lg p-0.5" role="group" aria-label="Ver toda a receita ou só a paga pelo site">
+                  <button onClick={() => onSoSite(false)} aria-pressed={!soSite}
+                    title="Toda a receita: site, WhatsApp e presencial"
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${!soSite ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Tudo
+                  </button>
+                  <button onClick={() => onSoSite(true)} aria-pressed={soSite}
+                    title="Só o que foi pago no site, por PIX ou cartão"
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${soSite ? "bg-white text-navy-800" : "text-navy-200 hover:text-white"}`}>
+                    Só site
                   </button>
                 </div>
               </div>
@@ -542,7 +586,7 @@ export default function AdminDashboard() {
       <Eyebrow kicker="Desempenho" title="De onde vem o dinheiro" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 overflow-hidden">
-          <CardHead title="Receita confirmada" icon={<TrendingUp size={14} className="text-emerald-500" />}
+          <CardHead title={soSite ? "Receita confirmada · só site" : "Receita confirmada"} icon={<TrendingUp size={14} className="text-emerald-500" />}
             action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["year", "month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "year" ? "Anual" : m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
           {loading ? <div className="py-6"><SkelGrafico n={12} altura="h-44" /></div> : (
             <div className="px-5 py-5">
