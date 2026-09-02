@@ -544,7 +544,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(vendasPeriodo, "venda", "vendas")}</span>
               <span className="text-navy-300" aria-hidden="true">·</span>
-              <span className="text-navy-100">{plw(paxPeriodo, "passageiro", "passageiros")}</span>
+              <span className="text-navy-100">{plw(paxPeriodo, "viajante", "viajantes")}</span>
               {/* A comparação com o mês anterior só faz sentido vendo o mês.
                   O rótulo diz "mesmo período" porque é isso que ele compara:
                   prometer "vs mês anterior" e entregar outra coisa foi o
