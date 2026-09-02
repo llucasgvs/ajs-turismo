@@ -267,9 +267,9 @@ function fmtDateRangeFull(dep?: string, ret?: string) {
 const FIELD = "w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-navy-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-navy-400 focus:border-navy-400 transition";
 
 /* Input com validação em tempo real: borda verde/vermelha + ícone ao sair do campo */
-function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text", inputMode, showIcon = true }: {
+function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text", inputMode, showIcon = true, readOnly = false }: {
   value: string; onChange: (v: string) => void; validate: (v: string) => boolean; errorMsg?: string;
-  placeholder?: string; type?: string; inputMode?: "numeric" | "text"; showIcon?: boolean;
+  placeholder?: string; type?: string; inputMode?: "numeric" | "text"; showIcon?: boolean; readOnly?: boolean;
 }) {
   const [touched, setTouched] = useState(false);
   const show = touched && value.length > 0;
@@ -279,8 +279,11 @@ function VInput({ value, onChange, validate, errorMsg, placeholder, type = "text
     <div>
       <div className="relative">
         <input type={type} inputMode={inputMode} value={value} placeholder={placeholder}
-          onChange={e => onChange(e.target.value)} onBlur={() => setTouched(true)}
-          className={`${FIELD} ${border} ${show && showIcon ? "pr-9" : ""}`} />
+          readOnly={readOnly}
+          // O `readOnly` sozinho não segura campo de data: o Chrome ainda abre
+          // o seletor e deixa escolher. Barrar aqui vale para todos os tipos.
+          onChange={e => { if (!readOnly) onChange(e.target.value); }} onBlur={() => setTouched(true)}
+          className={`${FIELD} ${border} ${show && showIcon ? "pr-9" : ""} ${readOnly ? "bg-gray-50 text-gray-500 cursor-default focus:ring-0" : ""}`} />
         {/* Os dois estados são ÍCONE, do mesmo tamanho. Antes o erro era o
             caractere "!", que carrega as métricas da fonte (linha de base,
             ascendente) e por isso nunca centraliza igual a um SVG, por mais
@@ -1051,21 +1054,24 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
         <div className="px-5 pb-5 space-y-4">
           {error && <ErrorMsg>{error}</ErrorMsg>}
 
-          {/* Titular */}
+          {/* Titular: o dono da conta, que viaja. Os dados dele são gravados
+              uma vez e depois ficam imutáveis; mudança só pelo suporte. Sem
+              aviso na tela por decisão do dono: quem precisar já manda WhatsApp.
+              A trava de verdade está no servidor; isto aqui só reflete. */}
           <div className="rounded-xl border border-gray-100 p-4 space-y-3">
             <p className="text-xs font-bold text-navy-800 uppercase tracking-wide flex flex-wrap items-center gap-x-1.5 gap-y-1.5"><User size={13} className="shrink-0" /> Titular {titularCat && <span className="normal-case text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal">{titularCat}</span>}</p>
-            <Field label="Nome completo" req><VInput value={fullName} onChange={setFullName} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Seu nome completo" /></Field>
+            <Field label="Nome completo" req><VInput value={fullName} onChange={setFullName} validate={vName} errorMsg="Informe nome e sobrenome." placeholder="Seu nome completo" readOnly={!!user?.full_name} /></Field>
             {/* No celular cada campo ocupa a linha inteira: em duas colunas o CPF
                 e o telefone nao cabiam e o numero aparecia cortado. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="CPF" req><VInput value={cpf} onChange={v => setCpf(maskCPF(v))}
                 validate={v => vCpf(v) && !cpfEmOutroPassageiro(v, -1)}
                 errorMsg={cpfEmOutroPassageiro(cpf, -1) ? ERRO_CPF_REPETIDO : "CPF inválido."}
-                placeholder="000.000.000-00" inputMode="numeric" /></Field>
-              <Field label="Telefone" req><VInput value={phone} onChange={v => setPhone(maskPhone(v))} validate={vPhone} errorMsg="Telefone incompleto." placeholder="(00) 00000-0000" inputMode="numeric" /></Field>
+                placeholder="000.000.000-00" inputMode="numeric" readOnly={!!user?.cpf} /></Field>
+              <Field label="Telefone" req><VInput value={phone} onChange={v => setPhone(maskPhone(v))} validate={vPhone} errorMsg="Telefone incompleto." placeholder="(00) 00000-0000" inputMode="numeric" readOnly={!!user?.phone} /></Field>
             </div>
             {/* Sem hint: a faixa ja aparece na etiqueta do topo deste mesmo card. */}
-            <Field label="Data de nascimento" req><VInput value={birth} onChange={setBirth} validate={v => !!v && !ageError(titularCat, v, "")} errorMsg={titularCat ? `A idade não corresponde à faixa ${titularCat}.` : undefined} type="date" showIcon={false} /></Field>
+            <Field label="Data de nascimento" req><VInput value={birth} onChange={setBirth} validate={v => !!v && !ageError(titularCat, v, "")} errorMsg={titularCat ? `A idade não corresponde à faixa ${titularCat}.` : undefined} type="date" showIcon={false} readOnly={!!user?.birth_date} /></Field>
           </div>
 
           {/* Acompanhantes */}
