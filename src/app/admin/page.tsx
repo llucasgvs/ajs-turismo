@@ -14,7 +14,7 @@ import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
 const RES = "/admin/reservas";
 
 /* ─── Types ─── */
-type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_revenue: number; month_confirmed: number; pending_interests: number; month_fee?: number; total_fee?: number; prev_month_revenue?: number; prev_month_confirmed?: number; prev_month_number?: number; month_elapsed_days?: number };
+type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_travelers?: number; month_revenue: number; month_confirmed: number; pending_interests: number; month_fee?: number; total_fee?: number; prev_month_revenue?: number; prev_month_confirmed?: number; prev_month_number?: number; month_elapsed_days?: number };
 type CountStats = { confirmed_revenue: number; pending_value: number; month_count: number; month_value: number };
 type Counts = { interesse: number; pending: number; confirmed: number; completed: number; cancelled: number; refunded: number; all: number; stats: CountStats };
 type RevPoint = { month: string; label: string; revenue: number; count: number };
@@ -377,6 +377,10 @@ export default function AdminDashboard() {
   const curRev = (totalNaTela ? stats?.total_revenue : stats?.month_revenue) ?? 0;
   const taxaPeriodo = (totalNaTela ? stats?.total_fee : stats?.month_fee) ?? 0;
   const vendasPeriodo = (totalNaTela ? stats?.total_confirmed : stats?.month_confirmed) ?? 0;
+  // Passageiros da MESMA medida que a receita ao lado: alternando para "total",
+  // mostrar o passageiro do mês (ou o contrário) poria duas medidas diferentes
+  // lado a lado no mesmo card.
+  const paxPeriodo = (totalNaTela ? stats?.total_travelers : stats?.month_travelers) ?? 0;
   // Só faz sentido no modo líquido, que é o único lugar onde é mostrado: ali
   // curRev é o líquido, então líquido + taxa é o bruto, e a conta fecha.
   const pctTaxa = curRev + taxaPeriodo > 0 ? (100 * taxaPeriodo) / (curRev + taxaPeriodo) : 0;
@@ -539,6 +543,8 @@ export default function AdminDashboard() {
             </p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(vendasPeriodo, "venda", "vendas")}</span>
+              <span className="text-navy-300" aria-hidden="true">·</span>
+              <span className="text-navy-100">{plw(paxPeriodo, "passageiro", "passageiros")}</span>
               {/* A comparação com o mês anterior só faz sentido vendo o mês.
                   O rótulo diz "mesmo período" porque é isso que ele compara:
                   prometer "vs mês anterior" e entregar outra coisa foi o
