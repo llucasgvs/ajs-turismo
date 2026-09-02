@@ -14,7 +14,7 @@ import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
 const RES = "/admin/reservas";
 
 /* ─── Types ─── */
-type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_revenue: number; month_confirmed: number; pending_interests: number; month_fee?: number; total_fee?: number };
+type Stats = { total_revenue: number; total_confirmed: number; total_travelers: number; month_revenue: number; month_confirmed: number; pending_interests: number; month_fee?: number; total_fee?: number; prev_month_revenue?: number; prev_month_confirmed?: number; prev_month_number?: number; month_elapsed_days?: number };
 type CountStats = { confirmed_revenue: number; pending_value: number; month_count: number; month_value: number };
 type Counts = { interesse: number; pending: number; confirmed: number; completed: number; cancelled: number; refunded: number; all: number; stats: CountStats };
 type RevPoint = { month: string; label: string; revenue: number; count: number };
@@ -380,8 +380,18 @@ export default function AdminDashboard() {
   // Só faz sentido no modo líquido, que é o único lugar onde é mostrado: ali
   // curRev é o líquido, então líquido + taxa é o bruto, e a conta fecha.
   const pctTaxa = curRev + taxaPeriodo > 0 ? (100 * taxaPeriodo) / (curRev + taxaPeriodo) : 0;
-  const prevRev = sMonth.length >= 2 ? sMonth[sMonth.length - 2].revenue : 0;
-  const hasPrev = prevRev > 0;
+  // Comparação com o MESMO PERÍODO do mês anterior (dia 1 até hoje), não com o
+  // mês anterior inteiro. Antes lia `sMonth[length-2]`, que é o mês fechado:
+  // todo dia 1º o painel anunciava queda enorme e o número só ficava honesto no
+  // último dia do mês. Em 01/09/2026 mostrava "-83%" num dia de R$ 10.712 em 8
+  // vendas, porque comparava com os R$ 62.477 de agosto inteiro.
+  const prevRev = stats?.prev_month_revenue ?? 0;
+  const prevCount = stats?.prev_month_confirmed ?? 0;
+  const diasCorridos = stats?.month_elapsed_days ?? 0;
+  const mesAnterior = stats?.prev_month_number ? MES_FULL[stats.prev_month_number - 1] : "";
+  // Com base fraca a variação vira ruído: no começo do mês uma venda sozinha
+  // faz +300%. Melhor não mostrar nada do que mostrar um número que oscila.
+  const hasPrev = prevRev > 0 && prevCount >= 2 && diasCorridos >= 3;
   const delta = hasPrev ? (curRev - prevRev) / prevRev : 0;
 
   const upcoming = trips.filter(t => {
@@ -529,13 +539,21 @@ export default function AdminDashboard() {
             </p>
             <div className="flex items-center gap-3 mt-2 text-sm">
               <span className="text-navy-100">{plw(vendasPeriodo, "venda", "vendas")}</span>
-              {/* A comparação com o mês anterior só faz sentido vendo o mês. */}
+              {/* A comparação com o mês anterior só faz sentido vendo o mês.
+                  O rótulo diz "mesmo período" porque é isso que ele compara:
+                  prometer "vs mês anterior" e entregar outra coisa foi o
+                  defeito que estava aqui. */}
               {!loading && !totalNaTela && hasPrev && (
-                <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-                  {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mês anterior
+                <span className={`inline-flex items-center gap-1 font-bold ${delta >= 0 ? "text-emerald-300" : "text-red-300"}`}
+                  title={`Mesmo período de ${mesAnterior} (dia 1 ao dia ${diasCorridos}): ${fmtR(prevRev)}`}>
+                  {delta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(Math.round(delta * 100))}% vs mesmo período de {mesAnterior}
                 </span>
               )}
-              {!loading && !totalNaTela && !hasPrev && vendasPeriodo > 0 && <span className="text-navy-300 text-xs">primeiro mês com vendas registradas</span>}
+              {!loading && !totalNaTela && !hasPrev && vendasPeriodo > 0 && (
+                <span className="text-navy-300 text-xs">
+                  {prevCount === 0 ? `sem vendas no mesmo período de ${mesAnterior}` : "poucos dias para comparar"}
+                </span>
+              )}
             </div>
             {/* A taxa vem DEPOIS da contagem de vendas, para o card ler de cima
                 para baixo: valor, quantas vendas, e então quanto foi embora. */}
