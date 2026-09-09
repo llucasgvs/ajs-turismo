@@ -534,10 +534,21 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                           type="button"
                           onClick={() => setTrocandoData((a) => ({ ...a, [roteiro.template_id]: !aberto }))}
                           aria-expanded={aberto}
-                          className="mt-3 w-full flex items-center justify-between gap-3 rounded-xl border-2 border-gray-200 hover:border-navy-300 px-3.5 py-3 text-left transition-colors"
+                          className="mt-3 w-full block rounded-xl border-2 border-gray-200 hover:border-navy-300 px-3.5 py-3 text-left transition-colors"
                         >
-                          <span className="min-w-0">
+                          {/* "Trocar" sobe para a linha do rótulo e a data usa a
+                              largura toda. Lado a lado, "18 de set. de 2026 →
+                              20 de set." quebrava em duas linhas no celular. */}
+                          <span className="flex items-center justify-between gap-3">
                             <span className="block text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Data</span>
+                            {roteiro.datas.length > 1 && (
+                              <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
+                                {aberto ? <><ChevronDown size={14} className="rotate-180" /> Fechar</>
+                                        : <><ChevronDown size={14} /> Trocar</>}
+                              </span>
+                            )}
+                          </span>
+                          <span className="min-w-0">
                             {data ? (
                               <>
                                 <span className="block text-sm font-bold text-navy-800">
@@ -555,12 +566,6 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                               <span className="block text-sm font-bold text-gray-400">Selecione uma data</span>
                             )}
                           </span>
-                          {roteiro.datas.length > 1 && (
-                            <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
-                              {aberto ? <><ChevronDown size={14} className="rotate-180" /> Fechar</>
-                                      : <><ChevronDown size={14} /> Trocar</>}
-                            </span>
-                          )}
                         </button>
 
                         {aberto && roteiro.datas.length > 1 && (
@@ -581,54 +586,43 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                             />
                           </div>
                         )}
+
+                        {/* Os opcionais DESTA viagem, logo abaixo da data dela.
+                            Numa lista separada no fim da página, o cliente
+                            precisava lembrar de qual viagem era cada extra; aqui
+                            cada viagem fica completa em si: foto, detalhes, data
+                            e o que dá para incluir nela.
+
+                            Depois da data e não antes porque o preço do opcional
+                            pode mudar de uma saída para outra. */}
+                        {data && data.optionals.length > 0 && (
+                          <div className="mt-3 border-t border-dashed border-gray-200 pt-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                              <span className="w-5 h-5 bg-amber-100 rounded-full flex items-center justify-center text-[10px]">✨</span>
+                              Opcionais desta viagem
+                            </p>
+                            <Opcionais
+                              moldura={false}
+                              optionals={data.optionals}
+                              selecionados={opcionais[data.trip_id] ?? []}
+                              forcados={quartoObrigatorio(data) ? [QUARTO_SINGLE] : []}
+                              onToggle={(nome) => setOpcionais((a) => {
+                                const atuais = a[data.trip_id] ?? [];
+                                return {
+                                  ...a,
+                                  [data.trip_id]: atuais.includes(nome)
+                                    ? atuais.filter((n) => n !== nome)
+                                    : [...atuais, nome],
+                                };
+                              })}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
-
-              {/* Opcionais: o MESMO bloco da página de viagem, uma lista por
-                  perna. Um bloco "parecido" no combo faria o cliente reaprender
-                  do zero um cartão que ele já conhece.
-
-                  Depois das datas de propósito: o preço de um opcional pode
-                  mudar de uma saída para outra, então só faz sentido oferecer
-                  quando a data já está escolhida. */}
-              {pernas.some((p) => (p.data?.optionals.length ?? 0) > 0) && (
-                <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm">
-                  <h3 className="font-display font-bold text-navy-800 mb-1 flex items-center gap-2 text-base">
-                    <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-sm flex-shrink-0">✨</span>
-                    Serviços Opcionais
-                  </h3>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Selecione os extras que deseja. O valor é por pessoa.
-                  </p>
-                  <div className="space-y-5">
-                    {pernas.map(({ roteiro, data }) => {
-                      if (!data || data.optionals.length === 0) return null;
-                      return (
-                        <Opcionais
-                          key={roteiro.template_id}
-                          moldura={false}
-                          subtitulo={roteiro.title}
-                          optionals={data.optionals}
-                          selecionados={opcionais[data.trip_id] ?? []}
-                          forcados={quartoObrigatorio(data) ? [QUARTO_SINGLE] : []}
-                          onToggle={(nome) => setOpcionais((a) => {
-                            const atuais = a[data.trip_id] ?? [];
-                            return {
-                              ...a,
-                              [data.trip_id]: atuais.includes(nome)
-                                ? atuais.filter((n) => n !== nome)
-                                : [...atuais, nome],
-                            };
-                          })}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* No celular a lateral não existe, então o seletor vem aqui. */}
               <div className="lg:hidden bg-white rounded-2xl shadow-sm overflow-hidden">
