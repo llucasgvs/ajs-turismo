@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown, Package } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
@@ -79,7 +79,93 @@ type Booking = {
   trip_return_at?: string | null;
   trip_quote_only?: boolean;
   trip_whatsapp_only?: boolean;
+  /* Venda de combo. Só a linha que representa a venda inteira traz isto: as
+     outras pernas são escondidas da listagem pelo backend, mas continuam sendo
+     reservas comuns e aparecem ao filtrar por viagem ou buscar pelo código. */
+  combo_grupo?: string | null;
+  combo_nome?: string | null;
+  combo_pernas?: PernaDoCombo[];
+  combo_total?: number | null;
+  combo_desconto?: number | null;
+  /** Status da VENDA, derivado do das pernas. A perna conclui no dia do ônibus
+   *  dela; a venda só quando a última viajar. */
+  combo_status?: string | null;
+  combo_viajadas?: number | null;
+  combo_a_viajar?: number | null;
 };
+
+type PernaDoCombo = {
+  booking_code: string;
+  trip_id: number;
+  trip_title: string | null;
+  trip_departure_date: string | null;
+  /** Nulo no painel do CLIENTE, onde o valor por perna não é enviado. Aqui vem
+   *  sempre: é a agência que precisa conferir o rateio da venda. */
+  final_amount: number | null;
+  discount_amount: number | null;
+  status: string;
+};
+
+/** As viagens de uma venda de combo, dentro da linha da venda.
+ *
+ * O combo é uma venda só, mas continua sendo N ônibus em N datas. A linha
+ * precisa dizer quais, senão o admin teria que abrir reserva por reserva para
+ * descobrir o que vendeu.
+ *
+ * Perna cancelada aparece riscada em vez de sumir: ela existiu, e some-la
+ * deixaria a venda com menos viagens do que o cliente comprou, sem explicação.
+ */
+/* Cada perna tem status próprio porque cada ônibus roda no seu dia. Um ponto
+   colorido basta na lista: o texto do status por perna encheria a linha de
+   palavras repetidas. A legenda inteira está na janela da venda. */
+const PONTO_DA_PERNA: Record<string, { cor: string; texto: string }> = {
+  completed: { cor: "bg-navy-400", texto: "já viajou" },
+  confirmed: { cor: "bg-emerald-500", texto: "confirmada" },
+  pending: { cor: "bg-amber-400", texto: "aguardando pagamento" },
+  interesse: { cor: "bg-gray-300", texto: "interesse" },
+  cancelled: { cor: "bg-red-300", texto: "cancelada" },
+  refunded: { cor: "bg-red-300", texto: "estornada" },
+};
+
+function ViagensDoCombo({ b }: { b: Booking }) {
+  const viajadas = b.combo_viajadas ?? 0;
+  const aViajar = b.combo_a_viajar ?? 0;
+  return (
+    <div className="max-w-[230px]">
+      <p className="text-navy-700 font-semibold truncate flex items-center gap-1">
+        <Package size={11} className="text-gold-600 shrink-0" />
+        {b.combo_nome ?? "Combo"}
+      </p>
+      <ul className="mt-0.5 space-y-0.5">
+        {b.combo_pernas?.map((p) => {
+          const morta = p.status === "cancelled" || p.status === "refunded";
+          const ponto = PONTO_DA_PERNA[p.status];
+          return (
+            <li key={p.booking_code}
+              title={ponto?.texto}
+              className={`text-xs truncate flex items-center gap-1.5 ${morta ? "text-gray-300 line-through" : "text-gray-500"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ponto?.cor ?? "bg-gray-300"}`} />
+              <span className="truncate">
+                {p.trip_title ?? `Viagem #${p.trip_id}`}
+                {p.trip_departure_date && (
+                  <span className="text-gray-400"> · {fmtDataHoraViagem(p.trip_departure_date)}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {/* Explica por que uma venda com viagem já feita continua em Confirmadas.
+          Sem esta linha, o admin veria "Confirmada" numa venda cujo primeiro
+          ônibus já rodou e acharia que o painel errou. */}
+      {viajadas > 0 && aViajar > 0 && (
+        <p className="text-[11px] text-navy-500 mt-1">
+          {viajadas} de {viajadas + aViajar} já {viajadas === 1 ? "viajou" : "viajaram"}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** Marca a reserva que veio de roteiro sem cartão (só WhatsApp e PIX).
  *
@@ -133,10 +219,13 @@ const teveTrocaDeData = (b: { notes?: string | null }) => (b.notes ?? "").includ
 const valorDiverge = (b: { notes?: string | null }) =>
   teveTrocaDeData(b) && (b.notes ?? "").includes(MARCA_VALOR_DIVERGE);
 function statusVisual(
-  b: { status: string; notes?: string | null; confirmado_manual?: boolean },
+  b: { status: string; notes?: string | null; confirmado_manual?: boolean; combo_status?: string | null },
 ): { label: string; color: string; border: string; tag?: string; hint?: string } {
-  const base = STATUS_LABEL[b.status] ?? { label: b.status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
-  if (b.status === "cancelled" && (b.notes ?? "").includes(MARCA_EXPIRADA)) {
+  /* Linha de venda de combo se apresenta pelo status da VENDA. O da âncora é o
+     de uma poltrona, e mostraria "Concluída" com dois ônibus ainda por sair. */
+  const status = b.combo_status ?? b.status;
+  const base = STATUS_LABEL[status] ?? { label: status, color: "bg-gray-100 text-gray-600", border: "border-l-gray-300" };
+  if (status === "cancelled" && (b.notes ?? "").includes(MARCA_EXPIRADA)) {
     return { label: "Expirado", color: "bg-gray-100 text-gray-600", border: "border-l-gray-400" };
   }
   // Venda de verdade, mas o dinheiro não entrou pelo site: foi o admin que
@@ -146,7 +235,7 @@ function statusVisual(
   // qualificador embaixo. Escrever as duas palavras dentro da pílula quebra a
   // linha na coluna de status e deixa uma linha com o dobro da altura das
   // outras, que foi o que despadronizou a tabela.
-  if (b.status === "confirmed" && b.confirmado_manual) {
+  if (status === "confirmed" && b.confirmado_manual) {
     return {
       ...base,
       tag: "manual",
@@ -671,6 +760,208 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
   );
 }
 
+/** A venda de combo, vista como venda.
+ *
+ * A janela da reserva mostra UMA viagem, porque reserva é poltrona. A venda de
+ * combo são várias, e abrir a primeira perna como se fosse a venda dava a
+ * impressão errada do que foi vendido e por quanto.
+ *
+ * Aqui não há ação de confirmar, cancelar ou trocar data de propósito: essas
+ * decisões são por poltrona (dá para cancelar uma perna e manter as outras), e
+ * moram na janela de cada reserva, que se abre daqui.
+ */
+function ComboDetailModal({ venda, onClose, onAbrirPerna, abrindo }: {
+  venda: Booking;
+  onClose: () => void;
+  onAbrirPerna: (code: string) => void;
+  abrindo: string | null;
+}) {
+  useFecharComEsc(true, onClose);
+  const [copiado, setCopiado] = useState<string | null>(null);
+  const copiar = (texto: string) => {
+    navigator.clipboard.writeText(texto).then(() => {
+      setCopiado(texto);
+      setTimeout(() => setCopiado(null), 2000);
+    });
+  };
+  const titular = venda.traveler_name || `Usuário #${venda.user_id}`;
+  const pernas = venda.combo_pernas ?? [];
+  const acompanhantes: { full_name: string; cpf: string; birth_date: string }[] = (() => {
+    try { return venda.travelers_info ? JSON.parse(venda.travelers_info) : []; }
+    catch { return []; }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-overlay p-0 sm:p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl animate-modal max-h-[92vh] flex flex-col">
+        <button onClick={onClose} aria-label="Fechar"
+          className="sm:hidden w-full pt-3 pb-1.5 flex justify-center flex-shrink-0 active:bg-gray-50 rounded-t-3xl">
+          <span className="h-1.5 w-12 rounded-full bg-gray-300" />
+        </button>
+
+        <div className="flex items-start justify-between gap-2 px-5 pb-4 pt-2 sm:pt-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <button onClick={() => copiar(venda.combo_grupo ?? "")}
+              className="flex items-center gap-1.5 font-mono text-sm text-navy-700 font-bold hover:text-gold-600 transition-colors group">
+              {venda.combo_grupo}
+              {copiado === venda.combo_grupo
+                ? <CheckCheck size={13} className="text-emerald-500" />
+                : <Copy size={13} className="text-gray-300 group-hover:text-gold-500 transition-colors" />}
+            </button>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gold-100 text-gold-700">
+              <Package size={10} /> Combo
+            </span>
+            <SeloStatus st={statusVisual(venda)} />
+            {venda.is_external
+              ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700"><Store size={10} /> Externo</span>
+              : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"><Globe size={10} /> Via Site</span>}
+          </div>
+          <button onClick={onClose} aria-label="Fechar"
+            className="w-10 h-10 -mr-2 -mt-1 flex items-center justify-center rounded-full hover:bg-gray-100 active:bg-gray-200 text-gray-500 transition-colors flex-shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+          <section>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Package size={11} /> Combo</p>
+            <p className="font-bold text-navy-800">{venda.combo_nome ?? "Combo"}</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {pernas.length} viagens · {venda.num_travelers} {venda.num_travelers === 1 ? "pessoa" : "pessoas"}
+            </p>
+            {/* A venda só conclui quando o último ônibus roda. Enquanto isso ela
+                fica em Confirmadas, e esta linha diz em que pé está. */}
+            {!!venda.combo_viajadas && !!venda.combo_a_viajar && (
+              <p className="text-xs text-navy-600 mt-1.5 bg-navy-50 border border-navy-100 rounded-lg px-2.5 py-1.5">
+                {venda.combo_viajadas} de {venda.combo_viajadas + venda.combo_a_viajar} já
+                {venda.combo_viajadas === 1 ? " viajou" : " viajaram"}. A venda conclui quando a última viagem acontecer.
+              </p>
+            )}
+          </section>
+
+          {/* Cada perna é uma reserva de verdade, com código próprio, lista de
+              embarque própria e vaga própria. É por isso que dá para abrir uma
+              a uma: as ações moram lá. */}
+          <section>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><MapPin size={11} /> Viagens</p>
+            <div className="space-y-2">
+              {pernas.map((p) => {
+                const morta = p.status === "cancelled" || p.status === "refunded";
+                return (
+                  <div key={p.booking_code}
+                    className={`border rounded-xl px-3.5 py-3 ${morta ? "border-gray-100 bg-gray-50" : "border-gray-200"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-semibold truncate ${morta ? "text-gray-400 line-through" : "text-navy-800"}`}>
+                          {p.trip_title ?? `Viagem #${p.trip_id}`}
+                        </p>
+                        {p.trip_departure_date && (
+                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                            <Clock size={10} /> {fmtDataHoraViagem(p.trip_departure_date)}
+                          </p>
+                        )}
+                        <p className="text-[11px] mt-1 flex items-center gap-1.5 text-gray-500">
+                          <span className={`w-1.5 h-1.5 rounded-full ${PONTO_DA_PERNA[p.status]?.cor ?? "bg-gray-300"}`} />
+                          {PONTO_DA_PERNA[p.status]?.texto ?? p.status}
+                        </p>
+                        <button onClick={() => copiar(p.booking_code)}
+                          className="mt-1 flex items-center gap-1 font-mono text-[11px] text-navy-500 font-semibold hover:text-gold-600 transition-colors group">
+                          {p.booking_code}
+                          {copiado === p.booking_code
+                            ? <CheckCheck size={10} className="text-emerald-500" />
+                            : <Copy size={10} className="text-gray-300 group-hover:text-gold-500" />}
+                        </button>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {p.final_amount != null && (
+                          <p className={`text-sm tabular-nums ${morta ? "text-gray-400 line-through" : "text-navy-800 font-semibold"}`}>
+                            R$ {fmtBRL(p.final_amount)}
+                          </p>
+                        )}
+
+                      </div>
+                    </div>
+                    <button onClick={() => onAbrirPerna(p.booking_code)} disabled={abrindo === p.booking_code}
+                      className="mt-2.5 w-full flex items-center justify-center gap-1.5 border border-gray-200 text-navy-700 hover:bg-gray-50 disabled:opacity-50 font-bold py-2 rounded-lg transition-colors text-xs">
+                      {abrindo === p.booking_code ? <Loader2 size={12} className="animate-spin" /> : <Ticket size={12} />}
+                      Abrir esta reserva
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><User size={11} /> Titular</p>
+            <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
+              <p className="font-semibold text-navy-800">{titular}</p>
+              {venda.traveler_cpf && (
+                <p className="text-gray-500 font-mono text-xs flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(venda.traveler_cpf)}</p>
+              )}
+              {venda.traveler_phone && (
+                <div className="flex items-center gap-2">
+                  <p className="text-gray-500 text-xs flex items-center gap-1.5"><Phone size={11} className="text-gray-400" />{formatPhone(venda.traveler_phone)}</p>
+                  <a href={buildWaUrl(venda)} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#25D366] hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors">
+                    <WhatsAppGlyph size={13} /> WhatsApp
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {acompanhantes.length > 0 && (
+            <section>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Users size={11} /> Acompanhantes</p>
+              <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
+                {acompanhantes.map((a, i) => (
+                  <p key={i} className="text-navy-700">
+                    {a.full_name}
+                    {a.cpf && <span className="text-gray-400 font-mono text-xs ml-2">{formatCPF(a.cpf)}</span>}
+                  </p>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">As mesmas pessoas viajam em todas as viagens do combo.</p>
+            </section>
+          )}
+
+          <section>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><DollarSign size={11} /> Pagamento</p>
+            <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Forma</span>
+                <span className="text-navy-800">{paymentLabel(venda.payment_method, venda.installments)}</span>
+              </div>
+              {!!venda.combo_desconto && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Desconto do combo</span>
+                  <span className="text-gold-700">- R$ {fmtBRL(venda.combo_desconto)}</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-1.5 border-t border-gray-200">
+                <span className="font-semibold text-navy-800">Total da venda</span>
+                <span className="font-black text-navy-800 tabular-nums">R$ {fmtBRL(venda.combo_total ?? 0)}</span>
+              </div>
+            </div>
+            {venda.confirmed_at && (
+              <p className="text-[11px] text-gray-400 mt-1.5">Confirmada em {fmtDataHoraViagem(venda.confirmed_at)}</p>
+            )}
+          </section>
+
+          {venda.notes && (
+            <section>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText size={11} /> Observações</p>
+              <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3 whitespace-pre-wrap">{venda.notes}</p>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCancel, onRefund, onTrocarData, actionLoading }: {
   booking: Booking;
   trip: Trip | undefined;
@@ -722,6 +1013,13 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700"><Store size={10} /> Externo</span>
               : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"><Globe size={10} /> Via Site</span>
             }
+            {/* A perna aberta a partir da venda perderia o contexto sem isto:
+                é uma reserva comum, mas foi vendida dentro de um combo. */}
+            {booking.combo_nome && (
+              <span title={booking.combo_nome} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gold-100 text-gold-700">
+                <Package size={10} /> Combo
+              </span>
+            )}
             {booking.status === "interesse" && <WaitingBadge createdAt={booking.created_at} />}
           </div>
           {/* flex-shrink-0 e alvo de 40px: com muitos selos o X era espremido
@@ -1922,6 +2220,31 @@ export default function AdminReservasPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showExternal, setShowExternal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [comboSelecionado, setComboSelecionado] = useState<Booking | null>(null);
+  const [abrindoPerna, setAbrindoPerna] = useState<string | null>(null);
+
+  /* Abre a linha certa: venda de combo tem janela de venda, reserva comum tem a
+     de reserva. É o mesmo clique porque para o admin é a mesma lista. */
+  const abrirLinha = (b: Booking) =>
+    b.combo_pernas?.length ? setComboSelecionado(b) : setSelectedBooking(b);
+
+  /* A janela da perna precisa dos campos enriquecidos (título da viagem, datas,
+     parcelas), que só a listagem monta. Buscar pelo código reaproveita isso: a
+     busca não agrupa, então devolve a perna mesmo estando escondida na lista. */
+  const abrirPerna = async (code: string) => {
+    setAbrindoPerna(code);
+    try {
+      const res = await apiFetch(`/bookings/admin/all?search=${encodeURIComponent(code)}`);
+      const d = await res.json();
+      const achada = (d.items as Booking[]).find((x) => x.booking_code === code);
+      if (achada) { setComboSelecionado(null); setSelectedBooking(achada); }
+    } catch {
+      /* Silêncio proposital: a janela do combo continua aberta e os códigos das
+         pernas estão ali para copiar e buscar na mão. */
+    } finally {
+      setAbrindoPerna(null);
+    }
+  };
   const [editTarget, setEditTarget] = useState<Booking | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [pagoTarget, setPagoTarget] = useState<Booking | null>(null);
@@ -2181,6 +2504,30 @@ export default function AdminReservasPage() {
     // Na tabela (compact) os botões são quadradinhos uniformes de 30px e NÃO quebram
     // linha; no card mobile mostram rótulo e podem quebrar.
     const sizing = compact ? "w-[30px] h-[30px] justify-center shrink-0" : "px-2.5 py-1.5";
+
+    /* Linha de combo não oferece editar, cancelar nem estornar.
+     *
+     * Essas ações são por POLTRONA, e daqui elas cairiam caladamente na
+     * primeira perna: o admin acharia que cancelou o combo e teria cancelado
+     * uma viagem das três. Quem quiser agir abre a venda e escolhe a perna. */
+    if (b.combo_pernas?.length) {
+      return (
+        <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => setComboSelecionado(b)} title="Ver a venda do combo"
+            className={`flex items-center gap-1 border border-gold-300 text-gold-700 hover:bg-gold-50 text-xs font-bold rounded-lg transition-colors ${sizing}`}>
+            <Package size={13} />{!compact && " Ver combo"}
+          </button>
+          {b.traveler_phone && (
+            <a href={buildWaUrl(b)} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()} title="Falar no WhatsApp"
+              className={`flex items-center justify-center gap-1.5 border border-emerald-200 text-[#25D366] hover:bg-emerald-50 font-semibold text-xs rounded-lg transition-colors ${sizing}`}>
+              <WhatsAppGlyph size={14} />{!compact && " WhatsApp"}
+            </a>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
         {/* Fechar venda de reserva em aguardando pagamento mora SÓ no modal de
@@ -2270,6 +2617,15 @@ export default function AdminReservasPage() {
           onClose={() => setRefundTarget(null)}
           onConfirm={executeRefund}
           loading={refundLoading}
+        />
+      )}
+
+      {comboSelecionado && (
+        <ComboDetailModal
+          venda={comboSelecionado}
+          onClose={() => setComboSelecionado(null)}
+          onAbrirPerna={abrirPerna}
+          abrindo={abrindoPerna}
         />
       )}
 
@@ -2461,23 +2817,36 @@ export default function AdminReservasPage() {
                     const st = statusVisual(b);
                     const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
                     return (
-                      <tr key={b.id} onClick={() => setSelectedBooking(b)}
+                      <tr key={b.id} onClick={() => abrirLinha(b)}
                         className={`border-b border-gray-50 border-l-4 ${st.border} hover:bg-gray-50 cursor-pointer transition-colors`}>
                         <td className="px-4 py-3 align-top">
-                          <button onClick={(e) => { e.stopPropagation(); copyCode(b.booking_code); }}
-                            className="flex items-center gap-1 font-mono text-xs text-navy-600 font-semibold hover:text-gold-600 transition-colors group">
-                            {b.booking_code}
-                            {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
-                          </button>
+                          {/* Linha de combo se identifica pelo código da VENDA.
+                              Mostrar o da primeira perna fazia a venda parecer
+                              uma reserva só, que foi o que confundiu. */}
+                          {(() => {
+                            const codigo = b.combo_grupo ?? b.booking_code;
+                            return (
+                              <button onClick={(e) => { e.stopPropagation(); copyCode(codigo); }}
+                                className="flex items-center gap-1 font-mono text-xs text-navy-600 font-semibold hover:text-gold-600 transition-colors group">
+                                {codigo}
+                                {copiedCode === codigo ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
+                              </button>
+                            );
+                          })()}
                           {valorDiverge(b) && (
                             <span title="Data trocada: o valor pago não bate com o preço da data atual" className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                               <AlertTriangle size={9} /> valor a acertar
                             </span>
                           )}
-                          <span className="mt-1 flex items-center gap-0.5 text-[10px] font-semibold">
+                          <span className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold">
                             {b.is_external
                               ? <span className="text-purple-600 flex items-center gap-0.5"><Store size={9} /> Externo</span>
                               : <span className="text-blue-500 flex items-center gap-0.5"><Globe size={9} /> Site</span>}
+                            {/* Pelo NOME, não pelas pernas: a reserva achada na
+                                busca é uma perna, e continua sendo de um combo. */}
+                            {!!b.combo_nome && (
+                              <span title={b.combo_nome} className="text-gold-700 flex items-center gap-0.5"><Package size={9} /> Combo</span>
+                            )}
                           </span>
                         </td>
                         <td className="px-4 py-3 align-top">
@@ -2485,11 +2854,24 @@ export default function AdminReservasPage() {
                           {b.traveler_phone && <p className="text-xs text-gray-400">{formatPhone(b.traveler_phone)}</p>}
                         </td>
                         <td className="px-4 py-3 align-top">
-                          <p className="text-navy-700 max-w-[200px] flex items-center gap-1"><span className="truncate">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</span><SeloSemCartao b={b} /></p>
-                          {b.trip_quote_only ? <p className="text-xs text-gray-400">Sob cotação</p> : b.trip_departure_date && <p className="text-xs text-gray-400">{fmtDataHoraViagem(b.trip_departure_at ?? b.trip_departure_date)}</p>}
+                          {b.combo_pernas?.length ? (
+                            /* A venda é uma linha, mas as viagens continuam
+                               sendo três ônibus. Escondê-las deixaria o admin
+                               sem saber quem embarca onde. */
+                            <ViagensDoCombo b={b} />
+                          ) : (
+                            <>
+                              <p className="text-navy-700 max-w-[200px] flex items-center gap-1"><span className="truncate">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`}</span><SeloSemCartao b={b} /></p>
+                              {b.trip_quote_only ? <p className="text-xs text-gray-400">Sob cotação</p> : b.trip_departure_date && <p className="text-xs text-gray-400">{fmtDataHoraViagem(b.trip_departure_at ?? b.trip_departure_date)}</p>}
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-3 align-top text-center text-gray-600">{b.num_travelers}</td>
-                        <td className="px-4 py-3 align-top text-right font-bold text-navy-800 whitespace-nowrap">R$ {fmtBRL(b.final_amount)}</td>
+                        {/* Combo mostra o valor da VENDA. Mostrar o da primeira
+                            perna faria uma venda de mil parecer de trezentos. */}
+                        <td className="px-4 py-3 align-top text-right font-bold text-navy-800 whitespace-nowrap">
+                          R$ {fmtBRL(b.combo_total ?? b.final_amount)}
+                        </td>
                         <td className="px-4 py-3 align-top text-xs text-gray-500 max-w-[130px]">{paymentLabel(b.payment_method, b.installments)}</td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex items-center gap-1.5">
@@ -2514,18 +2896,28 @@ export default function AdminReservasPage() {
                 const trip = tripMap[b.trip_id];
                 const st = statusVisual(b);
                 const travelerName = b.traveler_name || `Usuário #${b.user_id}`;
-                const showActions = ["interesse", "confirmed", "pending"].includes(b.status) || !!b.traveler_phone;
+                /* A âncora de um combo pode ser uma perna cancelada enquanto a
+                   VENDA segue de pé, e aí o status dela esconderia o botão de
+                   abrir a venda. Quem manda é a linha, não a poltrona. */
+                const showActions = !!b.combo_pernas?.length
+                  || ["interesse", "confirmed", "pending"].includes(b.status)
+                  || !!b.traveler_phone;
                 return (
-                  <div key={b.id} onClick={() => setSelectedBooking(b)}
+                  <div key={b.id} onClick={() => abrirLinha(b)}
                     className={`rounded-xl border border-gray-100 border-l-4 ${st.border} bg-gray-50 p-4 space-y-3 transition-colors duration-200 hover:bg-white hover:shadow-md cursor-pointer`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <button onClick={(e) => { e.stopPropagation(); copyCode(b.booking_code); }}
-                            className="flex items-center gap-1 font-mono text-xs text-navy-500 font-semibold hover:text-gold-600 transition-colors group">
-                            {b.booking_code}
-                            {copiedCode === b.booking_code ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
-                          </button>
+                          {(() => {
+                            const codigo = b.combo_grupo ?? b.booking_code;
+                            return (
+                              <button onClick={(e) => { e.stopPropagation(); copyCode(codigo); }}
+                                className="flex items-center gap-1 font-mono text-xs text-navy-500 font-semibold hover:text-gold-600 transition-colors group">
+                                {codigo}
+                                {copiedCode === codigo ? <CheckCheck size={11} className="text-emerald-500" /> : <Copy size={11} className="text-gray-300 group-hover:text-gold-500" />}
+                              </button>
+                            );
+                          })()}
                           {valorDiverge(b) && (
                             <span title="Data trocada: o valor pago não bate com o preço da data atual" className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                               <AlertTriangle size={9} /> valor a acertar
@@ -2534,13 +2926,20 @@ export default function AdminReservasPage() {
                           {b.is_external
                             ? <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600"><Store size={9} /> Ext.</span>
                             : <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500"><Globe size={9} /> Site</span>}
+                          {!!b.combo_nome && (
+                            <span title={b.combo_nome} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-gold-700"><Package size={9} /> Combo</span>
+                          )}
                         </div>
-                        <p className="font-bold text-navy-800 text-sm leading-snug">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`} <SeloSemCartao b={b} /></p>
+                        {b.combo_pernas?.length ? (
+                          <ViagensDoCombo b={b} />
+                        ) : (
+                          <p className="font-bold text-navy-800 text-sm leading-snug">{b.trip_title ?? trip?.title ?? `Viagem #${b.trip_id}`} <SeloSemCartao b={b} /></p>
+                        )}
                         <p className="text-xs text-gray-500 truncate">{travelerName}</p>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 pt-0.5">
                           <span>{b.num_travelers} pessoa{b.num_travelers !== 1 ? "s" : ""}</span>
                           <span>·</span>
-                          <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>
+                          <span className="font-bold text-navy-700">R$ {fmtBRL(b.combo_total ?? b.final_amount)}</span>
                           <span>·</span>
                           <span>{paymentLabel(b.payment_method, b.installments)}</span>
                         </div>

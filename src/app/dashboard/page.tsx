@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   LogOut, MapPin, Calendar, ChevronRight, ChevronLeft, Search, MessageCircle, Menu, X, Users,
-  Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2,
+  Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2, Package,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
 import { fmtBRL, salesClosed } from "@/lib/format";
@@ -27,6 +27,46 @@ interface Booking {
   trip_return_date?: string; trip_departure_at?: string; trip_return_at?: string; trip_image_url?: string;
   trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
   trip_quote_only?: boolean;
+  /* Combo. O cliente continua vendo UMA viagem por card, porque é o voucher de
+     cada ônibus que ele usa na porta. Estes campos só dão o contexto: que as
+     três viagens são uma compra só, e que o valor de cada uma já é a fatia
+     dela no desconto do pacote. */
+  combo_nome?: string | null;
+  combo_pernas?: PernaDoCombo[];
+  /** Total do pacote. É o único valor que o cliente vê num combo: o da perna
+   *  é rateio, não preço, e o desconto já cumpriu o papel dele na venda. */
+  combo_total?: number | null;
+}
+
+interface PernaDoCombo {
+  booking_code: string;
+  trip_id: number;
+  trip_title: string | null;
+  trip_departure_date: string | null;
+  status: string;
+}
+
+/** Onde esta viagem entra no combo: "viagem 2 de 3". Nulo quando a reserva não
+ *  faz parte de um combo, e é o que decide se o selo aparece. */
+function posicaoNoCombo(b: Booking): { i: number; total: number } | null {
+  const pernas = b.combo_pernas;
+  if (!pernas?.length || !b.combo_nome) return null;
+  const i = pernas.findIndex((p) => p.booking_code === b.booking_code);
+  if (i < 0) return null;
+  return { i: i + 1, total: pernas.length };
+}
+
+/** Selo do combo. Discreto e sempre igual, nos dois lugares em que a viagem
+ *  aparece para o cliente, para ele reconhecer o padrão. */
+function SeloCombo({ b, claro = false }: { b: Booking; claro?: boolean }) {
+  const pos = posicaoNoCombo(b);
+  if (!pos) return null;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+      claro ? "bg-gold-400/90 text-navy-900" : "bg-gold-100 text-gold-700"}`}>
+      <Package size={11} /> {b.combo_nome} · viagem {pos.i} de {pos.total}
+    </span>
+  );
 }
 
 const WA_BASE = "https://wa.me/5541998348766?text=";
@@ -123,6 +163,9 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white/85 uppercase tracking-wide"><Ticket size={12} /> Voucher</span>
           </div>
           <div>
+            {/* Antes do título: a primeira coisa a explicar é POR QUE o cliente
+                tem três viagens que ele comprou de uma vez só. */}
+            <div className="mb-1.5"><SeloCombo b={b} claro /></div>
             <h2 className="font-display font-black text-2xl sm:text-3xl leading-tight drop-shadow">{b.trip_title ?? "Viagem"}</h2>
             {b.trip_destination && <p className="flex items-center gap-1.5 text-white/85 text-sm mt-0.5"><MapPin size={13} /> {b.trip_destination}</p>}
           </div>
@@ -226,13 +269,64 @@ function Voucher({ b, userName }: { b: Booking; userName?: string }) {
           </VBlock>
         )}
 
+        {/* Seu combo: as outras viagens da mesma compra.
+            Sem isto o cliente veria três viagens soltas no painel e poderia
+            esquecer que comprou as outras duas, ou achar que houve engano. */}
+        {(() => {
+          const pos = posicaoNoCombo(b);
+          if (!pos) return null;
+          return (
+            <VBlock icon={<Package size={13} className="text-gold-500" />} title={`Seu combo: ${b.combo_nome}`}>
+              <p className="text-xs text-gray-500 mb-2">
+                Você comprou {pos.total} viagens juntas. Cada uma tem o seu voucher, com o embarque e os documentos do dia.
+              </p>
+              <ol className="space-y-1.5">
+                {/* O servidor manda só as pernas de pé: viagem cancelada aqui
+                    pareceria uma viagem que o cliente ainda tem. */}
+                {b.combo_pernas?.map((p, i) => {
+                  const atual = p.booking_code === b.booking_code;
+                  return (
+                    <li key={p.booking_code}
+                      className={`text-sm flex items-start gap-2 ${atual ? "text-navy-800 font-semibold" : "text-gray-600"}`}>
+                      <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center mt-0.5 tabular-nums">{i + 1}</span>
+                      <span className="min-w-0">
+                        {p.trip_title ?? "Viagem"}
+                        {p.trip_departure_date && <span className="text-gray-400"> · {fmtDate(p.trip_departure_date)}</span>}
+                        {atual && <span className="text-gold-600 font-bold"> · esta</span>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </VBlock>
+          );
+        })()}
+
         {/* Pagamento */}
-        <VBlock icon={<Wallet size={13} className="text-gold-500" />} title="Pagamento">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "-"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
-            <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(b.final_amount)}</span>
-          </div>
-        </VBlock>
+        {/* Num combo, o valor mostrado é o do PACOTE, não o da perna.
+            O da perna é rateio do desconto, um número que a AJS nunca vendeu, e
+            impresso num voucher ele vira argumento no dia em que alguém quiser
+            cancelar uma viagem das três. O total do pacote é o que o cliente
+            reconhece por ter pago. */}
+        {(() => {
+          const combo = posicaoNoCombo(b);
+          const valor = combo && b.combo_total != null ? b.combo_total : b.final_amount;
+          return (
+            <VBlock icon={<Wallet size={13} className="text-gold-500" />} title="Pagamento">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">{PAY[b.payment_method ?? ""] ?? "-"}{(b.installments ?? 1) > 1 ? ` · ${b.installments}x` : ""}</span>
+                <span className="font-display font-black text-lg text-navy-800">R$ {fmtBRL(valor)}</span>
+              </div>
+              {/* Sem isto, ver o mesmo total nos três vouchers pareceria ter
+                  pago três vezes. */}
+              {combo && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Valor do pacote, pelas {combo.total} viagens do combo.
+                </p>
+              )}
+            </VBlock>
+          );
+        })()}
       </div>
 
       {/* Ações */}
@@ -286,7 +380,12 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
               : <div className="w-full h-full flex items-center justify-center"><Plane size={20} className="text-navy-300" /></div>}
           </div>
           <div className="flex-1 min-w-0">
-            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mb-1 ${badge.cls}`}>{badge.txt}</span>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.txt}</span>
+              {/* Mesmo selo do voucher: no histórico, é o que faz o cliente
+                  lembrar que aquelas viagens vieram de uma compra só. */}
+              <SeloCombo b={b} />
+            </div>
             <p className="font-display font-black text-navy-800 text-sm sm:text-base leading-tight line-clamp-2">{b.trip_title ?? "Viagem"}</p>
             {b.trip_destination && <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5"><MapPin size={10} /> {b.trip_destination}</p>}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-2">
@@ -294,7 +393,10 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
                 {b.trip_quote_only ? "Sob consulta" : b.trip_departure_date ? (roundtrip ? `${fmtDate(b.trip_departure_date)} · bate e volta` : `${fmtDate(b.trip_departure_date)}${b.trip_return_date ? ` → ${fmtDate(b.trip_return_date)}` : ""}`) : "Data a definir"}
               </span>
               <span className="flex items-center gap-1"><Users size={11} className="text-gold-500" /> {pessoas(b.num_travelers)}</span>
-              {variant !== "interesse" && variant !== "past" && b.final_amount > 0 && <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>}
+              {/* Perna de combo não mostra valor aqui: seria o do rateio, e
+                  brigaria com o total do pacote que aparece no voucher. A
+                  conversa sobre dinheiro acontece uma vez, lá. */}
+              {variant !== "interesse" && variant !== "past" && b.final_amount > 0 && !posicaoNoCombo(b) && <span className="font-bold text-navy-700">R$ {fmtBRL(b.final_amount)}</span>}
             </div>
           </div>
         </div>
