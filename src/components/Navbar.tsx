@@ -12,7 +12,6 @@ const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%2
 
 const navLinks = [
   { label: "Viagens", href: "/viagens" },
-  { label: "Combos", href: "/combos" },
   { label: "Como Funciona", href: "/#como-funciona" },
   { label: "Depoimentos", href: "/#depoimentos" },
   { label: "Contato", href: "/#contato" },

@@ -14,7 +14,19 @@ async function getPublicTemplates() {
   }
 }
 
+async function getCombos() {
+  try {
+    const res = await fetch(`${API}/combos/public`, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
 export default async function ViagensPage() {
-  const templates = await getPublicTemplates();
-  return <ViagensClient initialTemplates={templates} />;
+  // Em paralelo: são duas listas independentes, e esperar uma para pedir a
+  // outra dobraria o tempo até a primeira pintura.
+  const [templates, combos] = await Promise.all([getPublicTemplates(), getCombos()]);
+  return <ViagensClient initialTemplates={templates} combos={combos} />;
 }

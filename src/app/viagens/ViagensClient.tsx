@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   MapPin, Search, ArrowRight,
-  X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp,
+  X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp, Package,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -99,7 +99,37 @@ function sortTemplates(templates: PublicTemplate[], sort: string): PublicTemplat
   return arr.sort((a, b) => dateKey(a) - dateKey(b));
 }
 
-export default function ViagensClient({ initialTemplates }: { initialTemplates: PublicTemplate[] }) {
+/* ── Combo ──
+ *
+ * Combo é viagem, não uma categoria à parte: por decisão do dono ele mora aqui
+ * junto das outras, e não numa aba própria. É uma viagem onde vão três, pagas
+ * de uma vez com desconto.
+ */
+export type RoteiroDoCombo = {
+  template_id: number;
+  title: string;
+  destination: string | null;
+  image_url: string | null;
+  preco_desde: number | null;
+  preco_tabela_desde: number | null;
+};
+
+export type ComboPublico = {
+  id: number;
+  nome: string;
+  slug: string;
+  desconto_pct: number;
+  max_installments: number;
+  venda_fim: string | null;
+  roteiros: RoteiroDoCombo[];
+  preco_tabela_desde: number | null;
+  preco_cheio_desde: number | null;
+  preco_com_desconto_desde: number | null;
+  preco_com_desconto_ate: number | null;
+};
+
+export default function ViagensClient({ initialTemplates, combos = [] }:
+  { initialTemplates: PublicTemplate[]; combos?: ComboPublico[] }) {
   const [templates, setTemplates] = useState<PublicTemplate[]>(initialTemplates);
   // Inicializa já ordenado para evitar flash de ordem errada no primeiro render
   const [filtered, setFiltered] = useState<PublicTemplate[]>(() => sortTemplates(initialTemplates, "date_asc"));
@@ -209,6 +239,19 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
 
   const clearFilters = () => { setSearch(""); setSelectedDate(""); setSelectedMonth(""); };
   const hasFilters = !!(search || selectedDate || selectedMonth);
+
+  /* Combos entram na busca por texto, mas somem quando o filtro é de DATA: o
+     combo não tem uma data só, ele tem uma por viagem, e fingir que casa com o
+     dia escolhido enganaria quem filtrou. */
+  const combosVisiveis = useMemo(() => {
+    if (selectedDate || selectedMonth) return [];
+    if (!search.trim()) return combos;
+    const alvo = semAcento(search);
+    return combos.filter((c) =>
+      semAcento(c.nome).includes(alvo) ||
+      c.roteiros.some((r) => semAcento(r.title).includes(alvo) || semAcento(r.destination ?? "").includes(alvo)),
+    );
+  }, [combos, search, selectedDate, selectedMonth]);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
 
   return (
@@ -448,10 +491,14 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && combosVisiveis.length === 0 ? (
           <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} />
         ) : (
           <div key={`${search}|${selectedDate}|${selectedMonth}|${sort}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-in">
+            {/* Primeiro os combos: é a oferta que o cliente não sabe que existe. */}
+            {combosVisiveis.map((c) => (
+              <ComboCard key={`combo-${c.id}`} c={c} />
+            ))}
             {filtered.map((tmpl) => (
               <TemplateCard key={tmpl.id} tmpl={tmpl} highlightDate={selectedDate} highlightMonth={selectedMonth} />
             ))}
@@ -491,6 +538,99 @@ export default function ViagensClient({ initialTemplates }: { initialTemplates: 
         <ArrowUp size={20} />
       </button>
     </div>
+  );
+}
+
+/* ── Combo Card ──
+ *
+ * Mesma casca do card de viagem, para o combo não parecer outra coisa no meio
+ * da vitrine. O que muda é o miolo: no lugar das datas, as VIAGENS do pacote com
+ * "de tanto por tanto" em cada uma.
+ *
+ * Esse "de/por" por viagem é o motivo de comprar. Só o total do pacote não diz
+ * nada a quem não sabe quanto custa cada viagem separada.
+ */
+function ComboCard({ c }: { c: ComboPublico }) {
+  const capa = c.roteiros.find((r) => r.image_url)?.image_url;
+  const fator = 1 - c.desconto_pct / 100;
+  const de = c.preco_tabela_desde ?? c.preco_cheio_desde;
+  const por = c.preco_com_desconto_desde ?? 0;
+
+  return (
+    <Link
+      href={`/combos/${c.slug}`}
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 flex flex-col border border-gray-100 hover:border-gold-300 hover:-translate-y-1"
+    >
+      <div className="relative h-44 flex-shrink-0 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img loading="lazy" decoding="async"
+          src={capa ? imgOtim(capa, 828, 85) : "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80"}
+          alt={c.nome}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+        <div className="absolute top-2.5 left-2.5 flex gap-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-xs font-bold px-2.5 py-1 rounded-full">
+            <Package size={10} /> Combo
+          </span>
+          <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+            -{c.desconto_pct.toString().replace(".", ",")}%
+          </span>
+        </div>
+        <div className="absolute bottom-2.5 left-2.5 right-2.5">
+          <h3 className="font-display font-black text-base text-white leading-tight drop-shadow">{c.nome}</h3>
+          <div className="flex items-center gap-1 text-white/80 text-xs mt-0.5">
+            <MapPin size={10} className="flex-shrink-0" /> {c.roteiros.length} viagens, você escolhe as datas
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 flex flex-col flex-1">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+          As viagens do combo
+        </p>
+        <div className="space-y-1.5">
+          {c.roteiros.map((r) => {
+            const cheio = r.preco_tabela_desde ?? r.preco_desde;
+            const comDesc = r.preco_desde != null ? r.preco_desde * fator : null;
+            return (
+              <div key={r.template_id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50 text-xs">
+                <span className="font-semibold text-navy-800 truncate">{r.title}</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {cheio != null && comDesc != null && cheio > comDesc && (
+                    <span className="text-gray-400 line-through">R$ {fmtBRL(cheio)}</span>
+                  )}
+                  {comDesc != null && <span className="font-bold text-gold-600">R$ {fmtBRL(comDesc)}</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-auto flex items-end justify-between pt-3 border-t border-gray-100">
+          <div>
+            {de != null && de > por && (
+              <p className="text-xs text-gray-400 line-through leading-none mb-0.5">R$ {fmtBRL(de)}</p>
+            )}
+            <p className="text-[10px] text-gray-400 leading-none">as {c.roteiros.length} viagens por</p>
+            <p className="font-display font-black text-xl text-navy-700 leading-tight">
+              R$ {fmtBRL(por)}
+              {c.preco_com_desconto_ate != null && (
+                <span className="text-sm font-bold text-gray-400"> a {fmtBRL(c.preco_com_desconto_ate)}</span>
+              )}
+            </p>
+            <p className="text-[10px] text-emerald-600 font-semibold">
+              {c.max_installments > 1
+                ? `${c.max_installments}x de R$ ${fmtInstallment(por, c.max_installments)} s/ juros`
+                : "à vista, no PIX ou cartão"}
+            </p>
+          </div>
+          <span className="flex-shrink-0 w-10 h-10 rounded-xl bg-navy-800 group-hover:bg-gold-500 text-white group-hover:text-navy-900 flex items-center justify-center transition-colors">
+            <ArrowRight size={17} />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 

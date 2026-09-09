@@ -48,7 +48,6 @@ export default function Footer() {
               {[
                 { label: "Destinos", href: "#destinos" },
                 { label: "Pacotes", href: "#pacotes" },
-                { label: "Combos", href: "/combos" },
                 { label: "Como Funciona", href: "#como-funciona" },
                 { label: "Depoimentos", href: "#depoimentos" },
                 { label: "Contato", href: "#contato" },
