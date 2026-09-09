@@ -7,6 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: SITE, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 },
     { url: `${SITE}/viagens`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
+    { url: `${SITE}/combos`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE}/cadastro`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE}/login`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
   ];
@@ -29,7 +30,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       }));
 
-    return [...staticRoutes, ...roteiroRoutes];
+    // Os combos que estão no ar. Vêm da mesma lista que a vitrine usa, então o
+    // sitemap nunca anuncia um combo que já saiu de venda.
+    let comboRoutes: MetadataRoute.Sitemap = [];
+    try {
+      const rc = await fetch(`${API}/combos/public`, { next: { revalidate: 3600 } });
+      if (rc.ok) {
+        const combos: Array<{ slug: string | null }> = await rc.json();
+        if (Array.isArray(combos)) {
+          comboRoutes = combos
+            .filter((c) => c.slug)
+            .map((c) => ({
+              url: `${SITE}/combos/${c.slug}`,
+              lastModified: new Date(),
+              changeFrequency: "weekly" as const,
+              priority: 0.8,
+            }));
+        }
+      }
+    } catch {
+      // Combo fora do sitemap não quebra o resto.
+    }
+
+    return [...staticRoutes, ...roteiroRoutes, ...comboRoutes];
   } catch {
     return staticRoutes;
   }
