@@ -13,6 +13,7 @@ import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeri
 import { DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
+import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { imgOtim } from "@/lib/imagem";
 
 type Opcional = { name: string; price: number };
@@ -25,6 +26,7 @@ type DataDoRoteiro = {
   original_price: number | null;
   available_spots: number;
   optionals: Opcional[];
+  price_tiers: { name?: string; age_range?: string; price?: number; occupies_seat?: boolean }[];
   tem_hospedagem: boolean;
 };
 
@@ -46,6 +48,15 @@ type RoteiroDoCombo = {
   datas: DataDoRoteiro[];
 };
 
+type Faixa = { name: string; age_range: string; occupies_seat: boolean };
+
+/** Rótulo mostrado ao cliente, igual ao da página de viagem. */
+function rotuloFaixa(f: Faixa): string {
+  return f.age_range ? `${f.name} (${f.age_range})` : f.name;
+}
+
+const ADULTO = "Adulto";
+
 type Combo = {
   id: number;
   nome: string;
@@ -53,6 +64,7 @@ type Combo = {
   descricao: string | null;
   desconto_pct: number;
   max_installments: number;
+  price_tiers: Faixa[];
   venda_fim: string | null;
   roteiros: RoteiroDoCombo[];
   preco_tabela_desde: number | null;
@@ -206,7 +218,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     for (const r of combo.roteiros) if (r.datas.length) inicial[r.template_id] = r.datas[0].trip_id;
     return inicial;
   });
+  /* Sem faixas, um contador simples, como na viagem sem faixa. Com faixas,
+     uma linha por categoria, exatamente como a página de viagem faz. */
+  const temFaixas = (combo.price_tiers ?? []).length > 0;
   const [pessoas, setPessoas] = useState(1);
+  const [porFaixa, setPorFaixa] = useState<Record<string, number>>({ [ADULTO]: 1 });
   /* trip_id -> nomes marcados. Por DATA e não por roteiro: o preço de um
      opcional pode mudar de uma saída para outra, e trocar a data tem que
      começar do zero em vez de carregar a escolha de outra saída. */
@@ -227,6 +243,19 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     [combo.roteiros, escolha],
   );
 
+  const totalPessoas = temFaixas
+    ? Object.values(porFaixa).reduce((a, b) => a + b, 0)
+    : pessoas;
+
+  /* Poltronas, que não é o mesmo que pessoas: criança de colo não desconta
+     vaga. É por poltrona que a viagem cabe ou não cabe. */
+  const poltronas = temFaixas
+    ? (combo.price_tiers ?? []).reduce(
+        (s, f) => s + (f.occupies_seat ? (porFaixa[rotuloFaixa(f)] ?? 0) : 0),
+        porFaixa[ADULTO] ?? 0,
+      )
+    : pessoas;
+
   /* Cabem tantas pessoas quanto a MENOR vaga entre as datas escolhidas: o combo
      não pode ser vendido para mais gente do que cabe na viagem mais cheia. */
   const vagaMinima = useMemo(() => {
@@ -237,16 +266,53 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   /* Opcional é por pessoa, como no checkout de viagem única. O quarto single é
      por adulto, mas enquanto o combo não tem faixas de idade todo mundo é
      adulto, então as duas contas dão no mesmo. */
+  /* Quarto single OBRIGATÓRIO: viagem com hospedagem, UM adulto e ao menos uma
+     criança. A regra é do servidor e roda de qualquer jeito no checkout; a tela
+     precisa aplicá-la também, senão o valor muda sozinho na hora de pagar.
+     Foi exatamente o que aconteceu ao testar: tela R$ 1.328,46, servidor
+     R$ 1.489,46, os R$ 230 do quarto que ninguém tinha pedido. */
+  const adultos = temFaixas ? (porFaixa[ADULTO] ?? 0) : pessoas;
+  const quartoObrigatorio = (d: DataDoRoteiro): boolean =>
+    d.tem_hospedagem && adultos === 1 && totalPessoas > adultos
+    && d.optionals.some((o) => o.name === QUARTO_SINGLE);
+
+  /* O que cada perna cobra de opcional: o que o cliente marcou, mais o quarto
+     quando ele deixa de ser escolha. O quarto multiplica por ADULTO, o resto
+     por pessoa, como no checkout de viagem única. */
+  const opcionaisDaPerna = (d: DataDoRoteiro) => {
+    const marcados = new Set(opcionais[d.trip_id] ?? []);
+    if (quartoObrigatorio(d)) marcados.add(QUARTO_SINGLE);
+    return d.optionals.filter((o) => marcados.has(o.name));
+  };
+
   const totalOpcionais = pernas.reduce((s, p) => {
     if (!p.data) return s;
-    const marcados = opcionais[p.data.trip_id] ?? [];
-    return s + p.data.optionals
-      .filter((o) => marcados.includes(o.name))
-      .reduce((t, o) => t + o.price * pessoas, 0);
+    return s + opcionaisDaPerna(p.data).reduce(
+      (t, o) => t + o.price * (o.name === QUARTO_SINGLE ? adultos : totalPessoas), 0,
+    );
   }, 0);
 
-  const cheio = pernas.reduce((s, p) => s + (p.data?.price_per_person ?? 0) * pessoas, 0)
-    + totalOpcionais;
+  /* O preço de cada perna sai da FAIXA daquela viagem, não da do combo: a faixa
+     do combo diz quem é criança, o valor é sempre o da viagem. É a mesma
+     tradução que o servidor faz ao cobrar, e as duas contas precisam bater,
+     senão o cliente vê um total na tela e outro na hora de pagar. */
+  const precoNaPerna = (d: DataDoRoteiro, faixa: Faixa | null): number => {
+    if (!faixa) return d.price_per_person;
+    const equivalente = (d.price_tiers ?? []).find(
+      (t) => (t.occupies_seat ?? true) === faixa.occupies_seat,
+    );
+    return equivalente ? Number(equivalente.price ?? d.price_per_person) : d.price_per_person;
+  };
+
+  const cheio = pernas.reduce((s, p) => {
+    if (!p.data) return s;
+    if (!temFaixas) return s + p.data.price_per_person * pessoas;
+    const adultos = (porFaixa[ADULTO] ?? 0) * p.data.price_per_person;
+    const demais = (combo.price_tiers ?? []).reduce(
+      (t, f) => t + (porFaixa[rotuloFaixa(f)] ?? 0) * precoNaPerna(p.data!, f), 0,
+    );
+    return s + adultos + demais;
+  }, 0) + totalOpcionais;
   const desconto = Math.round(cheio * combo.desconto_pct) / 100;
   const final = Math.round((cheio - desconto) * 100) / 100;
   const faltaData = pernas.some((p) => !p.data);
@@ -258,6 +324,9 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const continuar = async () => {
     setErro("");
     if (faltaData) { setErro("Escolha a data de cada viagem."); return; }
+    if (temFaixas && (porFaixa[ADULTO] ?? 0) < 1) {
+      setErro("A reserva precisa de pelo menos um adulto."); return;
+    }
     if (!getUser()) {
       router.push(`/login?redirect=${encodeURIComponent(`/combos/${combo.slug}`)}`);
       return;
@@ -273,7 +342,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
             // Só o nome: o preço vem do servidor, sempre.
             selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
           })),
-          num_travelers: pessoas,
+          num_travelers: totalPessoas,
+          tier_breakdown: temFaixas
+            ? Object.entries(porFaixa).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+            : [],
         }),
       });
       const d = await res.json();
@@ -291,7 +363,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const Resumo = ({ compacto = false }: { compacto?: boolean }) => (
     <>
       <p className="text-xs text-gray-400 mb-0.5">
-        as {combo.roteiros.length} viagens, {pessoas === 1 ? "1 pessoa" : `${pessoas} pessoas`}
+        as {combo.roteiros.length} viagens, {totalPessoas === 1 ? "1 pessoa" : `${totalPessoas} pessoas`}
       </p>
       <div className="flex items-end gap-2 mb-0.5">
         {desconto > 0 && (
@@ -423,11 +495,13 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                           </p>
                           <div className="space-y-2">
                             {data.optionals.map((o) => {
-                              const on = marcados.includes(o.name);
+                              const forcado = o.name === QUARTO_SINGLE && quartoObrigatorio(data);
+                              const on = forcado || marcados.includes(o.name);
                               return (
                                 <button
                                   key={o.name}
                                   type="button"
+                                  disabled={forcado}
                                   onClick={() => setOpcionais((a) => ({
                                     ...a,
                                     [data.trip_id]: on
@@ -435,7 +509,8 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                                       : [...marcados, o.name],
                                   }))}
                                   className={`w-full flex items-center gap-3 text-left px-3.5 py-3 rounded-xl border-2 transition-colors ${
-                                    on ? "border-navy-700 bg-navy-50" : "border-gray-200 hover:border-navy-300"
+                                    forcado ? "border-gold-300 bg-gold-50 cursor-default"
+                                      : on ? "border-navy-700 bg-navy-50" : "border-gray-200 hover:border-navy-300"
                                   }`}
                                 >
                                   <span className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 ${
@@ -445,7 +520,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                                   </span>
                                   <span className="min-w-0 flex-1">
                                     <span className="block text-sm font-semibold text-navy-800">{o.name}</span>
-                                    <span className="block text-xs text-gray-400">por pessoa</span>
+                                    <span className="block text-xs text-gray-400">
+                                      {forcado
+                                        ? "incluído: um adulto com criança não divide quarto"
+                                        : o.name === QUARTO_SINGLE ? "por adulto" : "por pessoa"}
+                                    </span>
                                   </span>
                                   <span className="text-sm font-bold text-navy-700 whitespace-nowrap">
                                     + R$ {fmtBRL(o.price)}
@@ -463,31 +542,6 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                   </p>
                 </div>
               )}
-
-              {/* Viajantes */}
-              <div className="bg-white rounded-2xl shadow-sm p-5">
-                <h2 className="font-display font-black text-navy-800 text-lg mb-1">Quantas pessoas</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  As mesmas pessoas viajam nas {combo.roteiros.length} viagens.
-                </p>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setPessoas((n) => Math.max(1, n - 1))} disabled={pessoas <= 1}
-                    className="w-11 h-11 rounded-xl border border-gray-200 text-navy-700 font-bold text-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                    −
-                  </button>
-                  <span className="w-12 text-center font-display font-black text-2xl text-navy-800 tabular-nums">
-                    {pessoas}
-                  </span>
-                  <button onClick={() => setPessoas((n) => Math.min(vagaMinima || 1, n + 1))}
-                    disabled={pessoas >= vagaMinima}
-                    className="w-11 h-11 rounded-xl border border-gray-200 text-navy-700 font-bold text-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                    +
-                  </button>
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Users size={12} /> cabem {vagaMinima} neste combo
-                  </span>
-                </div>
-              </div>
 
               {/* Sobre */}
               {combo.descricao && (
@@ -526,6 +580,68 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                         Você economiza R$ {fmtBRL(desconto)}
                       </div>
                     )}
+                  </div>
+
+                  {/* Pessoas, na lateral como na página de viagem.
+                      Com faixas, uma linha por categoria: o preço mostrado é o
+                      da PRIMEIRA viagem, porque cada uma cobra o seu e um número
+                      só ali seria mentira. O total embaixo é a conta real. */}
+                  <div className="border-t border-gray-100 px-5 py-3.5">
+                    {temFaixas ? (
+                      <>
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">
+                          Pessoas por categoria
+                        </p>
+                        <div className="space-y-2">
+                          {[{ name: ADULTO, age_range: "", occupies_seat: true }, ...combo.price_tiers].map((f) => {
+                            const rotulo = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
+                            const qtd = porFaixa[rotulo] ?? 0;
+                            return (
+                              <div key={rotulo} className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{rotulo}</p>
+                                  <p className="text-[11px] text-gray-400 leading-tight">
+                                    {f.occupies_seat ? "ocupa poltrona" : "não ocupa poltrona"}
+                                  </p>
+                                </div>
+                                <button type="button"
+                                  onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: Math.max(0, (a[rotulo] ?? 0) - 1) }))}
+                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
+                                <span className="w-6 text-center font-bold text-navy-800">{qtd}</span>
+                                <button type="button"
+                                  onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: (a[rotulo] ?? 0) + 1 }))}
+                                  disabled={f.occupies_seat && poltronas >= vagaMinima}
+                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">+</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Sem adulto não existe reserva: o servidor recusa, e
+                            descobrir isso só no fim seria pior. */}
+                        {(porFaixa[ADULTO] ?? 0) < 1 && totalPessoas > 0 && (
+                          <p className="text-[11px] text-gold-700 mt-2">
+                            Alguém precisa ser adulto na reserva.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => setPessoas((n) => Math.max(1, n - 1))}
+                            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold">−</button>
+                          <span className="flex-1 text-center font-bold text-navy-800">
+                            {pessoas} pessoa{pessoas > 1 ? "s" : ""}
+                          </span>
+                          <button type="button" onClick={() => setPessoas((n) => Math.min(vagaMinima || 1, n + 1))}
+                            disabled={pessoas >= vagaMinima}
+                            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold">+</button>
+                        </div>
+                      </>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-2">
+                      As mesmas pessoas viajam nas {combo.roteiros.length} viagens · cabem {vagaMinima}
+                    </p>
                   </div>
 
                   <div className="border-t border-gray-100 divide-y divide-gray-100">

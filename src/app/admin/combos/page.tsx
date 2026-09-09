@@ -31,6 +31,9 @@ type Combo = {
   /** Parcelas SEM JUROS do pacote. É do combo, não a menor entre as viagens:
    *  o pacote tem condição comercial própria. */
   max_installments: number;
+  /** Faixas do COMBO: [{name, age_range, occupies_seat}]. Sem preço, porque
+   *  quem cobra é cada viagem com a faixa dela. */
+  price_tiers: Faixa[];
   venda_inicio: string | null;
   venda_fim: string | null;
   is_active: boolean;
@@ -46,6 +49,14 @@ type Combo = {
 };
 
 type Roteiro = { id: number; title: string; active_dates_count: number; is_active: boolean };
+
+type Faixa = { name: string; age_range: string; occupies_seat: boolean };
+
+type Sugestao = {
+  colo: { faixa: Faixa | null; motivo: string | null; por_viagem?: string[] };
+  crianca: { faixa: Faixa | null; motivo: string | null; por_viagem?: string[] };
+  roteiros: string[];
+};
 
 /* O status vem pronto do servidor, derivado da janela mais o interruptor. A tela
    só escolhe a cor: recalcular aqui abriria espaço para os dois discordarem. */
@@ -367,6 +378,8 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
     }[];
   } | null>(null);
   const [parcelas, setParcelas] = useState(String(combo?.max_installments ?? 1));
+  const [faixas, setFaixas] = useState<Faixa[]>(combo?.price_tiers ?? []);
+  const [sugestao, setSugestao] = useState<Sugestao | null>(null);
   const [inicio, setInicio] = useState(combo?.venda_inicio ?? "");
   const [fim, setFim] = useState(combo?.venda_fim ?? "");
   // Ordem importa: é como o combo aparece na vitrine, então a seleção guarda
@@ -385,6 +398,18 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelado) setSoma(d); })
       .catch(() => { if (!cancelado) setSoma(null); });
+    return () => { cancelado = true; };
+  }, [escolhidos]);
+
+  // Sugestão de faixa: a interseção entre as faixas dos roteiros escolhidos.
+  // Mesma janela da soma de preços, e pelo mesmo motivo: muda com a seleção.
+  useEffect(() => {
+    if (escolhidos.length < 2) { setSugestao(null); return; }
+    let cancelado = false;
+    apiFetch(`/combos/sugestao-faixas?template_ids=${escolhidos.join(",")}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelado) setSugestao(d); })
+      .catch(() => { if (!cancelado) setSugestao(null); });
     return () => { cancelado = true; };
   }, [escolhidos]);
 
@@ -447,6 +472,7 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
         template_ids: escolhidos,
         desconto_pct: pct,
         max_installments: Math.max(1, Math.min(24, parseInt(parcelas) || 1)),
+        price_tiers: faixas,
         venda_inicio: inicio || null,
         venda_fim: fim || null,
       };
@@ -588,6 +614,87 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
             <p className="text-[11px] text-gray-400 mt-1.5">
               Vale para o pacote inteiro, independente do que cada viagem aceita sozinha.
               {parseInt(parcelas) > 1 && " Acima do limite de uma viagem, a diferença é da AJS."}
+            </p>
+          </div>
+
+          {/* Faixas de idade DO COMBO.
+              As do catálogo não são padronizadas e não podem ser: cada hotel e
+              cada bilheteria tem a sua regra. Num combo de Foz (criança 2 a 6)
+              com Gramado (5 a 7), uma criança de 4 anos seria criança numa
+              viagem e adulto na outra. A faixa daqui vale para todas, e a
+              sugestão é a interseção, que é a única onde isso não acontece. */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+              Faixas de idade do combo
+            </label>
+
+            {faixas.length > 0 ? (
+              <div className="space-y-2">
+                {faixas.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="text-sm font-semibold text-navy-800 flex-shrink-0">{f.name}</span>
+                    <input
+                      value={f.age_range}
+                      onChange={(e) => setFaixas((a) => a.map((x, k) => k === i ? { ...x, age_range: e.target.value } : x))}
+                      placeholder="5 a 6 anos"
+                      className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-300"
+                    />
+                    <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                      {f.occupies_seat ? "ocupa poltrona" : "não ocupa"}
+                    </span>
+                    <button type="button" onClick={() => setFaixas((a) => a.filter((_, k) => k !== i))}
+                      className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                      <X size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Sem faixa, todo mundo paga o valor de adulto neste combo.
+              </p>
+            )}
+
+            {/* A sugestão, com as faixas de origem: o admin precisa ver de onde
+                o número saiu, senão é confiança cega num número inventado. */}
+            {sugestao && (
+              <div className="mt-2.5 space-y-1.5">
+                {(["crianca", "colo"] as const).map((tipo) => {
+                  const s = sugestao[tipo];
+                  const jaTem = s.faixa && faixas.some((f) => f.name === s.faixa!.name);
+                  return (
+                    <div key={tipo} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                      {s.faixa ? (
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="min-w-0">
+                            <p className="text-xs text-navy-700">
+                              Sugestão: <strong>{s.faixa.name} ({s.faixa.age_range})</strong>
+                            </p>
+                            {s.por_viagem && (
+                              <p className="text-[11px] text-gray-400">
+                                nos roteiros: {s.por_viagem.join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          <button type="button" disabled={!!jaTem}
+                            onClick={() => setFaixas((a) => [...a, s.faixa!])}
+                            className="text-xs font-bold text-navy-700 border border-navy-200 px-2.5 py-1 rounded-lg hover:bg-navy-50 disabled:opacity-40 flex-shrink-0">
+                            {jaTem ? "já adicionada" : "usar"}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gold-700 flex items-start gap-1.5">
+                          <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                          {tipo === "crianca" ? "Criança" : "Criança de colo"}: {s.motivo}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              O preço é sempre o da viagem. Aqui você define só quem é criança neste combo.
             </p>
           </div>
 
