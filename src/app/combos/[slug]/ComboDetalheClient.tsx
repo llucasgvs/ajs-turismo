@@ -14,6 +14,7 @@ import { DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
+import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
 
 type Opcional = { name: string; price: number };
@@ -304,16 +305,21 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     return equivalente ? Number(equivalente.price ?? d.price_per_person) : d.price_per_person;
   };
 
-  const cheio = pernas.reduce((s, p) => {
+  /* Só as VIAGENS entram no desconto. Opcional é custo de terceiro e entra pelo
+     valor cheio, exatamente como na viagem avulsa. É a mesma conta do servidor,
+     e as duas precisam bater. */
+  const viagens = pernas.reduce((s, p) => {
     if (!p.data) return s;
     if (!temFaixas) return s + p.data.price_per_person * pessoas;
-    const adultos = (porFaixa[ADULTO] ?? 0) * p.data.price_per_person;
+    const deAdultos = (porFaixa[ADULTO] ?? 0) * p.data.price_per_person;
     const demais = (combo.price_tiers ?? []).reduce(
       (t, f) => t + (porFaixa[rotuloFaixa(f)] ?? 0) * precoNaPerna(p.data!, f), 0,
     );
-    return s + adultos + demais;
-  }, 0) + totalOpcionais;
-  const desconto = Math.round(cheio * combo.desconto_pct) / 100;
+    return s + deAdultos + demais;
+  }, 0);
+
+  const cheio = viagens + totalOpcionais;
+  const desconto = Math.round(viagens * combo.desconto_pct) / 100;
   const final = Math.round((cheio - desconto) * 100) / 100;
   const faltaData = pernas.some((p) => !p.data);
   const proxima = pernas
@@ -360,25 +366,93 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
 
   /* O resumo do preço aparece na lateral no desktop e na barra fixa no celular,
      então mora aqui em vez de duplicado nos dois. */
+  /* No celular a barra fixa divide 375px com o botão, então o valor precisa
+     caber numa linha: sem `whitespace-nowrap` o "R$ 839,23" quebrava entre o
+     cifrão e o número. O riscado sobe para a linha de cima, onde há espaço. */
   const Resumo = ({ compacto = false }: { compacto?: boolean }) => (
     <>
-      <p className="text-xs text-gray-400 mb-0.5">
+      <p className="text-[11px] text-gray-400 leading-tight truncate">
+        {compacto && desconto > 0 && (
+          <span className="line-through mr-1.5">R$ {fmtBRL(cheio)}</span>
+        )}
         as {combo.roteiros.length} viagens, {totalPessoas === 1 ? "1 pessoa" : `${totalPessoas} pessoas`}
       </p>
       <div className="flex items-end gap-2 mb-0.5">
-        {desconto > 0 && (
+        {!compacto && desconto > 0 && (
           <span className="text-sm text-gray-400 line-through leading-none mb-0.5">R$ {fmtBRL(cheio)}</span>
         )}
-        <span className={`font-display font-black text-navy-700 leading-tight ${compacto ? "text-2xl" : "text-4xl"}`}>
+        <span className={`font-display font-black text-navy-700 leading-tight whitespace-nowrap ${
+          compacto ? "text-xl" : "text-4xl"
+        }`}>
           R$ {fmtBRL(final)}
         </span>
       </div>
       {combo.max_installments > 1 && (
-        <p className="text-xs text-emerald-600 font-semibold">
+        <p className={`text-emerald-600 font-semibold leading-tight ${compacto ? "text-[11px] truncate" : "text-xs"}`}>
           {combo.max_installments}x de R$ {fmtInstallment(final, combo.max_installments)} sem juros
         </p>
       )}
     </>
+  );
+
+  /* O MESMO seletor no corpo (celular) e na lateral (desktop), com o mesmo
+     estado. Duplicar o componente e não o estado: no celular a lateral não
+     existe, e sem isto o cliente ficaria preso em uma pessoa, sem conseguir
+     dizer que leva criança. Foi o que aconteceu ao testar em 375px. */
+  const SeletorDePessoas = () => (
+    <div className="px-5 py-3.5">
+      {temFaixas ? (
+        <>
+          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">
+            Pessoas por categoria
+          </p>
+          <div className="space-y-2">
+            {[{ name: ADULTO, age_range: "", occupies_seat: true }, ...combo.price_tiers].map((f) => {
+              const rotulo = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
+              const qtd = porFaixa[rotulo] ?? 0;
+              return (
+                <div key={rotulo} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{rotulo}</p>
+                    <p className="text-[11px] text-gray-400 leading-tight">
+                      {f.occupies_seat ? "ocupa poltrona" : "não ocupa poltrona"}
+                    </p>
+                  </div>
+                  <button type="button"
+                    onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: Math.max(0, (a[rotulo] ?? 0) - 1) }))}
+                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
+                  <span className="w-6 text-center font-bold text-navy-800">{qtd}</span>
+                  <button type="button"
+                    onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: (a[rotulo] ?? 0) + 1 }))}
+                    disabled={f.occupies_seat && poltronas >= vagaMinima}
+                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">+</button>
+                </div>
+              );
+            })}
+          </div>
+          {(porFaixa[ADULTO] ?? 0) < 1 && totalPessoas > 0 && (
+            <p className="text-[11px] text-gold-700 mt-2">Alguém precisa ser adulto na reserva.</p>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setPessoas((n) => Math.max(1, n - 1))}
+              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold">−</button>
+            <span className="flex-1 text-center font-bold text-navy-800">
+              {pessoas} pessoa{pessoas > 1 ? "s" : ""}
+            </span>
+            <button type="button" onClick={() => setPessoas((n) => Math.min(vagaMinima || 1, n + 1))}
+              disabled={pessoas >= vagaMinima}
+              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold">+</button>
+          </div>
+        </>
+      )}
+      <p className="text-[11px] text-gray-400 mt-2">
+        As mesmas pessoas viajam nas {combo.roteiros.length} viagens · cabem {vagaMinima}
+      </p>
+    </div>
   );
 
   return (
@@ -473,75 +547,56 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                 </div>
               </div>
 
-              {/* Opcionais, por viagem.
+              {/* Opcionais: o MESMO bloco da página de viagem, uma lista por
+                  perna. Um bloco "parecido" no combo faria o cliente reaprender
+                  do zero um cartão que ele já conhece.
+
                   Depois das datas de propósito: o preço de um opcional pode
                   mudar de uma saída para outra, então só faz sentido oferecer
-                  depois de o cliente saber em qual data vai. */}
+                  quando a data já está escolhida. */}
               {pernas.some((p) => (p.data?.optionals.length ?? 0) > 0) && (
-                <div className="bg-white rounded-2xl shadow-sm p-5">
-                  <h2 className="font-display font-black text-navy-800 text-lg mb-1">Quer incluir algo?</h2>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Opcionais de cada viagem. Dá para escolher em uma e não na outra.
+                <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm">
+                  <h3 className="font-display font-bold text-navy-800 mb-1 flex items-center gap-2 text-base">
+                    <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-sm flex-shrink-0">✨</span>
+                    Serviços Opcionais
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Selecione os extras que deseja. O valor é por pessoa.
                   </p>
-
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     {pernas.map(({ roteiro, data }) => {
                       if (!data || data.optionals.length === 0) return null;
-                      const marcados = opcionais[data.trip_id] ?? [];
                       return (
-                        <div key={roteiro.template_id}>
-                          <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide mb-2">
-                            {roteiro.title}
-                          </p>
-                          <div className="space-y-2">
-                            {data.optionals.map((o) => {
-                              const forcado = o.name === QUARTO_SINGLE && quartoObrigatorio(data);
-                              const on = forcado || marcados.includes(o.name);
-                              return (
-                                <button
-                                  key={o.name}
-                                  type="button"
-                                  disabled={forcado}
-                                  onClick={() => setOpcionais((a) => ({
-                                    ...a,
-                                    [data.trip_id]: on
-                                      ? marcados.filter((n) => n !== o.name)
-                                      : [...marcados, o.name],
-                                  }))}
-                                  className={`w-full flex items-center gap-3 text-left px-3.5 py-3 rounded-xl border-2 transition-colors ${
-                                    forcado ? "border-gold-300 bg-gold-50 cursor-default"
-                                      : on ? "border-navy-700 bg-navy-50" : "border-gray-200 hover:border-navy-300"
-                                  }`}
-                                >
-                                  <span className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 ${
-                                    on ? "bg-navy-700 border-navy-700" : "border-gray-300"
-                                  }`}>
-                                    {on ? <Check size={12} className="text-white" /> : <Plus size={11} className="text-gray-400" />}
-                                  </span>
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block text-sm font-semibold text-navy-800">{o.name}</span>
-                                    <span className="block text-xs text-gray-400">
-                                      {forcado
-                                        ? "incluído: um adulto com criança não divide quarto"
-                                        : o.name === QUARTO_SINGLE ? "por adulto" : "por pessoa"}
-                                    </span>
-                                  </span>
-                                  <span className="text-sm font-bold text-navy-700 whitespace-nowrap">
-                                    + R$ {fmtBRL(o.price)}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
+                        <Opcionais
+                          key={roteiro.template_id}
+                          moldura={false}
+                          subtitulo={roteiro.title}
+                          optionals={data.optionals}
+                          selecionados={opcionais[data.trip_id] ?? []}
+                          forcados={quartoObrigatorio(data) ? [QUARTO_SINGLE] : []}
+                          onToggle={(nome) => setOpcionais((a) => {
+                            const atuais = a[data.trip_id] ?? [];
+                            return {
+                              ...a,
+                              [data.trip_id]: atuais.includes(nome)
+                                ? atuais.filter((n) => n !== nome)
+                                : [...atuais, nome],
+                            };
+                          })}
+                        />
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-3">
-                    O desconto do combo também vale para os opcionais.
-                  </p>
                 </div>
               )}
+
+              {/* No celular a lateral não existe, então o seletor vem aqui. */}
+              <div className="lg:hidden bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-5 pt-4">
+                  <h2 className="font-display font-black text-navy-800 text-lg">Quantas pessoas</h2>
+                </div>
+                <SeletorDePessoas />
+              </div>
 
               {/* Sobre */}
               {combo.descricao && (
@@ -582,67 +637,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                     )}
                   </div>
 
-                  {/* Pessoas, na lateral como na página de viagem.
-                      Com faixas, uma linha por categoria: o preço mostrado é o
-                      da PRIMEIRA viagem, porque cada uma cobra o seu e um número
-                      só ali seria mentira. O total embaixo é a conta real. */}
-                  <div className="border-t border-gray-100 px-5 py-3.5">
-                    {temFaixas ? (
-                      <>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">
-                          Pessoas por categoria
-                        </p>
-                        <div className="space-y-2">
-                          {[{ name: ADULTO, age_range: "", occupies_seat: true }, ...combo.price_tiers].map((f) => {
-                            const rotulo = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
-                            const qtd = porFaixa[rotulo] ?? 0;
-                            return (
-                              <div key={rotulo} className="flex items-center gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{rotulo}</p>
-                                  <p className="text-[11px] text-gray-400 leading-tight">
-                                    {f.occupies_seat ? "ocupa poltrona" : "não ocupa poltrona"}
-                                  </p>
-                                </div>
-                                <button type="button"
-                                  onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: Math.max(0, (a[rotulo] ?? 0) - 1) }))}
-                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
-                                <span className="w-6 text-center font-bold text-navy-800">{qtd}</span>
-                                <button type="button"
-                                  onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: (a[rotulo] ?? 0) + 1 }))}
-                                  disabled={f.occupies_seat && poltronas >= vagaMinima}
-                                  className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">+</button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {/* Sem adulto não existe reserva: o servidor recusa, e
-                            descobrir isso só no fim seria pior. */}
-                        {(porFaixa[ADULTO] ?? 0) < 1 && totalPessoas > 0 && (
-                          <p className="text-[11px] text-gold-700 mt-2">
-                            Alguém precisa ser adulto na reserva.
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
-                        <div className="flex items-center gap-3">
-                          <button type="button" onClick={() => setPessoas((n) => Math.max(1, n - 1))}
-                            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold">−</button>
-                          <span className="flex-1 text-center font-bold text-navy-800">
-                            {pessoas} pessoa{pessoas > 1 ? "s" : ""}
-                          </span>
-                          <button type="button" onClick={() => setPessoas((n) => Math.min(vagaMinima || 1, n + 1))}
-                            disabled={pessoas >= vagaMinima}
-                            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold">+</button>
-                        </div>
-                      </>
-                    )}
-                    <p className="text-[11px] text-gray-400 mt-2">
-                      As mesmas pessoas viajam nas {combo.roteiros.length} viagens · cabem {vagaMinima}
-                    </p>
-                  </div>
+                  <div className="border-t border-gray-100"><SeletorDePessoas /></div>
 
                   <div className="border-t border-gray-100 divide-y divide-gray-100">
                     {pernas.map(({ roteiro, data }, i) => (
@@ -680,11 +675,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
       </div>
 
       {/* Barra fixa do celular, como na página de viagem */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-3 py-2.5 flex items-center gap-3 shadow-2xl">
         <div className="flex-1 min-w-0"><Resumo compacto /></div>
         <button onClick={continuar} disabled={enviando || faltaData}
-          className="flex-shrink-0 bg-gold-500 hover:bg-gold-400 active:scale-95 disabled:opacity-50 text-navy-900 font-bold px-5 py-3.5 rounded-xl text-sm transition-[transform,background-color]">
-          {enviando ? <Loader2 size={16} className="animate-spin" /> : "Reservar agora"}
+          className="flex-shrink-0 bg-gold-500 hover:bg-gold-400 active:scale-95 disabled:opacity-50 text-navy-900 font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap transition-[transform,background-color]">
+          {enviando ? <Loader2 size={16} className="animate-spin" /> : "Reservar"}
         </button>
       </div>
 
