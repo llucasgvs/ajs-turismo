@@ -9,10 +9,10 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
-import { DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
+import { DataEscolhida, DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
-import { fmtBRL, fmtInstallment, erroDaApi, mesmoDia } from "@/lib/format";
+import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
@@ -72,8 +72,6 @@ type Combo = {
   preco_cheio_desde: number | null;
 };
 
-const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-
 /* A data do combo no formato que o seletor de viagem entende. Converter aqui,
    e não no servidor, mantém a resposta da API enxuta. */
 function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
@@ -87,14 +85,6 @@ function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
   };
 }
 
-/* Fuso de Brasília, como no resto do site: a data vem com hora, e fatiar o ISO
-   cru mostraria o dia em UTC, que é o seguinte em saída de fim de noite. */
-function dataCurta(iso: string, comAno = true): string {
-  const [a, m, d] = new Date(iso)
-    .toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" })
-    .split("-");
-  return comAno ? `${d} de ${MESES[parseInt(m) - 1]}. de ${a}` : `${d} de ${MESES[parseInt(m) - 1]}.`;
-}
 
 /** Fotos dos N destinos, intercaladas.
  *
@@ -551,14 +541,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                             {data ? (
                               <>
                                 <span className="block text-sm font-bold text-navy-800">
-                                  {dataCurta(data.departure_date)}
-                                  {/* Retorno sem o ano: com ele a linha quebrava
-                                      em duas no celular, e o ano já está do
-                                      lado esquerdo. É o mesmo corte que a
-                                      página de viagem faz. */}
-                                  {data.return_date && !mesmoDia(data.departure_date, data.return_date) && (
-                                    <> → {dataCurta(data.return_date, false)}</>
-                                  )}
+                                  <DataEscolhida saida={data.departure_date} retorno={data.return_date} />
                                 </span>
                                 <span className="block text-xs mt-0.5">
                                   <span className="text-gray-400 line-through mr-1.5">
@@ -702,7 +685,8 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">Viagem {i + 1}</p>
                         <p className="text-sm font-semibold text-navy-800 truncate">{roteiro.title}</p>
                         <p className="text-xs text-gray-500">
-                          {data ? dataCurta(data.departure_date) : "escolha a data"}
+                          {data ? <DataEscolhida saida={data.departure_date} retorno={data.return_date} />
+                                : "escolha a data"}
                         </p>
                       </div>
                     ))}

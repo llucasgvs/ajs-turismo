@@ -18,7 +18,7 @@ import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
 import { imgOtim } from "@/lib/imagem";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
-import { DateSelector, fmtDate } from "@/components/viagem/Datas";
+import { DataEscolhida, DateSelector, fmtDate } from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -2055,19 +2055,16 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
                           {selectedTrip ? (
                             <p className="text-sm font-bold text-navy-800">
-                              {new Date(selectedTrip.departure_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short",year:"numeric"})}
                               {/* No bate-e-volta, "· bate e volta" em vez de repetir
                                   a data. Repetida ficava pior que em outros blocos,
                                   porque aqui os dois lados usam formatos diferentes
                                   ("23 de ago. de 2026 → 23 de ago."), o que parecia
                                   defeito. É a mesma forma já usada no painel do
                                   cliente, e diz o mesmo dia com todas as letras. */}
-                              {mesmoDia(selectedTrip.departure_date, selectedTrip.return_date)
-                                ? " · bate e volta"
-                                : <>
-                                    {" → "}
-                                    {new Date(selectedTrip.return_date).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short"})}
-                                  </>}
+                              <DataEscolhida
+                                saida={selectedTrip.departure_date}
+                                retorno={selectedTrip.return_date}
+                              />
                             </p>
                           ) : (
                             <p className="text-sm font-bold text-gray-400">Selecione uma data</p>

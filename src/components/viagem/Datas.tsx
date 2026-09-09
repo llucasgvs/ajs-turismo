@@ -27,6 +27,31 @@ export type DataSelecionavel = {
   status?: string | null;
 };
 
+/* A data escolhida, como a lateral da página de viagem sempre mostrou.
+ *
+ * Estava escrita à mão dentro de TripDetailClient. Saiu para cá quando o combo
+ * precisou da mesma linha: escrever de novo, ainda que igual, era pedir para as
+ * duas divergirem no primeiro ajuste.
+ *
+ * O retorno vem sem o ano de propósito, e o mesmo dia vira "bate e volta" em
+ * vez de repetir a data. Não é escolha nova: é o que já estava no ar e passou
+ * pelos testes. */
+export function DataEscolhida({ saida, retorno }: { saida: string; retorno?: string | null }) {
+  const dia = (iso: string, comAno: boolean) =>
+    new Date(iso).toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo", day: "2-digit", month: "short",
+      ...(comAno ? { year: "numeric" as const } : {}),
+    });
+  return (
+    <>
+      {dia(saida, true)}
+      {retorno && (mesmoDia(saida, retorno)
+        ? " · bate e volta"
+        : <>{" → "}{dia(retorno, false)}</>)}
+    </>
+  );
+}
+
 export function fmtDate(d: string) {
   // Data no fuso de Brasília: fatiar o ISO cru usaria a data em UTC, que vira o
   // dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC).
