@@ -110,10 +110,20 @@ export function poucasVagas(disponivel: number | null | undefined): disponivel i
 }
 
 /**
- * Prazo de encerramento das vendas: N dias antes da saída (deve bater com o
- * BOOKING_CUTOFF_DAYS do backend, que é a regra autoritativa).
+ * Prazo de encerramento das vendas: N dias antes da saída.
+ *
+ * TEM que ser igual ao BOOKING_CUTOFF_DAYS do backend, que é a regra
+ * autoritativa. Já desencontrou uma vez: o backend passou de 4 para 3 em
+ * 01/09/2026 e este número ficou em 4 por oito dias. Enquanto isso, toda saída
+ * a 3 dias de distância aparecia como "Vendas encerradas" no site e travava o
+ * botão de comprar, enquanto o servidor aceitaria a venda numa boa. Eram três
+ * datas presas nessa janela no dia em que foi descoberto, uma delas com 27
+ * vagas livres.
+ *
+ * Quem mudar lá, mude aqui. Não há como o site perguntar ao servidor: este
+ * valor é usado em render de servidor, sem chamada de API no caminho.
  */
-export const BOOKING_CUTOFF_DAYS = 4;
+export const BOOKING_CUTOFF_DAYS = 3;
 export function salesClosed(departureISO?: string | null): boolean {
   if (!departureISO) return false;
   const dep = new Date(departureISO).getTime();
