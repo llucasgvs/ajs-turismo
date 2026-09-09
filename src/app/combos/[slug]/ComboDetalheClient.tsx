@@ -17,7 +17,7 @@ import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
 
-type Opcional = { name: string; price: number };
+type Opcional = { name: string; price: number; description?: string | null };
 
 type DataDoRoteiro = {
   trip_id: number;
@@ -597,12 +597,8 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                             pode mudar de uma saída para outra. */}
                         {data && data.optionals.length > 0 && (
                           <div className="mt-3 border-t border-dashed border-gray-200 pt-3">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                              <span className="w-5 h-5 bg-amber-100 rounded-full flex items-center justify-center text-[10px]">✨</span>
-                              Opcionais desta viagem
-                            </p>
                             <Opcionais
-                              moldura={false}
+                              titulo="Opcionais desta viagem (por pessoa)"
                               optionals={data.optionals}
                               selecionados={opcionais[data.trip_id] ?? []}
                               forcados={quartoObrigatorio(data) ? [QUARTO_SINGLE] : []}
