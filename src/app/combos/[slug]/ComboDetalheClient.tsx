@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, MapPin, Package, Calendar, Users, Check, Loader2, AlertCircle,
-  Ticket, ArrowRight, Clock,
+  ArrowLeft, MapPin, Package, Users, Check, Loader2, AlertCircle,
+  ArrowRight, ChevronDown, X, Plus,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -15,6 +15,8 @@ import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 
+type Opcional = { name: string; price: number };
+
 type DataDoRoteiro = {
   trip_id: number;
   departure_date: string;
@@ -22,6 +24,8 @@ type DataDoRoteiro = {
   price_per_person: number;
   original_price: number | null;
   available_spots: number;
+  optionals: Opcional[];
+  tem_hospedagem: boolean;
 };
 
 type RoteiroDoCombo = {
@@ -33,6 +37,11 @@ type RoteiroDoCombo = {
   duration_nights: number | null;
   preco_desde: number | null;
   preco_tabela_desde: number | null;
+  description: string | null;
+  includes: string[];
+  excludes: string[];
+  departure_locations: string[];
+  required_documents: string | null;
   gallery: string[];
   datas: DataDoRoteiro[];
 };
@@ -89,6 +98,107 @@ function galeriaDoCombo(roteiros: RoteiroDoCombo[]): string[] {
   return [...new Set(fotos)];
 }
 
+/* Os detalhes da viagem, abertos NA PRÓPRIA página do combo.
+ *
+ * Mandar o cliente para a página da viagem e esperar que ele volte é perder a
+ * compra no meio do caminho: ele sai do fluxo, perde as datas que já escolheu de
+ * vista e muitas vezes não volta.
+ *
+ * Padrão de "disclosure": um botão que diz o estado, conteúdo com id ligado a
+ * ele por aria-controls, e a seta girando. É o mesmo comportamento que o
+ * cliente já conhece de qualquer acordeão, e funciona no teclado. */
+function DetalhesDaViagem({ roteiro }: { roteiro: RoteiroDoCombo }) {
+  const [aberto, setAberto] = useState(false);
+  const id = `detalhes-${roteiro.template_id}`;
+  const temAlgo =
+    roteiro.description || roteiro.includes.length || roteiro.excludes.length ||
+    roteiro.departure_locations.length || roteiro.required_documents;
+  if (!temAlgo) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        aria-controls={id}
+        className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-navy-600 hover:text-gold-600 transition-colors"
+      >
+        {aberto ? "Ocultar detalhes" : "Ver detalhes desta viagem"}
+        <ChevronDown size={13} className={`transition-transform duration-200 ${aberto ? "rotate-180" : ""}`} />
+      </button>
+
+      {aberto && (
+        <div id={id} className="mt-3 bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-4">
+          {roteiro.description && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Sobre a viagem</p>
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{roteiro.description}</p>
+            </div>
+          )}
+
+          {roteiro.includes.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">O que inclui</p>
+              <ul className="sm:columns-2 sm:gap-x-5">
+                {roteiro.includes.map((x, i) => (
+                  <li key={i} className="text-sm text-gray-600 flex items-start gap-1.5 break-inside-avoid mb-1.5">
+                    <Check size={12} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                    <span className="min-w-0">{x}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {roteiro.excludes.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Não inclui</p>
+              <ul className="sm:columns-2 sm:gap-x-5">
+                {roteiro.excludes.map((x, i) => (
+                  <li key={i} className="text-sm text-gray-500 flex items-start gap-1.5 break-inside-avoid mb-1.5">
+                    <X size={12} className="text-gray-300 mt-0.5 flex-shrink-0" />
+                    <span className="min-w-0">{x}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {roteiro.departure_locations.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                {roteiro.departure_locations.length > 1 ? "Pontos de embarque" : "Local de embarque"}
+              </p>
+              <ol className="space-y-1">
+                {roteiro.departure_locations.map((l, i) => (
+                  <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                    {roteiro.departure_locations.length > 1 ? (
+                      <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-semibold flex items-center justify-center mt-0.5 tabular-nums">
+                        {i + 1}
+                      </span>
+                    ) : (
+                      <MapPin size={12} className="text-gray-300 mt-0.5 flex-shrink-0" />
+                    )}
+                    <span className="min-w-0">{l}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {roteiro.required_documents && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Documentos necessários</p>
+              <p className="text-sm text-gray-600 whitespace-pre-line">{roteiro.required_documents}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const router = useRouter();
   const [escolha, setEscolha] = useState<Record<number, number>>(() => {
@@ -97,6 +207,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     return inicial;
   });
   const [pessoas, setPessoas] = useState(1);
+  /* trip_id -> nomes marcados. Por DATA e não por roteiro: o preço de um
+     opcional pode mudar de uma saída para outra, e trocar a data tem que
+     começar do zero em vez de carregar a escolha de outra saída. */
+  const [opcionais, setOpcionais] = useState<Record<number, string[]>>({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [galeriaAberta, setGaleriaAberta] = useState(false);
@@ -120,7 +234,19 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     return vagas.length ? Math.min(...vagas) : 0;
   }, [pernas]);
 
-  const cheio = pernas.reduce((s, p) => s + (p.data?.price_per_person ?? 0) * pessoas, 0);
+  /* Opcional é por pessoa, como no checkout de viagem única. O quarto single é
+     por adulto, mas enquanto o combo não tem faixas de idade todo mundo é
+     adulto, então as duas contas dão no mesmo. */
+  const totalOpcionais = pernas.reduce((s, p) => {
+    if (!p.data) return s;
+    const marcados = opcionais[p.data.trip_id] ?? [];
+    return s + p.data.optionals
+      .filter((o) => marcados.includes(o.name))
+      .reduce((t, o) => t + o.price * pessoas, 0);
+  }, 0);
+
+  const cheio = pernas.reduce((s, p) => s + (p.data?.price_per_person ?? 0) * pessoas, 0)
+    + totalOpcionais;
   const desconto = Math.round(cheio * combo.desconto_pct) / 100;
   const final = Math.round((cheio - desconto) * 100) / 100;
   const faltaData = pernas.some((p) => !p.data);
@@ -142,7 +268,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
         method: "POST",
         body: JSON.stringify({
           combo_id: combo.id,
-          pernas: pernas.map((p) => ({ trip_id: p.data!.trip_id })),
+          pernas: pernas.map((p) => ({
+            trip_id: p.data!.trip_id,
+            // Só o nome: o preço vem do servidor, sempre.
+            selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
+          })),
           num_travelers: pessoas,
         }),
       });
@@ -251,12 +381,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                             Viagem {i + 1} de {combo.roteiros.length}
                           </p>
                           <p className="font-bold text-navy-800 leading-tight truncate">{roteiro.title}</p>
-                          {roteiro.slug && (
-                            <Link href={`/viagens/${roteiro.slug}`} target="_blank"
-                              className="text-xs text-navy-500 hover:text-gold-600 underline underline-offset-2">
-                              ver detalhes desta viagem
-                            </Link>
-                          )}
+                          <DetalhesDaViagem roteiro={roteiro} />
                         </div>
                       </div>
                       {/* O MESMO seletor da página de viagem. Um seletor
@@ -275,6 +400,69 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                   ))}
                 </div>
               </div>
+
+              {/* Opcionais, por viagem.
+                  Depois das datas de propósito: o preço de um opcional pode
+                  mudar de uma saída para outra, então só faz sentido oferecer
+                  depois de o cliente saber em qual data vai. */}
+              {pernas.some((p) => (p.data?.optionals.length ?? 0) > 0) && (
+                <div className="bg-white rounded-2xl shadow-sm p-5">
+                  <h2 className="font-display font-black text-navy-800 text-lg mb-1">Quer incluir algo?</h2>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Opcionais de cada viagem. Dá para escolher em uma e não na outra.
+                  </p>
+
+                  <div className="space-y-4">
+                    {pernas.map(({ roteiro, data }) => {
+                      if (!data || data.optionals.length === 0) return null;
+                      const marcados = opcionais[data.trip_id] ?? [];
+                      return (
+                        <div key={roteiro.template_id}>
+                          <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide mb-2">
+                            {roteiro.title}
+                          </p>
+                          <div className="space-y-2">
+                            {data.optionals.map((o) => {
+                              const on = marcados.includes(o.name);
+                              return (
+                                <button
+                                  key={o.name}
+                                  type="button"
+                                  onClick={() => setOpcionais((a) => ({
+                                    ...a,
+                                    [data.trip_id]: on
+                                      ? marcados.filter((n) => n !== o.name)
+                                      : [...marcados, o.name],
+                                  }))}
+                                  className={`w-full flex items-center gap-3 text-left px-3.5 py-3 rounded-xl border-2 transition-colors ${
+                                    on ? "border-navy-700 bg-navy-50" : "border-gray-200 hover:border-navy-300"
+                                  }`}
+                                >
+                                  <span className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border-2 ${
+                                    on ? "bg-navy-700 border-navy-700" : "border-gray-300"
+                                  }`}>
+                                    {on ? <Check size={12} className="text-white" /> : <Plus size={11} className="text-gray-400" />}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-semibold text-navy-800">{o.name}</span>
+                                    <span className="block text-xs text-gray-400">por pessoa</span>
+                                  </span>
+                                  <span className="text-sm font-bold text-navy-700 whitespace-nowrap">
+                                    + R$ {fmtBRL(o.price)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-3">
+                    O desconto do combo também vale para os opcionais.
+                  </p>
+                </div>
+              )}
 
               {/* Viajantes */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
