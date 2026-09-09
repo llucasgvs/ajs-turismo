@@ -28,6 +28,9 @@ type Combo = {
   slug: string | null;
   descricao: string | null;
   desconto_pct: number;
+  /** Parcelas SEM JUROS do pacote. É do combo, não a menor entre as viagens:
+   *  o pacote tem condição comercial própria. */
+  max_installments: number;
   venda_inicio: string | null;
   venda_fim: string | null;
   is_active: boolean;
@@ -181,6 +184,11 @@ export default function CombosPage() {
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gold-100 text-gold-700">
                     {c.desconto_pct.toString().replace(".", ",")}% off
                   </span>
+                  {c.max_installments > 1 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700">
+                      {c.max_installments}x sem juros
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   {janela(c)} · {c.roteiros.length} roteiros
@@ -358,6 +366,7 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
       preco_tabela_desde: number | null; desconto_proprio_pct: number | null;
     }[];
   } | null>(null);
+  const [parcelas, setParcelas] = useState(String(combo?.max_installments ?? 1));
   const [inicio, setInicio] = useState(combo?.venda_inicio ?? "");
   const [fim, setFim] = useState(combo?.venda_fim ?? "");
   // Ordem importa: é como o combo aparece na vitrine, então a seleção guarda
@@ -437,6 +446,7 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
         descricao: descricao.trim() || null,
         template_ids: escolhidos,
         desconto_pct: pct,
+        max_installments: Math.max(1, Math.min(24, parseInt(parcelas) || 1)),
         venda_inicio: inicio || null,
         venda_fim: fim || null,
       };
@@ -558,6 +568,27 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Parcelas do PACOTE. Fica junto do desconto porque é a outra
+              alavanca comercial do combo, e não perto das datas de venda. */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+              Parcelas sem juros
+            </label>
+            <select value={parcelas} onChange={(e) => setParcelas(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400">
+              <option value="1">À vista</option>
+              {[2, 3, 4, 5, 6, 8, 10, 12].map((n) => (
+                <option key={n} value={String(n)}>{n}x sem juros</option>
+              ))}
+            </select>
+            {/* O aviso importa: acima do que a viagem aceita sozinha, quem paga
+                a diferença é a AJS, e isso sai do desconto do combo. */}
+            <p className="text-[11px] text-gray-400 mt-1.5">
+              Vale para o pacote inteiro, independente do que cada viagem aceita sozinha.
+              {parseInt(parcelas) > 1 && " Acima do limite de uma viagem, a diferença é da AJS."}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
