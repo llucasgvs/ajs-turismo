@@ -140,3 +140,45 @@ export function semAcento(texto: string | null | undefined): string {
     .toLowerCase()
     .trim();
 }
+
+/**
+ * Dígitos verificadores do CPF.
+ *
+ * Mora aqui porque a venda de combo precisou dela e cada tela que pede CPF tem
+ * hoje a sua cópia. As cópias antigas continuam onde estão: mexer nelas agora
+ * seria refatorar três telas de pagamento sem necessidade.
+ */
+export function cpfValido(val: string): boolean {
+  const d = val.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(d[i]) * (10 - i);
+  let r = soma % 11;
+  if ((r < 2 ? 0 : 11 - r) !== parseInt(d[9])) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(d[i]) * (11 - i);
+  r = soma % 11;
+  return (r < 2 ? 0 : 11 - r) === parseInt(d[10]);
+}
+
+/**
+ * Mensagem legível vinda do backend, inclusive o 422 do Pydantic, que chega
+ * como lista de objetos e apareceria como "[object Object]" na tela.
+ */
+export function erroDaApi(err: unknown, padrao = "Erro ao salvar."): string {
+  if (!err || typeof err !== "object") return padrao;
+  const e = err as Record<string, unknown>;
+  if (typeof e.detail === "string") return e.detail;
+  if (Array.isArray(e.detail)) {
+    return e.detail
+      .map((d: unknown) => {
+        if (d && typeof d === "object") {
+          const de = d as Record<string, unknown>;
+          return typeof de.msg === "string" ? de.msg : JSON.stringify(de);
+        }
+        return String(d);
+      })
+      .join(", ");
+  }
+  return padrao;
+}
