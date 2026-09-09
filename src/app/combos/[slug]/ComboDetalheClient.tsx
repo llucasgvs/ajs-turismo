@@ -10,6 +10,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
+import { DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
@@ -17,7 +18,9 @@ import { imgOtim } from "@/lib/imagem";
 type DataDoRoteiro = {
   trip_id: number;
   departure_date: string;
+  return_date: string | null;
   price_per_person: number;
+  original_price: number | null;
   available_spots: number;
 };
 
@@ -49,8 +52,25 @@ type Combo = {
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
+/* A data do combo no formato que o seletor de viagem entende. Converter aqui,
+   e não no servidor, mantém a resposta da API enxuta. */
+function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
+  return {
+    id: d.trip_id,
+    departure_date: d.departure_date,
+    return_date: d.return_date,
+    price_per_person: d.price_per_person,
+    original_price: d.original_price,
+    available_spots: d.available_spots,
+  };
+}
+
+/* Fuso de Brasília, como no resto do site: a data vem com hora, e fatiar o ISO
+   cru mostraria o dia em UTC, que é o seguinte em saída de fim de noite. */
 function dataCurta(iso: string): string {
-  const [a, m, d] = iso.split("-");
+  const [a, m, d] = new Date(iso)
+    .toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" })
+    .split("-");
   return `${d} de ${MESES[parseInt(m) - 1]}. de ${a}`;
 }
 
@@ -209,25 +229,6 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* ── Coluna principal ── */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Faixa de informação, como a da viagem */}
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-100">
-                  {[
-                    [<Package key="p" size={13} />, "Viagens", `${combo.roteiros.length} no pacote`],
-                    [<Calendar key="c" size={13} />, "Primeira saída", proxima ? dataCurta(proxima) : "-"],
-                    [<Ticket key="t" size={13} />, "Vouchers", `${combo.roteiros.length}, um por viagem`],
-                    [<Clock key="k" size={13} />, "Pagamento", "uma vez só"],
-                  ].map(([icone, rotulo, valor], i) => (
-                    <div key={i} className="p-4">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide flex items-center gap-1">
-                        <span className="text-gold-500">{icone}</span> {rotulo as string}
-                      </p>
-                      <p className="text-sm font-bold text-navy-800 mt-0.5">{valor as string}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Escolha das datas: o coração da página */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <h2 className="font-display font-black text-navy-800 text-lg mb-1">Escolha suas datas</h2>
@@ -235,78 +236,43 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                   Uma data para cada viagem. Todas entram na mesma compra.
                 </p>
 
-                <div className="space-y-3">
-                  {pernas.map(({ roteiro, data }, i) => {
-                    const cheioR = roteiro.preco_tabela_desde ?? roteiro.preco_desde;
-                    return (
-                      <div key={roteiro.template_id} className="border border-gray-200 rounded-xl overflow-hidden">
-                        <div className="flex gap-3 p-3">
-                          <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-navy-100">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img loading="lazy" decoding="async"
-                              src={roteiro.image_url ? imgOtim(roteiro.image_url, 200, 80) : ""}
-                              alt="" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
-                              Viagem {i + 1}
-                            </p>
-                            <p className="font-bold text-navy-800 leading-tight truncate">{roteiro.title}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {data && cheioR != null && cheioR > data.price_per_person * (1 - combo.desconto_pct / 100) && (
-                                <span className="text-xs text-gray-400 line-through">R$ {fmtBRL(cheioR)}</span>
-                              )}
-                              {data && (
-                                <span className="text-sm font-bold text-gold-600">
-                                  R$ {fmtBRL(data.price_per_person * (1 - combo.desconto_pct / 100))}
-                                </span>
-                              )}
-                              {roteiro.slug && (
-                                <Link href={`/viagens/${roteiro.slug}`} target="_blank"
-                                  className="text-xs text-navy-500 hover:text-gold-600 underline underline-offset-2">
-                                  detalhes
-                                </Link>
-                              )}
-                            </div>
-                          </div>
+                <div className="space-y-5">
+                  {pernas.map(({ roteiro, data }, i) => (
+                    <div key={roteiro.template_id} className="border-t border-gray-100 pt-4 first:border-0 first:pt-0">
+                      <div className="flex gap-3 mb-3">
+                        <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-navy-100">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img loading="lazy" decoding="async"
+                            src={roteiro.image_url ? imgOtim(roteiro.image_url, 200, 80) : ""}
+                            alt="" className="w-full h-full object-cover" />
                         </div>
-
-                        <div className="px-3 pb-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {roteiro.datas.map((d) => {
-                              const ativa = escolha[roteiro.template_id] === d.trip_id;
-                              return (
-                                <button
-                                  key={d.trip_id}
-                                  onClick={() => setEscolha((a) => ({ ...a, [roteiro.template_id]: d.trip_id }))}
-                                  className={`text-left px-3 py-2 rounded-lg border transition-colors ${
-                                    ativa
-                                      ? "border-gold-400 bg-gold-50"
-                                      : "border-gray-200 bg-white hover:border-gold-300"
-                                  }`}
-                                >
-                                  <span className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-semibold text-navy-800">
-                                      {dataCurta(d.departure_date)}
-                                    </span>
-                                    {ativa && <Check size={14} className="text-gold-600 flex-shrink-0" />}
-                                  </span>
-                                  <span className="text-xs text-gray-400">
-                                    R$ {fmtBRL(d.price_per_person)}
-                                    {d.available_spots <= 5 && (
-                                      <span className="text-orange-500 font-semibold">
-                                        {" "}· últimas {d.available_spots}
-                                      </span>
-                                    )}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
+                            Viagem {i + 1} de {combo.roteiros.length}
+                          </p>
+                          <p className="font-bold text-navy-800 leading-tight truncate">{roteiro.title}</p>
+                          {roteiro.slug && (
+                            <Link href={`/viagens/${roteiro.slug}`} target="_blank"
+                              className="text-xs text-navy-500 hover:text-gold-600 underline underline-offset-2">
+                              ver detalhes desta viagem
+                            </Link>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                      {/* O MESMO seletor da página de viagem. Um seletor
+                          "parecido" faria o cliente aprender dois jeitos de
+                          escolher data no mesmo site. */}
+                      <DateSelector
+                        trips={roteiro.datas.map(paraSelecao)}
+                        selected={data ? paraSelecao(data) : null}
+                        onSelect={(d) => setEscolha((a) => ({ ...a, [roteiro.template_id]: d.id }))}
+                        hasError={false}
+                        titulo=""
+                        descontoPct={combo.desconto_pct}
+                        semMoldura
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
