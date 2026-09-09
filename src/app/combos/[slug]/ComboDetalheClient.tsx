@@ -7,12 +7,12 @@ import {
   ArrowLeft, MapPin, Package, Users, Check, Loader2, AlertCircle,
   ArrowRight, ChevronDown, X, Plus,
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
 import { DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
+import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
-import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
+import { fmtBRL, fmtInstallment, erroDaApi, mesmoDia } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
@@ -89,11 +89,11 @@ function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
 
 /* Fuso de Brasília, como no resto do site: a data vem com hora, e fatiar o ISO
    cru mostraria o dia em UTC, que é o seguinte em saída de fim de noite. */
-function dataCurta(iso: string): string {
+function dataCurta(iso: string, comAno = true): string {
   const [a, m, d] = new Date(iso)
     .toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" })
     .split("-");
-  return `${d} de ${MESES[parseInt(m) - 1]}. de ${a}`;
+  return comAno ? `${d} de ${MESES[parseInt(m) - 1]}. de ${a}` : `${d} de ${MESES[parseInt(m) - 1]}.`;
 }
 
 /** Fotos dos N destinos, intercaladas.
@@ -230,6 +230,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const [opcionais, setOpcionais] = useState<Record<number, string[]>>({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [trocandoData, setTrocandoData] = useState<Record<number, boolean>>({});
   const [galeriaAberta, setGaleriaAberta] = useState(false);
   const [galeriaInicio, setGaleriaInicio] = useState(0);
 
@@ -450,20 +451,20 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
         </>
       )}
       <p className="text-[11px] text-gray-400 mt-2">
-        As mesmas pessoas viajam nas {combo.roteiros.length} viagens · cabem {vagaMinima}
+        As mesmas pessoas viajam nas {combo.roteiros.length} viagens.
       </p>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
-      <div className="hidden lg:block"><Navbar /></div>
+      <TopoDaPagina usuario={getUser()} />
 
       {galeriaAberta && fotos.length > 0 && (
         <GalleryModal images={fotos} startIndex={galeriaInicio} onClose={() => setGaleriaAberta(false)} />
       )}
 
-      <div className="flex-1 pb-24 lg:pb-0">
+      <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
         {/* Barra do celular: voltar e compartilhar, igual à da viagem */}
         <div className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-20">
           <div className="flex items-center justify-between">
@@ -505,45 +506,101 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* ── Coluna principal ── */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Escolha das datas: o coração da página */}
+              {/* Escolha das datas.
+                  Uma LINHA por viagem, mostrando só a data escolhida, e o
+                  seletor abre em "Trocar". É o mesmo movimento da página de
+                  viagem, onde a lateral mostra uma data e o resto fica atrás de
+                  um clique. Com as quatro datas de cada viagem sempre abertas,
+                  um combo de três viravam doze cartões de uma vez. */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
-                <h2 className="font-display font-black text-navy-800 text-lg mb-1">Escolha suas datas</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Uma data para cada viagem. Todas entram na mesma compra.
-                </p>
+                <h2 className="font-display font-black text-navy-800 text-lg mb-4">Escolha suas datas</h2>
 
-                <div className="space-y-5">
-                  {pernas.map(({ roteiro, data }, i) => (
-                    <div key={roteiro.template_id} className="border-t border-gray-100 pt-4 first:border-0 first:pt-0">
-                      <div className="flex gap-3 mb-3">
-                        <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-navy-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img loading="lazy" decoding="async"
-                            src={roteiro.image_url ? imgOtim(roteiro.image_url, 200, 80) : ""}
-                            alt="" className="w-full h-full object-cover" />
+                <div className="space-y-4">
+                  {pernas.map(({ roteiro, data }, i) => {
+                    const aberto = !!trocandoData[roteiro.template_id];
+                    const comDesconto = data
+                      ? data.price_per_person * (1 - combo.desconto_pct / 100)
+                      : 0;
+                    return (
+                      <div key={roteiro.template_id} className="border-t border-gray-100 pt-4 first:border-0 first:pt-0">
+                        <div className="flex gap-3">
+                          <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-navy-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img loading="lazy" decoding="async"
+                              src={roteiro.image_url ? imgOtim(roteiro.image_url, 200, 80) : ""}
+                              alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
+                              Viagem {i + 1} de {combo.roteiros.length}
+                            </p>
+                            <p className="font-bold text-navy-800 leading-tight truncate">{roteiro.title}</p>
+                            <DetalhesDaViagem roteiro={roteiro} />
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
-                            Viagem {i + 1} de {combo.roteiros.length}
-                          </p>
-                          <p className="font-bold text-navy-800 leading-tight truncate">{roteiro.title}</p>
-                          <DetalhesDaViagem roteiro={roteiro} />
-                        </div>
+
+                        {/* A data escolhida, e só ela. */}
+                        <button
+                          type="button"
+                          onClick={() => setTrocandoData((a) => ({ ...a, [roteiro.template_id]: !aberto }))}
+                          aria-expanded={aberto}
+                          className="mt-3 w-full flex items-center justify-between gap-3 rounded-xl border-2 border-gray-200 hover:border-navy-300 px-3.5 py-3 text-left transition-colors"
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Data</span>
+                            {data ? (
+                              <>
+                                <span className="block text-sm font-bold text-navy-800">
+                                  {dataCurta(data.departure_date)}
+                                  {/* Retorno sem o ano: com ele a linha quebrava
+                                      em duas no celular, e o ano já está do
+                                      lado esquerdo. É o mesmo corte que a
+                                      página de viagem faz. */}
+                                  {data.return_date && !mesmoDia(data.departure_date, data.return_date) && (
+                                    <> → {dataCurta(data.return_date, false)}</>
+                                  )}
+                                </span>
+                                <span className="block text-xs mt-0.5">
+                                  <span className="text-gray-400 line-through mr-1.5">
+                                    R$ {fmtBRL(data.price_per_person)}
+                                  </span>
+                                  <span className="font-bold text-navy-700">R$ {fmtBRL(comDesconto)}</span>
+                                  <span className="text-gray-400"> /pessoa</span>
+                                </span>
+                              </>
+                            ) : (
+                              <span className="block text-sm font-bold text-gray-400">Selecione uma data</span>
+                            )}
+                          </span>
+                          {roteiro.datas.length > 1 && (
+                            <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
+                              {aberto ? <><ChevronDown size={14} className="rotate-180" /> Fechar</>
+                                      : <><ChevronDown size={14} /> Trocar</>}
+                            </span>
+                          )}
+                        </button>
+
+                        {aberto && roteiro.datas.length > 1 && (
+                          <div className="mt-2">
+                            <DateSelector
+                              trips={roteiro.datas.map(paraSelecao)}
+                              selected={data ? paraSelecao(data) : null}
+                              onSelect={(d) => {
+                                setEscolha((a) => ({ ...a, [roteiro.template_id]: d.id }));
+                                // Escolheu, fecha: manter aberto empurraria as
+                                // outras viagens para fora da tela.
+                                setTrocandoData((a) => ({ ...a, [roteiro.template_id]: false }));
+                              }}
+                              hasError={false}
+                              titulo=""
+                              descontoPct={combo.desconto_pct}
+                              semMoldura
+                            />
+                          </div>
+                        )}
                       </div>
-                      {/* O MESMO seletor da página de viagem. Um seletor
-                          "parecido" faria o cliente aprender dois jeitos de
-                          escolher data no mesmo site. */}
-                      <DateSelector
-                        trips={roteiro.datas.map(paraSelecao)}
-                        selected={data ? paraSelecao(data) : null}
-                        onSelect={(d) => setEscolha((a) => ({ ...a, [roteiro.template_id]: d.id }))}
-                        hasError={false}
-                        titulo=""
-                        descontoPct={combo.desconto_pct}
-                        semMoldura
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

@@ -19,6 +19,7 @@ import { trackViewItem } from "@/lib/analytics";
 import { imgOtim } from "@/lib/imagem";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
 import { DateSelector, fmtDate } from "@/components/viagem/Datas";
+import { TopoDaPagina } from "@/components/viagem/Topo";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -1521,49 +1522,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
 
-      {/* ── Desktop Header - fixed, always visible ── */}
-      <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white border-b border-gray-100 shadow-sm items-center px-6">
-        {/* Left: Logo + Back */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy" decoding="async" src="/icon_ajs.png" alt="AJS Turismo" className="w-9 h-9 object-contain" />
-            <div className="flex flex-col leading-tight">
-              <span className="font-display font-black text-navy-900 text-base tracking-tight">AJS</span>
-              <span className="text-gold-500 text-[10px] font-semibold tracking-[0.2em] uppercase leading-none">Turismo</span>
-            </div>
-          </Link>
-          <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
-          <button
-            onClick={() => router.push("/viagens")}
-            className="flex items-center gap-1.5 text-gray-500 hover:text-navy-700 text-sm font-medium transition-colors whitespace-nowrap"
-          >
-            <ArrowLeft size={15} /> Voltar para viagens
-          </button>
-        </div>
-
-        {/* Right: user/login */}
-        <div className="flex items-center gap-4 flex-shrink-0">
-          {navUser ? (
-            <Link href={navUser.is_admin ? "/admin" : "/dashboard"}
-              className="flex items-center gap-2 text-gray-700 hover:text-navy-800 transition-colors text-sm font-medium">
-              <div className="w-8 h-8 rounded-full bg-gold-500 flex items-center justify-center text-navy-900 font-black text-sm">
-                {navUser.full_name?.[0]?.toUpperCase()}
-              </div>
-              <span className="hidden xl:block max-w-[120px] truncate">{navUser.full_name?.split(" ")[0]}</span>
-            </Link>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/login" className="text-gray-600 hover:text-navy-800 text-sm font-medium transition-colors px-3 py-1.5">
-                Entrar
-              </Link>
-              <Link href="/cadastro" className="btn-primary py-1.5 px-4 text-sm">
-                Criar conta
-              </Link>
-            </div>
-          )}
-        </div>
-      </header>
+      <TopoDaPagina usuario={navUser} />
 
       {/* Gallery Modal */}
       {galleryOpen && allImages.length > 0 && (
