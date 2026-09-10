@@ -118,6 +118,8 @@ export type ComboPublico = {
   id: number;
   nome: string;
   slug: string;
+  /** A capa do combo: as fotos dos roteiros montadas numa imagem só. */
+  image_url: string | null;
   desconto_pct: number;
   max_installments: number;
   venda_fim: string | null;
@@ -551,7 +553,9 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
  * nada a quem não sabe quanto custa cada viagem separada.
  */
 function ComboCard({ c }: { c: ComboPublico }) {
-  const capa = c.roteiros.find((r) => r.image_url)?.image_url;
+  // A capa montada mostra os N destinos de uma vez. A foto de um roteiro só,
+  // que era o que dava para fazer antes, fazia o combo parecer uma viagem.
+  const capa = c.image_url ?? c.roteiros.find((r) => r.image_url)?.image_url;
   const fator = 1 - c.desconto_pct / 100;
   const de = c.preco_tabela_desde ?? c.preco_cheio_desde;
   const por = c.preco_com_desconto_desde ?? 0;

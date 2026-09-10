@@ -9,10 +9,13 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
-import { DataEscolhida, DateSelector, type DataSelecionavel } from "@/components/viagem/Datas";
+import {
+  COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector,
+  type DataSelecionavel,
+} from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
-import { fmtBRL, fmtInstallment, erroDaApi } from "@/lib/format";
+import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
@@ -27,7 +30,8 @@ type DataDoRoteiro = {
   original_price: number | null;
   available_spots: number;
   optionals: Opcional[];
-  price_tiers: { name?: string; age_range?: string; price?: number; occupies_seat?: boolean }[];
+  price_tiers: { name?: string; age_range?: string; price?: number;
+                 original_price?: number | null; occupies_seat?: boolean }[];
   tem_hospedagem: boolean;
 };
 
@@ -63,6 +67,8 @@ type Combo = {
   nome: string;
   slug: string;
   descricao: string | null;
+  /** A capa do combo: as fotos dos roteiros montadas numa imagem só. */
+  image_url: string | null;
   desconto_pct: number;
   max_installments: number;
   price_tiers: Faixa[];
@@ -86,19 +92,31 @@ function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
 }
 
 
-/** Fotos dos N destinos, intercaladas.
+/** Quantas fotos a página do combo mostra, a capa inclusa.
  *
- *  Intercalar e não concatenar: com as fotos em blocos, o grande da esquerda e
- *  os quatro menores viriam todos da primeira viagem, e a página de um combo de
- *  três destinos pareceria a de uma viagem só. */
-function galeriaDoCombo(roteiros: RoteiroDoCombo[]): string[] {
+ *  É exatamente o que cabe na grade: a grande da esquerda mais quatro. Passar
+ *  disso só acrescentaria um "+12" e um álbum sem fim, que é o oposto do que o
+ *  cliente precisa para decidir. */
+const MAX_FOTOS = 5;
+
+/** A capa montada, e depois as fotos dos N destinos intercaladas.
+ *
+ *  A capa vem primeiro porque é ela que diz, numa imagem só, que ali são duas
+ *  ou três viagens. É a foto grande da esquerda e a que vai para o WhatsApp.
+ *
+ *  Intercalar as demais e não concatenar: com as fotos em blocos, os quatro
+ *  menores viriam todos da primeira viagem, e a página de um combo de três
+ *  destinos pareceria a de uma viagem só. Intercalando, as primeiras a entrar
+ *  são a foto de capa de cada roteiro, e só depois as de galeria. */
+function galeriaDoCombo(capa: string | null, roteiros: RoteiroDoCombo[]): string[] {
   const fotos: string[] = [];
   const listas = roteiros.map((r) => [r.image_url, ...(r.gallery ?? [])].filter(Boolean) as string[]);
   const maior = Math.max(0, ...listas.map((l) => l.length));
   for (let i = 0; i < maior; i++) {
     for (const l of listas) if (l[i]) fotos.push(l[i]);
   }
-  return [...new Set(fotos)];
+  // O Set tira repetida e, com a capa na frente, garante que ela é a primeira.
+  return [...new Set([...(capa ? [capa] : []), ...fotos])].slice(0, MAX_FOTOS);
 }
 
 /* Os detalhes da viagem, abertos NA PRÓPRIA página do combo.
@@ -224,7 +242,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const [galeriaAberta, setGaleriaAberta] = useState(false);
   const [galeriaInicio, setGaleriaInicio] = useState(0);
 
-  const fotos = useMemo(() => galeriaDoCombo(combo.roteiros), [combo.roteiros]);
+  const fotos = useMemo(
+    () => galeriaDoCombo(combo.image_url, combo.roteiros),
+    [combo.image_url, combo.roteiros],
+  );
   const abrirGaleria = (i: number) => { setGaleriaInicio(i); setGaleriaAberta(true); };
 
   const pernas = useMemo(
@@ -289,20 +310,29 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      tradução que o servidor faz ao cobrar, e as duas contas precisam bater,
      senão o cliente vê um total na tela e outro na hora de pagar. */
   const precoNaPerna = (d: DataDoRoteiro, faixa: Faixa | null): number => {
-    if (!faixa) return d.price_per_person;
+    const padrao = precoDeTabela(d.price_per_person, d.original_price);
+    if (!faixa) return padrao;
     const equivalente = (d.price_tiers ?? []).find(
       (t) => (t.occupies_seat ?? true) === faixa.occupies_seat,
     );
-    return equivalente ? Number(equivalente.price ?? d.price_per_person) : d.price_per_person;
+    // O "de" DA FAIXA, não o da viagem: criança em promoção e adulto sem
+    // promoção na mesma reserva não caberiam num percentual só.
+    return equivalente
+      ? precoDeTabela(Number(equivalente.price ?? d.price_per_person), equivalente.original_price)
+      : padrao;
   };
 
   /* Só as VIAGENS entram no desconto. Opcional é custo de terceiro e entra pelo
      valor cheio, exatamente como na viagem avulsa. É a mesma conta do servidor,
-     e as duas precisam bater. */
+     e as duas precisam bater.
+
+     A base é a TABELA de cada viagem, nunca o preço já promocional: desconto de
+     combo não se aplica sobre desconto (decisão do dono, 09/09/2026). */
   const viagens = pernas.reduce((s, p) => {
     if (!p.data) return s;
-    if (!temFaixas) return s + p.data.price_per_person * pessoas;
-    const deAdultos = (porFaixa[ADULTO] ?? 0) * p.data.price_per_person;
+    const padrao = precoDeTabela(p.data.price_per_person, p.data.original_price);
+    if (!temFaixas) return s + padrao * pessoas;
+    const deAdultos = (porFaixa[ADULTO] ?? 0) * padrao;
     const demais = (combo.price_tiers ?? []).reduce(
       (t, f) => t + (porFaixa[rotuloFaixa(f)] ?? 0) * precoNaPerna(p.data!, f), 0,
     );
@@ -508,9 +538,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                 <div className="space-y-4">
                   {pernas.map(({ roteiro, data }, i) => {
                     const aberto = !!trocandoData[roteiro.template_id];
-                    const comDesconto = data
-                      ? data.price_per_person * (1 - combo.desconto_pct / 100)
+                    const cheioDaData = data
+                      ? precoDeTabela(data.price_per_person, data.original_price)
                       : 0;
+                    const comDesconto = cheioDaData * (1 - combo.desconto_pct / 100);
                     return (
                       <div key={roteiro.template_id} className="border-t border-gray-100 pt-4 first:border-0 first:pt-0">
                         <div className="flex gap-3">
@@ -556,7 +587,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                                 </span>
                                 <span className="block text-xs mt-0.5">
                                   <span className="text-gray-400 line-through mr-1.5">
-                                    R$ {fmtBRL(data.price_per_person)}
+                                    R$ {fmtBRL(cheioDaData)}
                                   </span>
                                   <span className="font-bold text-navy-700">R$ {fmtBRL(comDesconto)}</span>
                                   <span className="text-gray-400"> /pessoa</span>
@@ -568,24 +599,34 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                           </span>
                         </button>
 
-                        {aberto && roteiro.datas.length > 1 && (
-                          <div className="mt-2">
-                            <DateSelector
-                              trips={roteiro.datas.map(paraSelecao)}
-                              selected={data ? paraSelecao(data) : null}
-                              onSelect={(d) => {
-                                setEscolha((a) => ({ ...a, [roteiro.template_id]: d.id }));
-                                // Escolheu, fecha: manter aberto empurraria as
-                                // outras viagens para fora da tela.
-                                setTrocandoData((a) => ({ ...a, [roteiro.template_id]: false }));
-                              }}
-                              hasError={false}
-                              titulo=""
-                              descontoPct={combo.desconto_pct}
-                              semMoldura
-                            />
-                          </div>
-                        )}
+                        {aberto && roteiro.datas.length > 1 && (() => {
+                          // Roteiro com muita data usa o seletor agrupado por
+                          // mês, o MESMO da página de viagem. Ilha do Mel tem 42
+                          // datas à venda e Beto Carrero 80: na lista simples
+                          // seriam 80 cartões dentro do acordeão, jogando as
+                          // outras viagens do combo para fora da tela.
+                          const Seletor = roteiro.datas.length >= COMPACT_THRESHOLD
+                            ? CompactDateSelector
+                            : DateSelector;
+                          return (
+                            <div className="mt-2">
+                              <Seletor
+                                trips={roteiro.datas.map(paraSelecao)}
+                                selected={data ? paraSelecao(data) : null}
+                                onSelect={(d) => {
+                                  setEscolha((a) => ({ ...a, [roteiro.template_id]: d.id }));
+                                  // Escolheu, fecha: manter aberto empurraria as
+                                  // outras viagens para fora da tela.
+                                  setTrocandoData((a) => ({ ...a, [roteiro.template_id]: false }));
+                                }}
+                                hasError={false}
+                                titulo=""
+                                descontoPct={combo.desconto_pct}
+                                semMoldura
+                              />
+                            </div>
+                          );
+                        })()}
 
                         {/* Os opcionais DESTA viagem, logo abaixo da data dela.
                             Numa lista separada no fim da página, o cliente

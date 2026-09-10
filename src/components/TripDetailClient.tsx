@@ -18,7 +18,9 @@ import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 import { trackViewItem } from "@/lib/analytics";
 import { imgOtim } from "@/lib/imagem";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
-import { DataEscolhida, DateSelector, fmtDate } from "@/components/viagem/Datas";
+import {
+  COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector, fmtDate,
+} from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -1054,135 +1056,6 @@ function DescriptionBlock({ description }: { description: string }) {
           {expanded ? <><ChevronUp size={15} /> Ver menos</> : <><ChevronDown size={15} /> Ver mais</>}
         </button>
       )}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   11b. Compact Date Selector (many dates - grouped by month)
-═══════════════════════════════════════════ */
-const COMPACT_THRESHOLD = 20; // acima disso usa o modo compacto
-
-function CompactDateSelector({
-  trips, selected, onSelect, hasError,
-}: {
-  trips: Trip[]; selected: Trip | null; onSelect: (t: Trip) => void; hasError: boolean;
-}) {
-  const MONTHS_INITIAL = 2;
-  const [shownMonths, setShownMonths] = useState(MONTHS_INITIAL);
-
-  // Agrupar por "YYYY-MM"
-  const grouped = trips.reduce<Record<string, Trip[]>>((acc, t) => {
-    const key = spDay(t.departure_date).slice(0, 7); // "2026-04" (fuso BRT)
-    (acc[key] ||= []).push(t);
-    return acc;
-  }, {});
-  const allMonthKeys = Object.keys(grouped).sort();
-  const visibleKeys = allMonthKeys.slice(0, shownMonths);
-  const remaining = allMonthKeys.length - shownMonths;
-
-  const fmtMonthLabel = (key: string) => {
-    const [y, m] = key.split("-");
-    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  };
-  // A data sai por extenso (23/08/2026), igual ao card de viagem com pernoite.
-  // Antes era abreviada e sem ano ("23 de ago."), o que ia ficar ambíguo assim
-  // que entrassem datas de 2027 na mesma lista.
-
-  return (
-    <div id="date-selector" className={`bg-white rounded-2xl shadow-sm overflow-hidden ${hasError ? "ring-2 ring-red-400" : ""}`}>
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-black text-lg text-navy-800">Escolha sua data</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{trips.length} {trips.length === 1 ? "data disponível" : "datas disponíveis"}</p>
-        </div>
-        {hasError && (
-          <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
-            <AlertTriangle size={13} /> Selecione uma data
-          </span>
-        )}
-      </div>
-
-      <div className="px-4 pb-4 space-y-4">
-        {visibleKeys.map(monthKey => (
-          <div key={monthKey}>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 capitalize">
-              {fmtMonthLabel(monthKey)}
-            </p>
-            <div className="space-y-1.5">
-              {grouped[monthKey].map(t => {
-                const isSold = t.available_spots === 0 || t.status === "sold_out";
-                const isClosed = !isSold && salesClosed(t.departure_date);
-                const blocked = isSold || isClosed;
-                const isSelected = selected?.id === t.id;
-                const isLow = !blocked && poucasVagas(t.available_spots);
-                return (
-                  <button
-                    key={t.id}
-                    disabled={blocked}
-                    onClick={() => !blocked && onSelect(t)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow,transform,opacity] ${
-                      isSelected
-                        ? "border-navy-700 bg-navy-50"
-                        : blocked
-                        ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
-                        : "border-gray-200 hover:border-navy-300 hover:bg-gray-50 cursor-pointer"
-                    }`}
-                  >
-                    {/* Duas linhas, igual ao card de viagem com pernoite. Numa
-                        linha só, data + preço + selo de vagas não cabem num
-                        celular estreito, e o navegador quebrava no meio dos
-                        valores ("23 / de / ago.", "R$ / 216,00"). */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Calendar size={13} className={`flex-shrink-0 ${isSelected ? "text-navy-600" : "text-gold-500"}`} />
-                      <span className={`text-sm font-bold whitespace-nowrap ${isSelected ? "text-navy-800" : "text-navy-700"}`}>
-                        {fmtDate(t.departure_date)}
-                      </span>
-                      {isSelected && (
-                        <span className="ml-auto w-5 h-5 bg-navy-700 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check size={11} className="text-white" />
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Sem "/pessoa" aqui de propósito: neste card estreito ele
-                        é o que faz o conteúdo estourar num aparelho de 320px, e
-                        o preço por pessoa já aparece na barra fixa de baixo. */}
-                    <div className="flex items-center justify-between gap-2 min-w-0">
-                      {isSold ? (
-                        <span className="text-sm font-bold text-gray-400">Esgotado</span>
-                      ) : isClosed ? (
-                        <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
-                      ) : (
-                        <>
-                          <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                            R$ {fmtBRL(t.price_per_person)}
-                          </span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap overflow-hidden text-ellipsis ${
-                            isLow ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-500"
-                          }`}>
-                            {isLow ? `⚠ ${spotsLabel(t.available_spots)}` : spotsLabel(t.available_spots)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {remaining > 0 && (
-          <button
-            type="button"
-            onClick={() => setShownMonths(v => v + 3)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-navy-300 text-navy-600 text-sm font-semibold hover:bg-navy-50 transition-colors"
-          >
-            <ChevronDown size={15} /> Ver mais {remaining} {remaining === 1 ? "mês" : "meses"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

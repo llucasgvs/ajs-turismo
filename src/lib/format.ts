@@ -1,3 +1,19 @@
+/** O valor CHEIO: o "de" anunciado, quando ele é maior que o preço cobrado.
+ *
+ * É a base do desconto de combo. Decisão do dono em 09/09/2026: desconto de
+ * combo não se aplica sobre preço que já veio promocional. Precisa existir na
+ * tela porque a mesma conta roda no servidor (`preco_de_tabela`, em
+ * core/tiers.py), e tela e cobrança divergindo é o pior defeito possível num
+ * checkout.
+ *
+ * "de" vazio, zero ou MENOR que o preço é dado inconsistente do cadastro, e aí
+ * o próprio preço de venda é o valor cheio.
+ */
+export function precoDeTabela(preco: number, de?: number | null): number {
+  const cheio = Number(de ?? 0);
+  return cheio > preco ? cheio : preco;
+}
+
 /** Formata valor em BRL sempre com 2 casas decimais. Ex: 699,90 */
 export function fmtBRL(value: number): string {
   return value.toLocaleString("pt-BR", {

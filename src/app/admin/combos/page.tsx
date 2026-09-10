@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { cpfValido, erroDaApi, fmtBRL, formatCPF, formatPhone } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
+import { imgOtim } from "@/lib/imagem";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
 type RoteiroDoCombo = {
@@ -27,6 +28,8 @@ type Combo = {
   nome: string;
   slug: string | null;
   descricao: string | null;
+  /** A capa que o cliente vê: a montada com as fotos dos roteiros. */
+  image_url: string | null;
   desconto_pct: number;
   /** Parcelas SEM JUROS do pacote. É do combo, não a menor entre as viagens:
    *  o pacote tem condição comercial própria. */
@@ -186,24 +189,36 @@ export default function CombosPage() {
         {combos?.map((c) => (
           <div key={c.id} className="card p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-bold text-navy-800">{c.nome}</h2>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SELO[c.status].classe}`}>
-                    {SELO[c.status].texto}
-                  </span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gold-100 text-gold-700">
-                    {c.desconto_pct.toString().replace(".", ",")}% off
-                  </span>
-                  {c.max_installments > 1 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700">
-                      {c.max_installments}x sem juros
+              {/* A capa do combo, do jeito que o cliente vê. Aqui ela serve de
+                  conferência: se veio errada ou não foi gerada, aparece na
+                  própria lista, sem precisar abrir a página pública. */}
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                {c.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imgOtim(c.image_url, 320, 80)} alt=""
+                    className="hidden sm:block w-28 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-bold text-navy-800">{c.nome}</h2>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SELO[c.status].classe}`}>
+                      {SELO[c.status].texto}
                     </span>
-                  )}
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gold-100 text-gold-700">
+                      {c.desconto_pct.toString().replace(".", ",")}% off
+                    </span>
+                    {c.max_installments > 1 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy-50 text-navy-700">
+                        {c.max_installments}x sem juros
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {janela(c)} · {c.roteiros.length} roteiros
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  {janela(c)} · {c.roteiros.length} roteiros
-                </p>
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -312,18 +327,11 @@ export default function CombosPage() {
                   </p>
                 )}
 
-                {/* O aviso do desconto somado. Só aparece quando algum roteiro
-                    já tem promoção, porque só aí os dois se acumulam. */}
-                {c.roteiros_com_desconto > 0 && c.desconto_total_pct != null && (
-                  <div className="flex items-start gap-2 mt-2.5 bg-gold-50 border border-gold-200 rounded-xl px-3 py-2.5">
-                    <AlertTriangle size={14} className="text-gold-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-navy-700">
-                      {c.roteiros_com_desconto === 1 ? "Um roteiro deste combo já vende" : `${c.roteiros_com_desconto} roteiros deste combo já vendem`} com
-                      desconto próprio. Somando com os {c.desconto_pct.toString().replace(".", ",")}% do combo,
-                      o cliente paga <strong>{c.desconto_total_pct.toString().replace(".", ",")}% abaixo do preço anunciado</strong>.
-                    </p>
-                  </div>
-                )}
+                {/* Como o desconto do combo parte da TABELA, um roteiro em
+                    promoção funda pode sair mais barato avulso que no pacote.
+                    O aviso compara os dois valores em vez de só citar a regra:
+                    é o número que decide se o combo pode ser anunciado. */}
+                {c.roteiros_com_desconto > 0 && <AvisoDaTabela c={c} />}
               </div>
             )}
           </div>
@@ -333,6 +341,7 @@ export default function CombosPage() {
       {vendendo && (
         <VendaComboForm combo={vendendo} onClose={() => { setVendendo(null); carregar(); }} />
       )}
+
 
       {(criando || editando) && (
         <ComboForm
@@ -348,6 +357,62 @@ export default function CombosPage() {
 }
 
 /* ─── Formulário ─── */
+
+/* O aviso da regra do desconto, na linha do combo.
+ *
+ * A regra (decisão do dono, 09/09/2026): o desconto do combo incide sobre o
+ * preço de TABELA do roteiro, nunca sobre um preço já promocional. Não se
+ * aplica desconto em cima de desconto.
+ *
+ * A consequência precisa aparecer aqui e não num manual: quando a promoção
+ * própria do roteiro é MAIOR que a do combo, o pacote fica acima do que o
+ * cliente pagaria comprando separado. O sistema não corrige isso sozinho, de
+ * propósito, porque a decisão é comercial; então o painel mostra os dois
+ * valores lado a lado e diz qual está maior.
+ */
+function AvisoDaTabela({ c }: { c: Combo }) {
+  const pacote = c.preco_com_desconto_desde;
+  const avulso = c.preco_cheio_desde;
+  if (pacote == null || avulso == null) return null;
+
+  const piores = c.roteiros.filter(
+    (r) => r.desconto_proprio_pct != null && r.desconto_proprio_pct > c.desconto_pct,
+  );
+  const maisCaro = pacote > avulso;
+  const empatado = !maisCaro && Math.abs(pacote - avulso) < 0.01;
+  const ruim = maisCaro || empatado;
+
+  return (
+    <div className={`flex items-start gap-2 mt-2.5 rounded-xl px-3 py-2.5 border ${
+      ruim ? "bg-red-50 border-red-200" : "bg-gold-50 border-gold-200"
+    }`}>
+      <AlertTriangle size={14} className={`flex-shrink-0 mt-0.5 ${ruim ? "text-red-500" : "text-gold-600"}`} />
+      <div className="text-xs text-navy-700 space-y-1">
+        <p>
+          {c.roteiros_com_desconto === 1 ? "Um roteiro deste combo já vende" : `${c.roteiros_com_desconto} roteiros deste combo já vendem`} com
+          promoção própria. Os {c.desconto_pct.toString().replace(".", ",")}% do combo
+          são calculados sobre o <strong>preço de tabela</strong>, não sobre o promocional:
+          não aplicamos desconto em cima de desconto.
+        </p>
+        <p className={ruim ? "font-semibold text-red-700" : "text-gray-600"}>
+          {maisCaro
+            ? `Atenção: o pacote sai R$ ${fmtBRL(pacote)} e comprando separado hoje sai R$ ${fmtBRL(avulso)}. O combo está MAIS CARO que o avulso.`
+            : empatado
+            ? `O pacote sai R$ ${fmtBRL(pacote)}, o mesmo que comprando separado hoje. O combo não dá vantagem ao cliente.`
+            : `Comprando separado hoje sai R$ ${fmtBRL(avulso)}; no pacote, R$ ${fmtBRL(pacote)}. O cliente economiza R$ ${fmtBRL(avulso - pacote)}.`}
+        </p>
+        {piores.length > 0 && (
+          <p className="text-gray-600">
+            {piores.length === 1 ? "A promoção de " : "As promoções de "}
+            <strong>{piores.map((r) => nomeCurto(r.title)).join(", ")}</strong>
+            {piores.length === 1 ? " é maior" : " são maiores"} que o desconto do combo.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function ComboForm({ combo, roteiros, onClose, onSaved }: {
   combo: Combo | null;
@@ -371,6 +436,7 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
     preco_cheio_desde: number;
     preco_cheio_ate: number | null;
     preco_tabela_desde: number | null;
+    preco_tabela_ate: number | null;
     roteiros: {
       template_id: number; title: string; datas_abertas: number;
       preco_desde: number | null; preco_ate: number | null;
@@ -425,27 +491,32 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
   const cheio = soma?.preco_cheio_desde ?? 0;
   const semDataEscolhido = (soma?.roteiros ?? []).filter((r) => r.datas_abertas === 0);
   const comPromocao = (soma?.roteiros ?? []).filter((r) => r.desconto_proprio_pct != null);
+  // A TABELA é a base do desconto do combo, não o preço de venda: não se aplica
+  // desconto em cima de desconto (decisão do dono, 09/09/2026). É contra ela que
+  // o preço final digitado vira percentual, senão o dono digitaria um valor e o
+  // sistema gravaria um percentual que produz outro.
   const tabela = soma?.preco_tabela_desde ?? cheio;
-  // O desconto que o cliente enxerga: combo somado à promoção que o roteiro já
-  // tem. É este número que precisa aparecer ANTES de o dono fechar o valor.
-  const totalPct = cheio > 0 && tabela > 0 && pct > 0
-    ? Math.round((1 - (cheio * (1 - pct / 100)) / tabela) * 1000) / 10
-    : 0;
+  const pacote = tabela > 0 ? Math.round(tabela * (1 - pct / 100) * 100) / 100 : 0;
+  // As promoções que já são maiores que a do combo: nelas o pacote sai acima do
+  // avulso, e é o que o dono precisa ver ANTES de fechar o valor.
+  const promoMaiorQueCombo = (soma?.roteiros ?? []).filter(
+    (r) => r.desconto_proprio_pct != null && r.desconto_proprio_pct > pct,
+  );
 
   // Digitar o preço final define o percentual, e mexer no percentual atualiza o
   // preço. Os dois campos mostram a mesma decisão de dois jeitos.
   const aoDigitarAlvo = (v: string) => {
     setPrecoAlvo(v);
     const alvo = parseFloat(v.replace(",", "."));
-    if (cheio > 0 && alvo > 0 && alvo < cheio) {
-      setDesconto((Math.round((1 - alvo / cheio) * 10000) / 100).toString());
+    if (tabela > 0 && alvo > 0 && alvo < tabela) {
+      setDesconto((Math.round((1 - alvo / tabela) * 10000) / 100).toString());
     }
   };
   const aoDigitarPct = (v: string) => {
     setDesconto(v);
     const p = parseFloat(v.replace(",", "."));
-    if (cheio > 0 && p > 0 && p < 100) {
-      setPrecoAlvo((Math.round(cheio * (1 - p / 100) * 100) / 100).toFixed(2));
+    if (tabela > 0 && p > 0 && p < 100) {
+      setPrecoAlvo((Math.round(tabela * (1 - p / 100) * 100) / 100).toFixed(2));
     }
   };
   const valido = nome.trim().length >= 3 && escolhidos.length >= 2 && pct > 0 && pct < 100
@@ -544,9 +615,13 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
             ) : (
               <div className="flex items-end gap-3 flex-wrap">
                 <div>
-                  <span className="block text-[11px] text-gray-400 mb-1">De</span>
+                  {/* O "de" é a TABELA somada, porque é dela que o desconto do
+                      combo sai. Mostrar aqui a soma dos preços de venda faria o
+                      dono digitar um "por" e o sistema gravar um percentual que
+                      produz outro valor. */}
+                  <span className="block text-[11px] text-gray-400 mb-1">De (tabela)</span>
                   <span className="block text-lg text-gray-400 line-through tabular-nums">
-                    {cheio > 0 ? `R$ ${fmtBRL(cheio)}` : "R$ 0,00"}
+                    {tabela > 0 ? `R$ ${fmtBRL(tabela)}` : "R$ 0,00"}
                   </span>
                 </div>
                 <div className="w-32">
@@ -571,26 +646,49 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
             )}
             {escolhidos.length >= 2 && (
               <p className="text-[11px] text-gray-400 mt-2">
-                Valor por pessoa.
-                {soma?.preco_cheio_ate
-                  ? ` Há datas de preços diferentes: escolhendo as mais caras, o cheio vai a R$ ${fmtBRL(soma.preco_cheio_ate)}.`
+                Valor por pessoa, calculado sobre o preço de tabela.
+                {soma?.preco_tabela_ate
+                  ? ` Há datas de preços diferentes: escolhendo as mais caras, a tabela vai a R$ ${fmtBRL(soma.preco_tabela_ate)}.`
                   : " Todas as datas custam o mesmo, então o valor é exato."}
               </p>
             )}
 
-            {comPromocao.length > 0 && totalPct > 0 && (
-              <div className="flex items-start gap-2 mt-3 bg-gold-50 border border-gold-200 rounded-xl px-3 py-2.5">
-                <AlertTriangle size={14} className="text-gold-600 flex-shrink-0 mt-0.5" />
-                <div className="text-xs text-navy-700">
+            {/* O aviso da regra, na hora de definir o valor.
+                Os {pct}% saem da tabela, então quando a promoção própria do
+                roteiro é maior que a do combo o pacote fica ACIMA do avulso.
+                Vermelho nesse caso: é decisão comercial, não erro de sistema,
+                mas ninguém pode fechar o valor sem ver. */}
+            {comPromocao.length > 0 && pct > 0 && (
+              <div className={`flex items-start gap-2 mt-3 rounded-xl px-3 py-2.5 border ${
+                pacote >= cheio ? "bg-red-50 border-red-200" : "bg-gold-50 border-gold-200"
+              }`}>
+                <AlertTriangle size={14} className={`flex-shrink-0 mt-0.5 ${
+                  pacote >= cheio ? "text-red-500" : "text-gold-600"
+                }`} />
+                <div className="text-xs text-navy-700 space-y-1">
                   <p>
                     {comPromocao.length === 1 ? "Este roteiro já vende" : "Estes roteiros já vendem"} com desconto próprio:{" "}
                     {comPromocao.map((r) => `${nomeCurto(r.title)} (${r.desconto_proprio_pct!.toString().replace(".", ",")}%)`).join(", ")}.
                   </p>
-                  <p className="mt-1">
-                    Com os {pct.toString().replace(".", ",")}% do combo, o cliente pagará{" "}
-                    <strong>{totalPct.toString().replace(".", ",")}% abaixo do preço anunciado</strong>
-                    {tabela > cheio && <> (de R$ {fmtBRL(tabela)})</>}.
+                  <p>
+                    Os {pct.toString().replace(".", ",")}% do combo saem do{" "}
+                    <strong>preço de tabela</strong> (R$ {fmtBRL(tabela)}), não do promocional:
+                    não aplicamos desconto em cima de desconto.
                   </p>
+                  <p className={pacote >= cheio ? "font-semibold text-red-700" : "text-gray-600"}>
+                    {pacote > cheio
+                      ? `Atenção: o pacote sai R$ ${fmtBRL(pacote)} e comprando separado hoje sai R$ ${fmtBRL(cheio)}. O combo está MAIS CARO que o avulso.`
+                      : pacote === cheio
+                      ? `O pacote sai R$ ${fmtBRL(pacote)}, o mesmo que comprando separado hoje. O combo não dá vantagem ao cliente.`
+                      : `Comprando separado hoje sai R$ ${fmtBRL(cheio)}; no pacote, R$ ${fmtBRL(pacote)}. O cliente economiza R$ ${fmtBRL(cheio - pacote)}.`}
+                  </p>
+                  {promoMaiorQueCombo.length > 0 && (
+                    <p className="text-gray-600">
+                      {promoMaiorQueCombo.length === 1 ? "A promoção de " : "As promoções de "}
+                      <strong>{promoMaiorQueCombo.map((r) => nomeCurto(r.title)).join(", ")}</strong>
+                      {promoMaiorQueCombo.length === 1 ? " é maior" : " são maiores"} que o desconto do combo.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
