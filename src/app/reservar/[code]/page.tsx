@@ -998,11 +998,13 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         </>
         )}
 
-        {/* Só depois de existir reserva. No passo de login ela ainda não foi
-            criada, e "Código:" vazio parecia defeito. */}
-        {booking.booking_code && (
-          <p className="text-xs text-gray-400 mt-3">Código: {booking.booking_code}</p>
-        )}
+        {/* O código da reserva NÃO aparece aqui, e é de propósito.
+            Decisão do dono, 10/09/2026: antes de o pagamento confirmar, o
+            código confunde. Ele parece um comprovante de algo que ainda não
+            aconteceu, e o cliente pode guardá-lo achando que já comprou. O
+            código aparece na tela de sucesso, depois de pago, e é lá que ele
+            passa a valer alguma coisa. Este card só existe enquanto a reserva
+            está pendente: quando confirma, a tela inteira vira a de sucesso. */}
       </div>
     </aside>
   );

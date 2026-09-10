@@ -279,12 +279,10 @@ export function ComboEditavel({
                   </button>
                 )}
               </div>
-              {/* O código da reserva daquela viagem, que é o que vale na porta
-                  do ônibus. Só existe DEPOIS de a reserva ser criada: no passo
-                  de login ainda não há nenhum, e não se inventa um. */}
-              {perna?.booking_code && (
-                <p className="text-[11px] text-gray-400 mt-0.5">{perna.booking_code}</p>
-              )}
+              {/* Sem o código de cada viagem aqui: ver o comentário no card do
+                  checkout. Antes de o pagamento confirmar, o código confunde, e
+                  num combo seriam três de uma vez. Eles aparecem no voucher de
+                  cada viagem, depois de pago. */}
 
               {aberta[r.template_id] && (
                 /* UMA coluna, sempre. Este bloco vive dentro do card do
