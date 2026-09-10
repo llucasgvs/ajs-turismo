@@ -930,12 +930,25 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
              servidor), então a conta aqui é a mesma de sempre: quantidade vezes
              preço. */
           <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
-            {(booking.tier_breakdown || []).filter(t => t.qty > 0).map(t => (
-              <div key={t.label} className="flex justify-between gap-2 text-gray-600">
-                <span className="min-w-0 break-words">{t.qty}× {t.label}</span>
-                <span className="shrink-0 whitespace-nowrap">{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
+            {(booking.tier_breakdown || []).filter(t => t.qty > 0).length > 0 ? (
+              (booking.tier_breakdown || []).filter(t => t.qty > 0).map(t => (
+                <div key={t.label} className="flex justify-between gap-2 text-gray-600">
+                  <span className="min-w-0 break-words">{t.qty}× {t.label}</span>
+                  <span className="shrink-0 whitespace-nowrap">{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
+                </div>
+              ))
+            ) : (
+              /* Combo sem faixas de idade: não há o que separar por categoria, e
+                 sem esta linha o detalhamento mostrava um desconto e um total
+                 sem dizer de onde saíram. Mesma forma do "1× Viagem" da viagem
+                 avulsa, dizendo quantas viagens tem o pacote. */
+              <div className="flex justify-between gap-2 text-gray-600">
+                <span className="min-w-0 break-words">
+                  {booking.num_travelers}× Combo ({(booking.combo_pernas || []).length} viagens)
+                </span>
+                <span className="shrink-0 whitespace-nowrap">R$ {fmtBRL(booking.total_amount)}</span>
               </div>
-            ))}
+            )}
             {(booking.combo_pernas || []).flatMap(p =>
               (p.selected_optionals || []).map(o => (
                 <div key={`${p.booking_code}-${o.name}`} className="flex justify-between gap-2 text-gold-700">
