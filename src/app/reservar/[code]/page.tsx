@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthModal from "@/components/AuthModal";
+import { ComboEditavel } from "@/components/pagamento/ComboEditavel";
 import {
   QrCode, CreditCard, MessageCircle, Copy, Check, Loader2, CheckCircle2,
   ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Minus, Plus, Calendar, Users, MapPin, Clock, AlertCircle, X, Package,
@@ -51,8 +52,11 @@ interface Booking {
      viajantes, um conjunto de faixas. O que muda é que a viagem não é uma, e
      por isso vem a lista. */
   combo_nome?: string | null;
+  combo_slug?: string | null;
   combo_pernas?: { booking_code: string; trip_id: number; trip_title?: string | null;
-                   trip_departure_date?: string | null; status: string }[];
+                   trip_departure_date?: string | null; status: string;
+                   trip_template_id?: number | null;
+                   selected_optionals?: { name: string; price: number }[] }[];
   combo_total?: number | null;
   combo_desconto?: number | null;
 }
@@ -428,6 +432,16 @@ function BookingCheckout({ code }: { code: string }) {
     return () => { vivo = false; };
   }, [booking?.trip_id, trip]);
 
+  /* O combo foi editado: o servidor refez o carrinho.
+     Mesmas datas, ele mantém o mesmo grupo e só muda os valores, e basta
+     recarregar. Datas diferentes, ele cancela o antigo e abre outro, com código
+     novo: aí a URL precisa acompanhar, senão a tela ficaria apontando para um
+     carrinho que acabou de ser cancelado. */
+  const aoSalvarCombo = useCallback((grupo: string) => {
+    if (grupo && grupo !== code) { router.replace(`/reservar/${grupo}`); return; }
+    loadStatus();
+  }, [code, router, loadStatus]);
+
   // Ao confirmar o pagamento, sobe pro topo (a tela de sucesso aparece no início).
   useEffect(() => { if (confirmed) window.scrollTo({ top: 0, behavior: "auto" }); }, [confirmed]);
   // Etapa 2 do funil: entrou no checkout (reserva aberta, ainda não paga).
@@ -484,11 +498,7 @@ function BookingCheckout({ code }: { code: string }) {
               <StepTravelers booking={booking} done={step > 1} active={step === 1} onEdit={() => setStep(1)} onDone={() => setStep(2)} code={code} />
               <StepPayment booking={booking} active={step === 2} code={code} method={method} setMethod={setMethod} installments={installments} setInstallments={setInstallments} onConfirmed={() => setConfirmed(true)} pollStatus={loadStatus} />
             </div>
-            {/* Pacote não se edita perna a perna: o valor de cada uma é a fatia
-                do combo com o desconto dentro, e o servidor recusa mexer nela
-                sozinha. Trocar data ou pessoas é refazer o combo na página
-                dele. */}
-            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={!ehCombo(booking)} method={method} installments={installments} onTravelersChange={() => setStep(1)} />
+            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={true} method={method} installments={installments} onTravelersChange={() => setStep(1)} onComboSalvo={aoSalvarCombo} />
           </div>
         </div>
       </main>
@@ -499,9 +509,11 @@ function BookingCheckout({ code }: { code: string }) {
 }
 
 /* ── Card da reserva (direita): foto + edição + preço ────────────────── */
-function ReservationCard({ booking, trip, code, onUpdate, editable, method, installments, onTravelersChange }: {
+function ReservationCard({ booking, trip, code, onUpdate, editable, method, installments, onTravelersChange, onComboSalvo }: {
   booking: Booking; trip: Trip | null; code: string; onUpdate: (b: Booking) => void; editable: boolean;
   method: Method; installments: number; onTravelersChange?: () => void;
+  /** Combo: o servidor devolve o grupo depois de refazer o carrinho. */
+  onComboSalvo?: (grupo: string) => void;
 }) {
   const hasTiers = (trip?.price_tiers ?? []).length > 0;
   const priceForLabel = (label: string) =>
@@ -702,37 +714,19 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           Num combo a foto de UMA das viagens diria a coisa errada, e a data
           única não existe: são N datas, escolhidas na página do combo. */}
       {combo ? (
-        <div className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
-              <Package size={10} /> Combo
-            </span>
-            <p className="font-bold text-navy-800 text-sm leading-snug min-w-0 truncate">{booking.combo_nome || "Seu combo"}</p>
-          </div>
-          <div className="border border-gray-100 rounded-xl divide-y divide-gray-100">
-            {(booking.combo_pernas || []).map((p, i) => (
-              <div key={p.booking_code} className="px-3 py-2.5">
-                <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
-                  Viagem {i + 1} de {(booking.combo_pernas || []).length}
-                </p>
-                <p className="text-sm font-semibold text-navy-800 leading-snug">{p.trip_title || "Viagem"}</p>
-                <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                  <Calendar size={11} className="text-gold-500 shrink-0" />
-                  {p.trip_departure_date ? fmtDateRangeFull(p.trip_departure_date) : "data a confirmar"}
-                </p>
-                {/* O código de cada reserva: é ele que vale na porta do ônibus.
-                    Antes de entrar na conta a reserva ainda não existe, e aí não
-                    há código para mostrar. */}
-                {!p.booking_code.startsWith("perna-") && (
-                  <p className="text-[11px] text-gray-400 mt-0.5">{p.booking_code}</p>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-            <ShieldCheck size={12} /> Confirmação imediata
-          </div>
-        </div>
+        /* O resumo do pacote, editável durante os passos igual ao da viagem
+           avulsa: trocar a data de uma perna, mudar quem vai, marcar um
+           opcional. Quem salva é o mesmo POST /combos/checkout que abriu o
+           carrinho, e ele devolve o grupo (que muda quando a data muda). */
+        <ComboEditavel
+          slug={booking.combo_slug}
+          nome={booking.combo_nome}
+          pernas={booking.combo_pernas || []}
+          faixasAtuais={booking.tier_breakdown || []}
+          numViajantes={booking.num_travelers}
+          editavel={editable}
+          aoSalvar={onComboSalvo || (() => {})}
+        />
       ) : (
         <div className="flex gap-3 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -777,7 +771,11 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           </div>
         )}
 
-        {/* Edição de pessoas/faixas */}
+        {/* Edição de pessoas/faixas.
+            Num combo quem cuida disso é o ComboEditavel acima: as faixas são as
+            do PACOTE e valem para as N viagens, e este bloco leria as da perna
+            âncora. */}
+        {!combo && (
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-navy-800 flex items-center gap-1.5"><Users size={14} /> Viajantes</span>
@@ -811,8 +809,11 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           )}
         </div>
 
-        {/* Opcionais */}
-        {editable && trip && trip.optionals?.length > 0 && (
+        )}
+
+        {/* Opcionais. No combo eles são de CADA viagem, e aparecem junto da
+            data de cada uma no bloco acima. */}
+        {!combo && editable && trip && trip.optionals?.length > 0 && (
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs font-semibold text-gray-500 mb-2">Opcionais (por pessoa)</p>
             <div className="space-y-2">
@@ -900,7 +901,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         {combo ? (
           <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
             <div className="flex justify-between gap-2 text-gray-600">
-              <span className="min-w-0 truncate">
+              <span className="min-w-0">
                 {(booking.combo_pernas || []).length} viagens
                 {booking.num_travelers > 1 ? `, ${booking.num_travelers} pessoas` : ""}
               </span>
