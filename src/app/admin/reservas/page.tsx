@@ -62,6 +62,10 @@ type Booking = {
   cancelled_at: string | null;
   updated_at: string | null;
   discount_amount: number;
+  /** Dinheiro recebido por fora do Asaas, alem da cobranca (PIX no WhatsApp). */
+  pago_por_fora?: number;
+  /** Quanto ainda falta entrar. Zero quando a reserva esta quitada. */
+  falta_receber?: number;
   optionals_amount: number;
   installments: number;
   is_external: boolean;
@@ -1164,10 +1168,31 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   </div>
                 ) : null;
               })()}
+              {(booking.pago_por_fora || 0) > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Recebido por fora</span>
+                  <span>+ R$ {fmtBRL(booking.pago_por_fora || 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
                 <span>Total</span>
                 <span>R$ {fmtBRL(booking.final_amount)}</span>
               </div>
+              {/* O aviso que faltava.
+                  Acrescentar um opcional depois do pagamento deixa a reserva
+                  valendo mais do que entrou, e isso passava batido ate alguem
+                  estranhar o numero na tela. Agora a propria reserva diz. */}
+              {(booking.falta_receber || 0) > 0 && (
+                <div className="flex items-start gap-2 mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-navy-700">
+                    Falta receber <strong>R$ {fmtBRL(booking.falta_receber || 0)}</strong>.
+                    {" "}A reserva vale mais do que entrou, o que costuma acontecer quando um
+                    opcional e acrescentado depois do pagamento. Recebendo por fora, lance em
+                    "Recebido por fora" na edicao.
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-gray-400">{PAYMENT_LABEL[booking.payment_method ?? ""] ?? booking.payment_method ?? "-"}{booking.installments > 1 ? ` · ${booking.installments}x` : ""}</p>
             </div>
           </section>
@@ -1323,6 +1348,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
 
   const [price, setPrice] = useState(String(booking.price_per_person));
   const [discount, setDiscount] = useState(String(booking.discount_amount || ""));
+  const [porFora, setPorFora] = useState(String(booking.pago_por_fora || ""));
   const [paymentMethod, setPaymentMethod] = useState(booking.payment_method || "whatsapp");
   const [notes, setNotes] = useState(booking.notes || "");
   const [phone, setPhone] = useState(booking.traveler_phone || "");
@@ -1387,8 +1413,10 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const opcionaisAgora = JSON.stringify(
     opcionais.map((o) => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
   );
+  const foraNum = parseFloat(porFora) || 0;
   const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0)
-    || people !== booking.num_travelers || opcionaisAgora !== opcionaisOriginais;
+    || people !== booking.num_travelers || opcionaisAgora !== opcionaisOriginais
+    || foraNum !== (booking.pago_por_fora || 0);
 
   const PAYMENT_LABEL: Record<string, string> = {
     whatsapp: "Presencial / WhatsApp", pix: "PIX", transfer: "Transferência", credit_card: "Cartão de crédito",
@@ -1405,6 +1433,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
           // desabilitado: não mandar evita gravar divergência à toa.
           price_per_person: !temFaixas && priceNum !== booking.price_per_person ? priceNum : undefined,
           discount_amount: discNum,
+          pago_por_fora: foraNum,
           // Linha em branco não vira opcional de R$ 0 na reserva.
           selected_optionals: opcionais
             .filter((o) => o.name.trim().length >= 2)
@@ -1467,6 +1496,30 @@ function EditBookingModal({ booking, onClose, onSaved }: {
               </div>
             </div>
           </div>
+
+          {/* Dinheiro que entrou por outro caminho.
+              Existe porque acrescentar um opcional depois do pagamento deixa a
+              reserva valendo mais do que foi cobrado, e o complemento costuma
+              vir por PIX no WhatsApp: o Asaas nunca fica sabendo e o valor sumia
+              do faturamento. So aparece onde HA cobranca pelo site; no balcao o
+              dinheiro ja esta no total da reserva. */}
+          {booking.confirmado_manual === false && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                Recebido por fora <span className="text-gray-400 font-normal normal-case">(PIX, dinheiro)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                <input type="number" min="0" step="0.01" placeholder="0" value={porFora}
+                  onChange={(e) => setPorFora(e.target.value)}
+                  className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${
+                    foraNum > 0 ? "border-emerald-300 bg-emerald-50" : "border-gray-200"}`} />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Entra no faturamento junto com a cobranca. Anote na observacao como veio.
+              </p>
+            </div>
+          )}
 
           {/* Pessoas + Pagamento */}
           <div className="grid grid-cols-2 gap-3">
