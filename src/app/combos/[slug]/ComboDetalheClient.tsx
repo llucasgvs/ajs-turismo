@@ -348,36 +348,57 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     .filter(Boolean)
     .sort()[0] as string | undefined;
 
+  /* O que o cliente escolheu, no formato que o checkout entende. */
+  const paraOCheckout = () => ({
+    pernas: pernas.map((p) => ({
+      trip_id: p.data!.trip_id,
+      titulo: p.roteiro.title,
+      data: p.data!.departure_date,
+      // Só o nome: o preço vem do servidor, sempre.
+      selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
+    })),
+    num_travelers: totalPessoas,
+    tier_breakdown: temFaixas
+      ? Object.entries(porFaixa).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+      : [],
+    nome: combo.nome,
+    // `base` é a soma de TABELA mais os opcionais, e `total` é o que se paga.
+    // O checkout mostra os dois: sem a base, o detalhamento repetiria o total e
+    // o desconto ficaria pendurado sem de onde ter saído.
+    base: cheio,
+    total: final,
+    desconto: desconto,
+  });
+
   const continuar = async () => {
     setErro("");
     if (faltaData) { setErro("Escolha a data de cada viagem."); return; }
     if (temFaixas && (porFaixa[ADULTO] ?? 0) < 1) {
       setErro("A reserva precisa de pelo menos um adulto."); return;
     }
+    /* Sem conta, vai para o MESMO funil da viagem avulsa: entrar ou cadastrar é
+       o passo 1 do checkout, dentro dele. Mandar para /login e trazer de volta
+       tira o cliente do fluxo e perde a compra no caminho. */
     if (!getUser()) {
-      router.push(`/login?redirect=${encodeURIComponent(`/combos/${combo.slug}`)}`);
+      router.push(`/reservar/novo?combo=${combo.id}&sel=${encodeURIComponent(JSON.stringify(paraOCheckout()))}`);
       return;
     }
     setEnviando(true);
     try {
+      const e = paraOCheckout();
       const res = await apiFetch("/combos/checkout", {
         method: "POST",
         body: JSON.stringify({
           combo_id: combo.id,
-          pernas: pernas.map((p) => ({
-            trip_id: p.data!.trip_id,
-            // Só o nome: o preço vem do servidor, sempre.
-            selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
-          })),
-          num_travelers: totalPessoas,
-          tier_breakdown: temFaixas
-            ? Object.entries(porFaixa).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
-            : [],
+          pernas: e.pernas.map((p) => ({ trip_id: p.trip_id, selected_optionals: p.selected_optionals })),
+          num_travelers: e.num_travelers,
+          tier_breakdown: e.tier_breakdown,
         }),
       });
       const d = await res.json();
       if (!res.ok) { setErro(erroDaApi(d, "Não foi possível abrir a reserva.")); return; }
-      router.push(`/reservar/combo/${d.combo_grupo}`);
+      // O código da venda (CMB-...) entra no checkout de sempre.
+      router.push(`/reservar/${d.combo_grupo}`);
     } catch {
       setErro("Erro de conexão. Tente de novo.");
     } finally {

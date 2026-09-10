@@ -7,7 +7,7 @@ import Link from "next/link";
 import AuthModal from "@/components/AuthModal";
 import {
   QrCode, CreditCard, MessageCircle, Copy, Check, Loader2, CheckCircle2,
-  ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Minus, Plus, Calendar, Users, MapPin, Clock, AlertCircle, X,
+  ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Minus, Plus, Calendar, Users, MapPin, Clock, AlertCircle, X, Package,
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
@@ -45,7 +45,21 @@ interface Booking {
   trip_quote_only?: boolean;
   installments_max?: number;
   installment_options?: { n: number; installment: number; total: number; interest_free: boolean }[];
+  /* ── Combo ──
+     O código da venda de combo (CMB-...) entra nesta MESMA tela, e o servidor
+     responde o pacote no formato de uma reserva: um valor, um número de
+     viajantes, um conjunto de faixas. O que muda é que a viagem não é uma, e
+     por isso vem a lista. */
+  combo_nome?: string | null;
+  combo_pernas?: { booking_code: string; trip_id: number; trip_title?: string | null;
+                   trip_departure_date?: string | null; status: string }[];
+  combo_total?: number | null;
+  combo_desconto?: number | null;
 }
+
+/** O checkout é o mesmo para reserva e para combo. Quem diz qual é dos dois é
+ *  o servidor, mandando as pernas do pacote. */
+const ehCombo = (b: Booking | null) => !!b?.combo_pernas?.length;
 type Companion = { full_name: string; cpf: string; birth_date: string };
 type Method = "pix" | "card" | "whatsapp";
 
@@ -470,7 +484,11 @@ function BookingCheckout({ code }: { code: string }) {
               <StepTravelers booking={booking} done={step > 1} active={step === 1} onEdit={() => setStep(1)} onDone={() => setStep(2)} code={code} />
               <StepPayment booking={booking} active={step === 2} code={code} method={method} setMethod={setMethod} installments={installments} setInstallments={setInstallments} onConfirmed={() => setConfirmed(true)} pollStatus={loadStatus} />
             </div>
-            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={true} method={method} installments={installments} onTravelersChange={() => setStep(1)} />
+            {/* Pacote não se edita perna a perna: o valor de cada uma é a fatia
+                do combo com o desconto dentro, e o servidor recusa mexer nela
+                sozinha. Trocar data ou pessoas é refazer o combo na página
+                dele. */}
+            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={!ehCombo(booking)} method={method} installments={installments} onTravelersChange={() => setStep(1)} />
           </div>
         </div>
       </main>
@@ -676,22 +694,60 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     } catch { /* mantém */ } finally { setBusy(false); }
   };
 
+  const combo = ehCombo(booking);
+
   return (
     <aside className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-fit min-w-0 order-1 md:order-2 md:sticky md:top-24">
-      {/* Identificação clara da viagem */}
-      <div className="flex gap-3 p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={booking.trip_image_url || PLACEHOLDER} alt={booking.trip_title || "Viagem"} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
-        <div className="min-w-0">
-          <p className="font-bold text-navy-800 text-sm leading-snug line-clamp-2">{booking.trip_title || "Sua viagem"}</p>
-          {booking.trip_destination && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><MapPin size={11} /> {booking.trip_destination}</p>}
-          <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium"><ShieldCheck size={12} /> Confirmação imediata</div>
+      {/* Identificação: uma viagem, ou as N do pacote com a data de cada uma.
+          Num combo a foto de UMA das viagens diria a coisa errada, e a data
+          única não existe: são N datas, escolhidas na página do combo. */}
+      {combo ? (
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1 bg-gold-500 text-navy-900 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+              <Package size={10} /> Combo
+            </span>
+            <p className="font-bold text-navy-800 text-sm leading-snug min-w-0 truncate">{booking.combo_nome || "Seu combo"}</p>
+          </div>
+          <div className="border border-gray-100 rounded-xl divide-y divide-gray-100">
+            {(booking.combo_pernas || []).map((p, i) => (
+              <div key={p.booking_code} className="px-3 py-2.5">
+                <p className="text-[10px] font-bold text-gold-600 uppercase tracking-wide">
+                  Viagem {i + 1} de {(booking.combo_pernas || []).length}
+                </p>
+                <p className="text-sm font-semibold text-navy-800 leading-snug">{p.trip_title || "Viagem"}</p>
+                <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                  <Calendar size={11} className="text-gold-500 shrink-0" />
+                  {p.trip_departure_date ? fmtDateRangeFull(p.trip_departure_date) : "data a confirmar"}
+                </p>
+                {/* O código de cada reserva: é ele que vale na porta do ônibus.
+                    Antes de entrar na conta a reserva ainda não existe, e aí não
+                    há código para mostrar. */}
+                {!p.booking_code.startsWith("perna-") && (
+                  <p className="text-[11px] text-gray-400 mt-0.5">{p.booking_code}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
+            <ShieldCheck size={12} /> Confirmação imediata
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex gap-3 p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={booking.trip_image_url || PLACEHOLDER} alt={booking.trip_title || "Viagem"} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-gray-100" />
+          <div className="min-w-0">
+            <p className="font-bold text-navy-800 text-sm leading-snug line-clamp-2">{booking.trip_title || "Sua viagem"}</p>
+            {booking.trip_destination && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><MapPin size={11} /> {booking.trip_destination}</p>}
+            <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium"><ShieldCheck size={12} /> Confirmação imediata</div>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 pb-4 space-y-4">
         {/* Data - oculta em roteiro sob cotação (sem data fixa) */}
-        {booking.trip_departure_date && !booking.trip_quote_only && (
+        {booking.trip_departure_date && !booking.trip_quote_only && !combo && (
           <div className="border-t border-gray-100 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500 flex items-center gap-1.5"><Calendar size={13} /> Data</span>
@@ -836,8 +892,34 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           </div>
         ) : (
         <>
-        {/* Detalhamento de preço */}
-        {(() => {
+        {/* Detalhamento de preço.
+            No combo a conta é do PACOTE: as N viagens pelo preço de tabela,
+            menos o desconto do combo. O detalhamento por faixa e por opcional é
+            de cada viagem, e listar tudo aqui daria uma coluna de linhas soltas
+            sem dizer de qual viagem é cada uma. */}
+        {combo ? (
+          <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between gap-2 text-gray-600">
+              <span className="min-w-0 truncate">
+                {(booking.combo_pernas || []).length} viagens
+                {booking.num_travelers > 1 ? `, ${booking.num_travelers} pessoas` : ""}
+              </span>
+              <span className="shrink-0 whitespace-nowrap">R$ {fmtBRL(booking.total_amount)}</span>
+            </div>
+            {(booking.optionals_amount || 0) > 0 && (
+              <div className="flex justify-between gap-2 text-gold-700">
+                <span className="min-w-0 truncate">Opcionais escolhidos</span>
+                <span className="shrink-0 whitespace-nowrap">+ R$ {fmtBRL(booking.optionals_amount)}</span>
+              </div>
+            )}
+            {(booking.combo_desconto || 0) > 0 && (
+              <div className="flex justify-between text-emerald-600 font-semibold">
+                <span>Desconto do combo</span>
+                <span>− R$ {fmtBRL(booking.combo_desconto || 0)}</span>
+              </div>
+            )}
+          </div>
+        ) : (() => {
           const price = trip?.price_per_person || 0;
           const orig = trip?.original_price && trip.original_price > price ? trip.original_price : 0;
           // Economia de TODAS as categorias: cada faixa tem o seu próprio "de".
@@ -914,7 +996,11 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         </>
         )}
 
-        <p className="text-xs text-gray-400 mt-3">Código: {booking.booking_code}</p>
+        {/* Só depois de existir reserva. No passo de login ela ainda não foi
+            criada, e "Código:" vazio parecia defeito. */}
+        {booking.booking_code && (
+          <p className="text-xs text-gray-400 mt-3">Código: {booking.booking_code}</p>
+        )}
       </div>
     </aside>
   );
@@ -1131,7 +1217,12 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
             )}
             {/* Sem prometer nº de parcelas nem "sem juros": a condição varia por
                 roteiro e quem fecha isso é a equipe, não esta tela. */}
-            <MethodRadio icon={<MessageCircle size={18} />} label="Combinar pelo WhatsApp" hint={booking.trip_whatsapp_only ? "Parcelamento pelo WhatsApp" : "Fale com a equipe"} selected={method === "whatsapp"} onClick={() => setMethod("whatsapp")} />
+            {/* Combo não tem esta opção: a cobrança do pacote é uma só e não
+                existe caminho de WhatsApp para um grupo. Oferecer levaria a um
+                botão que não faz nada. */}
+            {!ehCombo(booking) && (
+              <MethodRadio icon={<MessageCircle size={18} />} label="Combinar pelo WhatsApp" hint={booking.trip_whatsapp_only ? "Parcelamento pelo WhatsApp" : "Fale com a equipe"} selected={method === "whatsapp"} onClick={() => setMethod("whatsapp")} />
+            )}
           </div>
           <div key={method} className="mt-5 animate-pop">
             {method === "pix" && <PixPanel code={code} amount={booking.final_amount} onConfirmed={onConfirmed} pollStatus={pollStatus} />}
@@ -1445,6 +1536,12 @@ function PreCheckout() {
   const router = useRouter();
   const sp = useSearchParams();
   const tripId = sp.get("trip");
+  /* Combo: o pacote já foi montado na página dele (datas, pessoas e opcionais de
+     cada viagem), e o que falta é a conta. Entra no MESMO funil, porque o passo
+     que falta é exatamente o mesmo: entrar ou cadastrar antes de existir
+     reserva. Mandar o cliente para /login e trazer de volta perde a compra no
+     caminho, que é o motivo de esta tela existir. */
+  const comboId = sp.get("combo");
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
@@ -1466,9 +1563,12 @@ function PreCheckout() {
   const selTiers: { label: string; qty: number }[] = sel.tiers || [];
 
   useEffect(() => {
+    // Num combo não há UMA viagem para buscar: o resumo vem pronto da página do
+    // combo, que é onde o pacote foi montado.
+    if (comboId) { setLoading(false); return; }
     if (!tripId) { setLoading(false); return; }
     fetch(`${API}/trips/${tripId}`).then(r => r.ok ? r.json() : null).then(t => { setTrip(t); setLoading(false); }).catch(() => setLoading(false));
-  }, [tripId]);
+  }, [tripId, comboId]);
 
   const createBooking = useCallback(async () => {
     setCreating(true); setError("");
@@ -1490,6 +1590,29 @@ function PreCheckout() {
     // Sob cotação: cria "interesse" (sem valor) em /bookings/. Os demais roteiros
     // (inclusive whatsapp_only com preço) seguem pelo checkout pago.
     const endpoint = trip?.quote_only ? `/bookings/` : `/payments/checkout`;
+    if (comboId) {
+      try {
+        const res = await apiFetch("/combos/checkout", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            combo_id: Number(comboId),
+            pernas: (sel.pernas || []).map((p: { trip_id: number; selected_optionals?: { name: string }[] }) => ({
+              trip_id: p.trip_id,
+              // Só o nome: o preço vem do servidor, sempre.
+              selected_optionals: p.selected_optionals || [],
+            })),
+            num_travelers: sel.num_travelers || 1,
+            tier_breakdown: sel.tier_breakdown || [],
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) { setError(typeof d.detail === "string" ? d.detail : "Não foi possível abrir a reserva."); setCreating(false); return; }
+        // O código da venda (CMB-...) segue pelo mesmo caminho de um código de
+        // reserva: a tela seguinte é a mesma.
+        router.replace(`/reservar/${d.combo_grupo}`);
+      } catch { setError("Erro de conexão. Tente novamente."); setCreating(false); }
+      return;
+    }
     try {
       const res = await apiFetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1502,13 +1625,13 @@ function PreCheckout() {
       try { if (trip && payload.trip_id === trip.id) sessionStorage.setItem(`reservar_trip_${d.booking_code}`, JSON.stringify(trip)); } catch { /* ignore */ }
       router.replace(`/reservar/${d.booking_code}`);
     } catch { setError("Erro de conexão. Tente novamente."); setCreating(false); }
-  }, [book, editouAqui, sel, tripId, people, selOptionals, selTiers, trip, router]);
+  }, [book, editouAqui, sel, tripId, people, selOptionals, selTiers, trip, router, comboId]);
 
   // Já logado → cria a reserva e segue direto (sem passar pelo passo de login).
   const tried = useRef(false);
   useEffect(() => {
-    if (trip && getToken() && !tried.current) { tried.current = true; createBooking(); }
-  }, [trip, createBooking]);
+    if ((trip || comboId) && getToken() && !tried.current) { tried.current = true; createBooking(); }
+  }, [trip, comboId, createBooking]);
 
   // Resumo editável (pseudo-reserva). Recalculado no cliente; o servidor reconcilia ao criar.
   const hasTiers = selTiers.length > 0;
@@ -1541,16 +1664,37 @@ function PreCheckout() {
       trip_max_installments: trip.max_installments, installments_max: trip.max_installments, installment_options: [],
     };
   }, [trip, hasTiers, people, selOptionals, selTiers]);
+  /* O pacote no formato de reserva, para o card da direita ser o mesmo. Vem da
+     página do combo pela URL: aqui não há o que recalcular, só mostrar o que o
+     cliente acabou de escolher. */
+  const pseudoCombo = useMemo<Booking | null>(() => {
+    if (!comboId) return null;
+    const pernas = (sel.pernas || []) as { trip_id: number; booking_code?: string;
+      titulo?: string; data?: string }[];
+    return {
+      booking_code: "", trip_id: pernas[0]?.trip_id ?? 0,
+      final_amount: sel.total || 0, total_amount: sel.base ?? sel.total ?? 0, optionals_amount: 0,
+      num_travelers: sel.num_travelers || 1, status: "pending",
+      selected_optionals: [], tier_breakdown: sel.tier_breakdown || [],
+      combo_nome: sel.nome, combo_total: sel.total || 0, combo_desconto: sel.desconto || 0,
+      combo_pernas: pernas.map((p, i) => ({
+        booking_code: p.booking_code || `perna-${i}`,
+        trip_id: p.trip_id, trip_title: p.titulo, trip_departure_date: p.data, status: "pending",
+      })),
+      installment_options: [],
+    };
+  }, [comboId, sel]);
+
   useEffect(() => { if (pseudo) setBook(prev => prev ?? pseudo); }, [pseudo]);
 
   if (loading || (getToken() && !error)) {
     return <BrandedLoader label="Abrindo sua reserva..." />;
   }
-  if (!trip) {
+  if (!trip && !comboId) {
     return <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4"><div className="text-center"><p className="text-gray-600 mb-4">Viagem não encontrada.</p><Link href="/viagens" className="text-navy-700 font-semibold">Ver viagens</Link></div></main>;
   }
 
-  const view = book ?? pseudo;
+  const view = pseudoCombo ?? book ?? pseudo;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
@@ -1584,7 +1728,7 @@ function PreCheckout() {
                 <div className="flex items-center gap-3 px-5 py-4"><StepBadge n={3} done={false} active={false} /><h2 className="font-bold text-navy-800">Forma de pagamento</h2></div>
               </section>
             </div>
-            <ReservationCard booking={view!} trip={trip} code="" onUpdate={(b) => { setEditouAqui(true); setBook(b); }} editable={true} method="pix" installments={1} />
+            <ReservationCard booking={view!} trip={trip} code="" onUpdate={(b) => { setEditouAqui(true); setBook(b); }} editable={!comboId} method="pix" installments={1} />
           </div>
         </div>
       </main>
