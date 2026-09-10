@@ -66,6 +66,7 @@ export type PernaAtual = {
   trip_id: number;
   trip_title?: string | null;
   trip_departure_date?: string | null;
+  trip_return_date?: string | null;
   trip_template_id?: number | null;
   selected_optionals?: { name: string; price: number }[];
 };
@@ -249,8 +250,9 @@ export function ComboEditavel({
           const perna = pernas.find((p) => p.trip_id === tripId) ?? pernas[i];
           const data = r.datas.find((d) => d.trip_id === tripId);
           const saida = data?.departure_date ?? perna?.trip_departure_date ?? null;
+          const volta = data?.return_date ?? perna?.trip_return_date ?? null;
           const podeTrocar = editavel && r.datas.length > 1;
-          const Seletor = r.datas.length >= COMPACT_THRESHOLD ? CompactDateSelector : DateSelector;
+          const muitasDatas = r.datas.length >= COMPACT_THRESHOLD;
           const quartoTravado = quartoObrigatorio(data?.tem_hospedagem, adultos, totalPessoas);
 
           return (
@@ -264,7 +266,7 @@ export function ComboEditavel({
                 <p className="text-xs text-gray-500 flex items-start gap-1.5 min-w-0">
                   <Calendar size={11} className="text-gold-500 shrink-0 mt-0.5" />
                   <span className="break-words">
-                    {saida ? <DataEscolhida saida={saida} retorno={data?.return_date} /> : "data a confirmar"}
+                    {saida ? <DataEscolhida saida={saida} retorno={volta} /> : "data a confirmar"}
                   </span>
                 </p>
                 {podeTrocar && (
@@ -277,21 +279,42 @@ export function ComboEditavel({
                   </button>
                 )}
               </div>
+              {/* O código da reserva daquela viagem, que é o que vale na porta
+                  do ônibus. Só existe DEPOIS de a reserva ser criada: no passo
+                  de login ainda não há nenhum, e não se inventa um. */}
               {perna?.booking_code && (
                 <p className="text-[11px] text-gray-400 mt-0.5">{perna.booking_code}</p>
               )}
 
               {aberta[r.template_id] && (
+                /* UMA coluna, sempre. Este bloco vive dentro do card do
+                   checkout, que no desktop tem 380px: em duas colunas cada
+                   cartão ficava com 170px, a data quebrava em duas linhas, o
+                   preço saía cortado ("R$ 194,6") e o selo de desconto
+                   encavalava. É para isso que o seletor tem o modo de lateral. */
                 <div className="mt-2">
-                  <Seletor
-                    trips={r.datas.map(paraSelecao)}
-                    selected={data ? paraSelecao(data) : null}
-                    onSelect={(d) => trocarData(r.template_id, d.id)}
-                    hasError={false}
-                    titulo=""
-                    descontoPct={combo?.desconto_pct ?? 0}
-                    semMoldura
-                  />
+                  {muitasDatas ? (
+                    <CompactDateSelector
+                      trips={r.datas.map(paraSelecao)}
+                      selected={data ? paraSelecao(data) : null}
+                      onSelect={(d) => trocarData(r.template_id, d.id)}
+                      hasError={false}
+                      titulo=""
+                      descontoPct={combo?.desconto_pct ?? 0}
+                      semMoldura
+                    />
+                  ) : (
+                    <DateSelector
+                      trips={r.datas.map(paraSelecao)}
+                      selected={data ? paraSelecao(data) : null}
+                      onSelect={(d) => trocarData(r.template_id, d.id)}
+                      hasError={false}
+                      titulo=""
+                      descontoPct={combo?.desconto_pct ?? 0}
+                      semMoldura
+                      sidebar
+                    />
+                  )}
                 </div>
               )}
 

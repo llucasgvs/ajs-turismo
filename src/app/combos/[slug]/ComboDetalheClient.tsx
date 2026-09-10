@@ -354,6 +354,9 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
       trip_id: p.data!.trip_id,
       titulo: p.roteiro.title,
       data: p.data!.departure_date,
+      // A volta junto: sem ela o passo de login mostrava só a ida, e "03 de
+      // out." sozinho não diz que a viagem tem pernoite.
+      volta: p.data!.return_date,
       // Só o nome: o preço vem do servidor, sempre.
       selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
     })),

@@ -54,7 +54,8 @@ interface Booking {
   combo_nome?: string | null;
   combo_slug?: string | null;
   combo_pernas?: { booking_code: string; trip_id: number; trip_title?: string | null;
-                   trip_departure_date?: string | null; status: string;
+                   trip_departure_date?: string | null; trip_return_date?: string | null;
+                   status: string;
                    trip_template_id?: number | null;
                    selected_optionals?: { name: string; price: number }[] }[];
   combo_total?: number | null;
@@ -1671,7 +1672,7 @@ function PreCheckout() {
   const pseudoCombo = useMemo<Booking | null>(() => {
     if (!comboId) return null;
     const pernas = (sel.pernas || []) as { trip_id: number; booking_code?: string;
-      titulo?: string; data?: string }[];
+      titulo?: string; data?: string; volta?: string | null }[];
     return {
       booking_code: "", trip_id: pernas[0]?.trip_id ?? 0,
       final_amount: sel.total || 0, total_amount: sel.base ?? sel.total ?? 0, optionals_amount: 0,
@@ -1679,8 +1680,11 @@ function PreCheckout() {
       selected_optionals: [], tier_breakdown: sel.tier_breakdown || [],
       combo_nome: sel.nome, combo_total: sel.total || 0, combo_desconto: sel.desconto || 0,
       combo_pernas: pernas.map((p, i) => ({
-        booking_code: p.booking_code || `perna-${i}`,
-        trip_id: p.trip_id, trip_title: p.titulo, trip_departure_date: p.data, status: "pending",
+        // Sem código: a reserva ainda não existe neste passo, e inventar um
+        // marcador só para preencher acabaria na tela do cliente.
+        booking_code: "",
+        trip_id: p.trip_id, trip_title: p.titulo, trip_departure_date: p.data,
+        trip_return_date: p.volta, status: "pending",
       })),
       installment_options: [],
     };
