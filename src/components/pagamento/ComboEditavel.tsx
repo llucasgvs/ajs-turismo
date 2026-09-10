@@ -28,11 +28,13 @@ import {
   type DataSelecionavel,
 } from "@/components/viagem/Datas";
 import { Opcionais } from "@/components/viagem/Opcionais";
+import {
+  ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor,
+} from "@/components/pagamento/Viajantes";
 import { apiFetch } from "@/lib/api";
 import { QUARTO_SINGLE, quartoObrigatorio } from "@/lib/opcionais";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const ADULTO = "Adulto";
 
 type Faixa = { name: string; age_range: string; occupies_seat: boolean };
 
@@ -86,13 +88,17 @@ function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
 }
 
 export function ComboEditavel({
-  slug, nome, pernas, faixasAtuais, numViajantes, editavel, aoSalvar,
+  slug, nome, pernas, faixas, faixasAtuais, numViajantes, vagas, editavel, aoSalvar,
 }: {
   slug?: string | null;
   nome?: string | null;
   pernas: PernaAtual[];
+  /** O catálogo de faixas DO COMBO, com o preço somado das N viagens. */
+  faixas: FaixaDoSeletor[];
   faixasAtuais: { label: string; qty: number }[];
   numViajantes: number;
+  /** Menor número de poltronas livres entre as pernas: é ele que limita. */
+  vagas: number;
   /** Depois de pago não se edita mais nada: fica só a leitura. */
   editavel: boolean;
   /** Recebe o grupo devolvido pelo servidor. Muda quando as datas mudam. */
@@ -211,11 +217,13 @@ export function ComboEditavel({
   };
 
   const mudarFaixa = (label: string, delta: number) => {
-    const novas = { ...porFaixa, [label]: Math.max(0, (porFaixa[label] ?? 0) + delta) };
-    const pessoas = temFaixas
-      ? Object.values(novas).reduce((a, b) => a + b, 0)
-      : (novas[ADULTO] ?? 0);
-    if (pessoas < 1) return;
+    const novas = contagemApos(
+      porFaixa, temFaixas ? faixas : [{ label: ADULTO, price: 0, occupies_seat: true }],
+      label, delta, vagas,
+    );
+    // `null` = a regra barrou. O botão simplesmente não faz nada, em vez de
+    // mexer em outra faixa por conta própria.
+    if (!novas) return;
     setPorFaixa(novas);
     salvar(escolha, opcionais, novas);
   };
@@ -334,61 +342,23 @@ export function ComboEditavel({
       </div>
 
       {/* Quem vai. Vale para as N viagens: é regra do combo que sejam as mesmas
-          pessoas nas três. */}
-      <div className="border-t border-gray-100 mt-3 pt-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-navy-800">Viajantes</span>
-          {salvando && <Loader2 size={13} className="animate-spin text-gray-300" />}
-        </div>
-        {!editavel || !combo ? (
-          <p className="text-sm text-gray-500">{numViajantes} viajante{numViajantes > 1 ? "s" : ""}</p>
-        ) : temFaixas ? (
-          <div className="space-y-2.5">
-            {[{ name: ADULTO, age_range: "", occupies_seat: true } as Faixa, ...combo.price_tiers].map((f) => {
-              const label = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
-              return (
-                <div key={label} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-gray-600 min-w-0 break-words">{label}</span>
-                  <Contador
-                    valor={porFaixa[label] ?? 0}
-                    onMenos={() => mudarFaixa(label, -1)}
-                    onMais={() => mudarFaixa(label, 1)}
-                    travado={salvando}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-gray-600">Pessoas</span>
-            <Contador
-              valor={porFaixa[ADULTO] ?? numViajantes}
-              onMenos={() => mudarFaixa(ADULTO, -1)}
-              onMais={() => mudarFaixa(ADULTO, 1)}
-              travado={salvando}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+          pessoas nas três.
 
-function Contador({ valor, onMenos, onMais, travado }: {
-  valor: number; onMenos: () => void; onMais: () => void; travado: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 shrink-0">
-      <button type="button" onClick={onMenos} disabled={travado || valor <= 0}
-        className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-navy-700 disabled:opacity-30 hover:bg-gray-50 transition-colors">
-        <Minus size={13} />
-      </button>
-      <span className="w-5 text-center text-sm font-semibold text-navy-800 tabular-nums">{valor}</span>
-      <button type="button" onClick={onMais} disabled={travado}
-        className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-navy-700 disabled:opacity-30 hover:bg-gray-50 transition-colors">
-        <Plus size={13} />
-      </button>
+          É o MESMO bloco do checkout de viagem avulsa, com as MESMAS travas: o
+          adulto nunca chega a zero, nunca fica ninguém, e não passa das
+          poltronas livres. Escrever outro foi o erro da primeira versão, que
+          deixava tirar o único adulto. */}
+      <SeletorDeViajantes
+        faixas={temFaixas ? faixas : []}
+        contagem={porFaixa}
+        pessoas={porFaixa[ADULTO] ?? numViajantes}
+        vagas={vagas}
+        editavel={editavel && !!combo}
+        ocupado={salvando}
+        precoPorPessoa={faixas.find((f) => f.label === ADULTO)?.price ?? 0}
+        onFaixa={(label, delta) => mudarFaixa(label, delta)}
+        onPessoas={(delta) => mudarFaixa(ADULTO, delta)}
+      />
     </div>
   );
 }

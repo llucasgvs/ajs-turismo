@@ -7,6 +7,9 @@ import Link from "next/link";
 import AuthModal from "@/components/AuthModal";
 import { ComboEditavel } from "@/components/pagamento/ComboEditavel";
 import {
+  SeletorDeViajantes, contagemApos, type FaixaDoSeletor,
+} from "@/components/pagamento/Viajantes";
+import {
   QrCode, CreditCard, MessageCircle, Copy, Check, Loader2, CheckCircle2,
   ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Minus, Plus, Calendar, Users, MapPin, Clock, AlertCircle, X, Package,
 } from "lucide-react";
@@ -53,11 +56,15 @@ interface Booking {
      por isso vem a lista. */
   combo_nome?: string | null;
   combo_slug?: string | null;
+  /** Faixas do PACOTE, com o preço somado das N viagens. */
+  combo_faixas?: { label: string; price: number; original_price?: number; occupies_seat: boolean }[];
+  /** Menor número de poltronas livres entre as pernas: é ele que limita. */
+  combo_vagas?: number | null;
   combo_pernas?: { booking_code: string; trip_id: number; trip_title?: string | null;
                    trip_departure_date?: string | null; trip_return_date?: string | null;
                    status: string;
                    trip_template_id?: number | null;
-                   selected_optionals?: { name: string; price: number }[] }[];
+                   selected_optionals?: { name: string; price: number; total?: number }[] }[];
   combo_total?: number | null;
   combo_desconto?: number | null;
 }
@@ -65,6 +72,13 @@ interface Booking {
 /** O checkout é o mesmo para reserva e para combo. Quem diz qual é dos dois é
  *  o servidor, mandando as pernas do pacote. */
 const ehCombo = (b: Booking | null) => !!b?.combo_pernas?.length;
+
+/** O destino, sem o prefixo do roteiro. "[TESTE] Bombinhas - SC" fica
+ *  "Bombinhas": na linha do opcional só cabe dizer de qual viagem ele é. */
+function nomeCurtoDaViagem(titulo?: string | null): string {
+  const t = (titulo || "").replace(/^\[[^\]]*\]\s*/, "").trim();
+  return (t.split(/\s+[-|]\s+/)[0] || t).trim();
+}
 type Companion = { full_name: string; cpf: string; birth_date: string };
 type Method = "pix" | "card" | "whatsapp";
 
@@ -529,10 +543,6 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       : (trip?.price_tiers.find(t => tierLabel(t) === label)?.original_price ?? 0);
     return de > priceForLabel(label) ? de : 0;
   };
-  /** Poltronas de uma escolha por categoria (criança de colo não conta). */
-  const contaPoltronas = (sel: Record<string, number>) =>
-    Object.entries(sel).reduce((s, [label, qty]) => s + (ocupaPoltrona(label) ? qty : 0), 0);
-
   const [people, setPeople] = useState(booking.num_travelers);
   const [tierCounts, setTierCounts] = useState<Record<string, number>>(() => {
     if (!trip || !hasTiers) return {};
@@ -570,6 +580,35 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       });
     }
   }, [quartoTravado, opts]);
+  /** As faixas desta viagem no formato do bloco compartilhado. Vazio quando a
+   *  viagem não tem faixas, e aí ele vira um contador de pessoas. */
+  const faixasDoSeletor: FaixaDoSeletor[] = hasTiers
+    ? [ADULT, ...(trip?.price_tiers ?? []).map(t => tierLabel(t))].map(label => ({
+        label,
+        price: priceForLabel(label),
+        original_price: deForLabel(label),
+        occupies_seat: ocupaPoltrona(label),
+      }))
+    : [];
+
+  /* As faixas só podem ser montadas com a VIAGEM na mão, e ela nem sempre está
+     lá no primeiro render: quem vem da tela anterior recebe a viagem junto, mas
+     quem recarrega a página ou abre o link depois espera a consulta.
+     Sem isto, `tierCounts` nascia vazio e ficava vazio: a reserva tinha um
+     viajante e a tela mostrava "Adulto 0, Criança 0, Colo 0". Só re-inicializa
+     enquanto ninguém mexeu, para não desfazer escolha do cliente. */
+  useEffect(() => {
+    if (!trip || !hasTiers) return;
+    setTierCounts(prev => {
+      if (Object.keys(prev).length > 0) return prev;
+      const init: Record<string, number> = { [ADULT]: 0 };
+      trip.price_tiers.forEach(t => { init[tierLabel(t)] = 0; });
+      if (booking.tier_breakdown?.length) booking.tier_breakdown.forEach(b => { init[b.label] = b.qty; });
+      else init[ADULT] = booking.num_travelers;
+      return init;
+    });
+  }, [trip, hasTiers, booking.tier_breakdown, booking.num_travelers]);
+
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
 
@@ -640,12 +679,10 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
 
   const changePeople = (d: number) => { const v = Math.max(1, Math.min(trip?.available_spots || 50, people + d)); setPeople(v); push(v, tierCounts, opts); onTravelersChange?.(); };
   const changeTier = (label: string, d: number) => setTierCounts(prev => {
-    const next = { ...prev, [label]: Math.max(0, (prev[label] || 0) + d) };
-    // O limite é de poltronas: a criança de colo não consome vaga do ônibus.
-    if (d > 0 && contaPoltronas(next) > (trip?.available_spots || 50)) return prev;
-    if (Object.values(next).reduce((a, b) => a + b, 0) < 1) return prev;
-    // Alguém tem que levar as crianças: o Adulto nunca chega a zero.
-    if ((next[ADULT] || 0) < 1) return prev;
+    // As regras (adulto nunca zera, ninguém fica de fora, teto de poltronas)
+    // moram no bloco compartilhado, para valerem igual aqui e no combo.
+    const next = contagemApos(prev, faixasDoSeletor, label, d, trip?.available_spots || 50);
+    if (!next) return prev;
     push(0, next, opts); onTravelersChange?.(); return next;
   });
   const toggleOpt = (name: string) => setOpts(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); push(people, tierCounts, n); return n; });
@@ -723,8 +760,10 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           slug={booking.combo_slug}
           nome={booking.combo_nome}
           pernas={booking.combo_pernas || []}
+          faixas={booking.combo_faixas || []}
           faixasAtuais={booking.tier_breakdown || []}
           numViajantes={booking.num_travelers}
+          vagas={booking.combo_vagas ?? 50}
           editavel={editable}
           aoSalvar={onComboSalvo || (() => {})}
         />
@@ -776,40 +815,23 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             Num combo quem cuida disso é o ComboEditavel acima: as faixas são as
             do PACOTE e valem para as N viagens, e este bloco leria as da perna
             âncora. */}
+        {/* O MESMO bloco que o combo usa, com as MESMAS travas (o adulto nunca
+            chega a zero, nunca fica ninguém, e não passa das poltronas). Ele
+            mora em components/pagamento/Viajantes justamente para existir uma
+            vez só. */}
         {!combo && (
-        <div className="border-t border-gray-100 pt-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-navy-800 flex items-center gap-1.5"><Users size={14} /> Viajantes</span>
-            {busy && <Loader2 size={13} className="animate-spin text-gray-300" />}
-          </div>
-          {!editable ? (
-            <p className="text-sm text-gray-500">{booking.num_travelers} viajante{booking.num_travelers > 1 ? "s" : ""}</p>
-          ) : hasTiers ? (
-            <div className="space-y-2.5">
-              {[ADULT, ...(trip?.price_tiers ?? []).map(t => tierLabel(t))].map(label => (
-                <div key={label} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-navy-800">{label}</p>
-                    <p className="text-xs text-gray-400">
-                      {deForLabel(label) > 0 && (
-                        <s className="text-gray-300 mr-1">R$ {fmtBRL(deForLabel(label))}</s>
-                      )}
-                      {tierPriceLabel(priceForLabel(label), fmtBRL)}
-                      {!ocupaPoltrona(label) && " · não ocupa poltrona"}
-                    </p>
-                  </div>
-                  <Counter value={tierCounts[label] || 0} onMinus={() => changeTier(label, -1)} onPlus={() => changeTier(label, 1)} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-400">{booking.trip_quote_only ? "Valor sob consulta" : `R$ ${fmtBRL(trip?.price_per_person ?? booking.total_amount / booking.num_travelers)} / pessoa`}</p>
-              <Counter value={people} onMinus={() => changePeople(-1)} onPlus={() => changePeople(1)} />
-            </div>
-          )}
-        </div>
-
+          <SeletorDeViajantes
+            faixas={faixasDoSeletor}
+            contagem={tierCounts}
+            pessoas={people}
+            vagas={trip?.available_spots || 50}
+            editavel={editable}
+            ocupado={busy}
+            semPreco={booking.trip_quote_only}
+            precoPorPessoa={trip?.price_per_person ?? booking.total_amount / booking.num_travelers}
+            onFaixa={changeTier}
+            onPessoas={changePeople}
+          />
         )}
 
         {/* Opcionais. No combo eles são de CADA viagem, e aparecem junto da
@@ -900,19 +922,32 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             de cada viagem, e listar tudo aqui daria uma coluna de linhas soltas
             sem dizer de qual viagem é cada uma. */}
         {combo ? (
+          /* O mesmo detalhamento da viagem avulsa: uma linha por faixa
+             ("1× Adulto") e uma por opcional, dizendo de qual viagem ele é.
+             "3 viagens R$ 799,00" não dizia o que era o quê.
+
+             O preço de cada faixa já vem somado das N viagens (combo_faixas no
+             servidor), então a conta aqui é a mesma de sempre: quantidade vezes
+             preço. */
           <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
-            <div className="flex justify-between gap-2 text-gray-600">
-              <span className="min-w-0">
-                {(booking.combo_pernas || []).length} viagens
-                {booking.num_travelers > 1 ? `, ${booking.num_travelers} pessoas` : ""}
-              </span>
-              <span className="shrink-0 whitespace-nowrap">R$ {fmtBRL(booking.total_amount)}</span>
-            </div>
-            {(booking.optionals_amount || 0) > 0 && (
-              <div className="flex justify-between gap-2 text-gold-700">
-                <span className="min-w-0 truncate">Opcionais escolhidos</span>
-                <span className="shrink-0 whitespace-nowrap">+ R$ {fmtBRL(booking.optionals_amount)}</span>
+            {(booking.tier_breakdown || []).filter(t => t.qty > 0).map(t => (
+              <div key={t.label} className="flex justify-between gap-2 text-gray-600">
+                <span className="min-w-0 break-words">{t.qty}× {t.label}</span>
+                <span className="shrink-0 whitespace-nowrap">{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
               </div>
+            ))}
+            {(booking.combo_pernas || []).flatMap(p =>
+              (p.selected_optionals || []).map(o => (
+                <div key={`${p.booking_code}-${o.name}`} className="flex justify-between gap-2 text-gold-700">
+                  <span className="min-w-0 break-words">
+                    {o.name}
+                    {/* De QUAL viagem, senão "1× Transfer" três vezes na lista
+                        não diz nada. */}
+                    <span className="text-gray-400"> · {nomeCurtoDaViagem(p.trip_title)}</span>
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap">+ R$ {fmtBRL(o.total ?? o.price)}</span>
+                </div>
+              )),
             )}
             {(booking.combo_desconto || 0) > 0 && (
               <div className="flex justify-between text-emerald-600 font-semibold">
@@ -1010,15 +1045,6 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   );
 }
 
-function Counter({ value, onMinus, onPlus }: { value: number; onMinus: () => void; onPlus: () => void }) {
-  return (
-    <div className="flex items-center gap-3">
-      <button onClick={onMinus} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Minus size={15} /></button>
-      <span className="w-5 text-center font-semibold text-navy-800">{value}</span>
-      <button onClick={onPlus} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Plus size={15} /></button>
-    </div>
-  );
-}
 
 /* ── Passo 1: Viajantes ──────────────────────────────────────────────── */
 function StepTravelers({ booking, done, active, onEdit, onDone, code }: {

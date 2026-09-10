@@ -235,6 +235,15 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   /* trip_id -> nomes marcados. Por DATA e não por roteiro: o preço de um
      opcional pode mudar de uma saída para outra, e trocar a data tem que
      começar do zero em vez de carregar a escolha de outra saída. */
+  /* Opcionais escolhidos, por ROTEIRO e não por data.
+   *
+   * Por data, trocar a data desmarcava tudo, e voltar para a data anterior fazia
+   * a escolha antiga reaparecer sozinha. Quem quer o transfer quer o transfer,
+   * não "o transfer daquele dia": é assim que a viagem avulsa se comporta, onde
+   * a troca de data leva os opcionais junto pelo NOME.
+   *
+   * O nome que não existe na data nova simplesmente não é cobrado: o catálogo
+   * válido é o da data, tanto na tela quanto no servidor. */
   const [opcionais, setOpcionais] = useState<Record<number, string[]>>({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
@@ -292,15 +301,15 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   /* O que cada perna cobra de opcional: o que o cliente marcou, mais o quarto
      quando ele deixa de ser escolha. O quarto multiplica por ADULTO, o resto
      por pessoa, como no checkout de viagem única. */
-  const opcionaisDaPerna = (d: DataDoRoteiro) => {
-    const marcados = new Set(opcionais[d.trip_id] ?? []);
+  const opcionaisDaPerna = (d: DataDoRoteiro, templateId: number) => {
+    const marcados = new Set(opcionais[templateId] ?? []);
     if (quartoObrigatorio(d)) marcados.add(QUARTO_SINGLE);
     return d.optionals.filter((o) => marcados.has(o.name));
   };
 
   const totalOpcionais = pernas.reduce((s, p) => {
     if (!p.data) return s;
-    return s + opcionaisDaPerna(p.data).reduce(
+    return s + opcionaisDaPerna(p.data, p.roteiro.template_id).reduce(
       (t, o) => t + o.price * (o.name === QUARTO_SINGLE ? adultos : totalPessoas), 0,
     );
   }, 0);
@@ -358,7 +367,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
       // out." sozinho não diz que a viagem tem pernoite.
       volta: p.data!.return_date,
       // Só o nome: o preço vem do servidor, sempre.
-      selected_optionals: (opcionais[p.data!.trip_id] ?? []).map((name) => ({ name })),
+      // Pelo ROTEIRO: a escolha acompanha a troca de data, como na viagem
+      // avulsa. O que não existir na data escolhida o servidor ignora.
+      selected_optionals: (opcionais[p.roteiro.template_id] ?? [])
+        .filter((n) => p.data!.optionals.some((o) => o.name === n))
+        .map((name) => ({ name })),
     })),
     num_travelers: totalPessoas,
     tier_breakdown: temFaixas
@@ -665,13 +678,13 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                             <Opcionais
                               titulo="Opcionais desta viagem (por pessoa)"
                               optionals={data.optionals}
-                              selecionados={opcionais[data.trip_id] ?? []}
+                              selecionados={opcionais[roteiro.template_id] ?? []}
                               forcados={quartoObrigatorio(data) ? [QUARTO_SINGLE] : []}
                               onToggle={(nome) => setOpcionais((a) => {
-                                const atuais = a[data.trip_id] ?? [];
+                                const atuais = a[roteiro.template_id] ?? [];
                                 return {
                                   ...a,
-                                  [data.trip_id]: atuais.includes(nome)
+                                  [roteiro.template_id]: atuais.includes(nome)
                                     ? atuais.filter((n) => n !== nome)
                                     : [...atuais, nome],
                                 };
