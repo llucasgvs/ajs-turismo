@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import ComboDetalheClient from "./ComboDetalheClient";
+import { imgOg } from "@/lib/imagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -27,7 +28,7 @@ export async function generateMetadata(
   // A capa montada é o que aparece no WhatsApp quando alguém manda o link. É a
   // única imagem que mostra os N destinos de uma vez; a foto de um roteiro só
   // faria o combo chegar parecendo uma viagem avulsa.
-  const capa = combo.image_url || `${SITE}/og-image.jpg`;
+  const capa = imgOg(combo.image_url, SITE) || `${SITE}/og-image.jpg`;
   return {
     title: combo.nome,
     description:
