@@ -33,3 +33,19 @@ export function imgOtim(url?: string | null, largura = 828, qualidade = 85): str
   const q = Math.min(100, Math.max(1, Math.round(qualidade)));
   return `/_next/image?url=${encodeURIComponent(u)}&w=${w}&q=${q}`;
 }
+
+/**
+ * A imagem de prévia (OpenGraph: WhatsApp, Facebook) pela MESMA porta das
+ * fotos do site. Absoluta, porque o robô lê a URL fora do site.
+ *
+ * Antes apontava para o arquivo cru no Supabase: a foto de capa em WebP de
+ * 396 KB, e a capa montada do combo em JPEG de 500 a 680 KB, baixadas do
+ * Supabase (Cached Egress) a cada prévia gerada. Pelo otimizador o robô
+ * recebe JPEG de ~130 KB, da Vercel, com cache de um ano. Testado em
+ * produção com Accept "*\/*", que é o que os robôs mandam: vem image/jpeg.
+ */
+export function imgOg(url: string | null | undefined, site: string): string | null {
+  const otim = imgOtim(url, 1200, 75);
+  if (!otim) return null;
+  return otim.startsWith("/") ? `${site}${otim}` : otim;
+}

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import TripDetailClient from "@/components/TripDetailClient";
 import type { Trip } from "@/types/trip";
 import { fmtBRL } from "@/lib/format";
+import { imgOg } from "@/lib/imagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -82,8 +83,9 @@ export async function generateMetadata({
         ? `Pacote para ${roteiro.destination}. A partir de R$ ${fmtBRL(trip.price_per_person)} por pessoa. ${roteiro.duration_nights + 1} dias / ${roteiro.duration_nights} noites saindo de Curitiba.`
         : `Pacote para ${roteiro.destination} saindo de Curitiba. Consulte as próximas saídas com a AJS Turismo.`);
 
-  const ogImage = roteiro.image_url
-    ? [{ url: roteiro.image_url, width: 1200, height: 630, alt: roteiro.title }]
+  const capaOg = imgOg(roteiro.image_url, SITE);
+  const ogImage = capaOg
+    ? [{ url: capaOg, width: 1200, height: 630, alt: roteiro.title }]
     : [{ url: "/og-image.jpg", width: 1200, height: 630, alt: roteiro.title }];
 
   const pageUrl = `${SITE}/viagens/${slug}`;
