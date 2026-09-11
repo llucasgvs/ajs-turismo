@@ -98,6 +98,14 @@ type Booking = {
   combo_pernas?: PernaDoCombo[];
   combo_total?: number | null;
   combo_desconto?: number | null;
+  /** O financeiro da VENDA somado das pernas, no formato da reserva avulsa. */
+  combo_financeiro?: {
+    faixas: { label: string; qty: number; price: number }[];
+    opcionais: { name: string; price: number; qty: number; total: number; trip_title?: string | null }[];
+    base: number; opcionais_total: number; desconto: number; valor: number;
+    juros: number; recebido: number; por_fora: number; falta: number; a_pagar: number;
+    installments: number; payment_method: string | null;
+  } | null;
   /** Status da VENDA, derivado do das pernas. A perna conclui no dia do ônibus
    *  dela; a venda só quando a última viajar. */
   combo_status?: string | null;
@@ -279,6 +287,12 @@ const PAYMENT_LABEL: Record<string, string> = {
   transfer: "Transferência",
   credit_card: "Cartão de crédito",
 };
+
+/** "[TESTE] FOZ DO IGUAÇU - Opcionais..." vira "FOZ DO IGUAÇU": o que cabe numa linha pequena. */
+function nomeCurtoDaViagem(titulo?: string | null): string {
+  const t = (titulo || "").replace(/^\[[^\]]*\]\s*/, "").trim();
+  return (t.split(/\s+[-|]\s+/)[0] || t).trim();
+}
 
 function paymentLabel(method: string | null, installments?: number): string {
   const base = PAYMENT_LABEL[method ?? ""] ?? method ?? "-";
@@ -920,45 +934,145 @@ function ComboDetailModal({ venda, onClose, onAbrirPerna, abrindo }: {
                   </a>
                 </div>
               )}
+              {/* Idade e aniversário contados pela PRIMEIRA viagem que ainda vai
+                  acontecer (a âncora da venda), que é a data que importa agora. */}
+              {venda.traveler_birth_date && (
+                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmtDia(venda.traveler_birth_date)} <IdadeAoLado nascimento={venda.traveler_birth_date} saida={venda.trip_departure_date} quoteOnly={venda.trip_quote_only} /> <AniversarioTag nascimento={venda.traveler_birth_date} saida={venda.trip_departure_date} retorno={venda.trip_return_date} quoteOnly={venda.trip_quote_only} /></p>
+              )}
             </div>
           </section>
 
+          {/* O MESMO bloco da janela de reserva: um cartão por pessoa, com CPF,
+              nascimento e idade. A versão antiga era uma linha por nome. */}
           {acompanhantes.length > 0 && (
             <section>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Users size={11} /> Acompanhantes</p>
-              <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
-                {acompanhantes.map((a, i) => (
-                  <p key={i} className="text-navy-700">
-                    {a.full_name}
-                    {a.cpf && <span className="text-gray-400 font-mono text-xs ml-2">{formatCPF(a.cpf)}</span>}
-                  </p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Users size={11} /> Acompanhantes ({acompanhantes.length})</p>
+              <div className="space-y-2">
+                {acompanhantes.map((c, i) => (
+                  <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
+                    <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
+                    {c.cpf && <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>}
+                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmtDia(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={venda.trip_departure_date} quoteOnly={venda.trip_quote_only} /> <AniversarioTag nascimento={c.birth_date} saida={venda.trip_departure_date} retorno={venda.trip_return_date} quoteOnly={venda.trip_quote_only} /></p>}
+                  </div>
                 ))}
               </div>
               <p className="text-[11px] text-gray-400 mt-1.5">As mesmas pessoas viajam em todas as viagens do combo.</p>
             </section>
           )}
 
+          {/* Financeiro da VENDA, somado das pernas, no formato da reserva
+              avulsa: faixas, opcionais (dizendo de qual viagem), desconto,
+              juros, total a pagar, recebido e o que falta. */}
           <section>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><DollarSign size={11} /> Pagamento</p>
-            <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Forma</span>
-                <span className="text-navy-800">{paymentLabel(venda.payment_method, venda.installments)}</span>
-              </div>
-              {!!venda.combo_desconto && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Desconto do combo</span>
-                  <span className="text-gold-700">- R$ {fmtBRL(venda.combo_desconto)}</span>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><DollarSign size={11} /> Financeiro</p>
+            {(() => {
+              const f = venda.combo_financeiro;
+              if (!f) {
+                return (
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Forma</span>
+                      <span className="text-navy-800">{paymentLabel(venda.payment_method, venda.installments)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1.5 border-t border-gray-200">
+                      <span className="font-semibold text-navy-800">Total da venda</span>
+                      <span className="font-black text-navy-800 tabular-nums">R$ {fmtBRL(venda.combo_total ?? 0)}</span>
+                    </div>
+                  </div>
+                );
+              }
+              const comExtras = f.juros > 0.01 || f.por_fora > 0.01 || f.falta > 0.01;
+              return (
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
+                  {f.faixas.length > 0 ? (
+                    f.faixas.filter((t) => t.qty > 0).map((t) => (
+                      <div key={t.label} className="flex justify-between text-gray-600">
+                        <span>{t.qty} × {t.label} (R$ {fmtBRL(t.price)})</span>
+                        <span>R$ {fmtBRL(t.qty * t.price)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex justify-between text-gray-600">
+                      <span>{venda.num_travelers} pessoa{venda.num_travelers !== 1 ? "s" : ""} × {pernas.length} viagens</span>
+                      <span>R$ {fmtBRL(f.base)}</span>
+                    </div>
+                  )}
+                  {f.opcionais.length > 0 && (
+                    <div className="space-y-1 border-t border-gray-100 pt-2">
+                      {f.opcionais.map((o, i) => (
+                        <div key={i} className="flex justify-between gap-2 text-gold-700">
+                          <span className="min-w-0">
+                            + {o.name} <span className="text-gray-400 text-xs">({o.qty}×)</span>
+                            {o.trip_title && <span className="block text-[11px] text-gray-400 leading-tight">{nomeCurtoDaViagem(o.trip_title)}</span>}
+                          </span>
+                          <span className="shrink-0">R$ {fmtBRL(o.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {f.desconto > 0.01 && (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Desconto do combo</span>
+                      <span>− R$ {fmtBRL(f.desconto)}</span>
+                    </div>
+                  )}
+                  {!comExtras ? (
+                    <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
+                      <span>Total</span>
+                      <span>R$ {fmtBRL(f.valor)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between text-navy-700 border-t border-gray-200 pt-2">
+                        <span>Valor da venda</span>
+                        <span>R$ {fmtBRL(f.valor)}</span>
+                      </div>
+                      {f.juros > 0.01 && (
+                        <div className="flex justify-between text-gray-500">
+                          <span>Juros do parcelamento{f.installments > 1 ? ` (${f.installments}x)` : ""}</span>
+                          <span>+ R$ {fmtBRL(f.juros)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
+                        <span>Total a pagar</span>
+                        <span>R$ {fmtBRL(f.a_pagar)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-700">
+                        <span>Recebido</span>
+                        <span>R$ {fmtBRL(f.recebido)}</span>
+                      </div>
+                      {f.por_fora > 0.01 && (
+                        <div className="flex justify-between gap-2 text-[11px] text-gray-500">
+                          <span className="shrink-0">Sendo por fora do site</span>
+                          <span className="text-right">R$ {fmtBRL(f.por_fora)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {f.falta > 0.01 && (
+                    <div className="flex items-start gap-2 mt-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                      <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-navy-700">
+                        Falta receber <strong>R$ {fmtBRL(f.falta)}</strong> no pacote. Lance o que
+                        entrou por fora na reserva da viagem em que o valor mudou.
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400">{paymentLabel(f.payment_method ?? venda.payment_method, f.installments)}</p>
                 </div>
-              )}
-              <div className="flex justify-between pt-1.5 border-t border-gray-200">
-                <span className="font-semibold text-navy-800">Total da venda</span>
-                <span className="font-black text-navy-800 tabular-nums">R$ {fmtBRL(venda.combo_total ?? 0)}</span>
-              </div>
+              );
+            })()}
+          </section>
+
+          {/* Histórico, como na reserva: quando nasceu e quando entrou o dinheiro. */}
+          <section>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock size={11} /> Histórico</p>
+            <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between gap-2"><span className="text-gray-500">Criada</span><span className="text-navy-700">{fmtDataHoraViagem(venda.created_at)}</span></div>
+              {venda.confirmed_at && <div className="flex justify-between gap-2"><span className="text-gray-500">Confirmada</span><span className="text-navy-700">{fmtDataHoraViagem(venda.confirmed_at)}</span></div>}
+              {venda.cancelled_at && <div className="flex justify-between gap-2"><span className="text-gray-500">Cancelada</span><span className="text-navy-700">{fmtDataHoraViagem(venda.cancelled_at)}</span></div>}
+              {venda.updated_at && <div className="flex justify-between gap-2"><span className="text-gray-500">Última alteração</span><span className="text-navy-700">{fmtDataHoraViagem(venda.updated_at)}</span></div>}
             </div>
-            {venda.confirmed_at && (
-              <p className="text-[11px] text-gray-400 mt-1.5">Confirmada em {fmtDataHoraViagem(venda.confirmed_at)}</p>
-            )}
           </section>
 
           {venda.notes && (

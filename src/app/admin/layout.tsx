@@ -8,12 +8,19 @@ import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, 
 import { getUser, logout } from "@/lib/api";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
-const nav = [
+// Combos é produto, então mora debaixo de Roteiros; Listas é leitura das
+// reservas, então mora debaixo de Reservas (decisão do dono, 11/09/2026). Os
+// subitens ficam sempre visíveis, indentados: menu que esconde item atrás de
+// clique faz a pessoa procurar.
+type ItemDoMenu = { href: string; label: string; icon: typeof Map; filhos?: ItemDoMenu[] };
+const nav: ItemDoMenu[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/viagens", label: "Roteiros", icon: Map },
-  { href: "/admin/reservas", label: "Reservas", icon: ClipboardList },
-  { href: "/admin/combos", label: "Combos", icon: Package },
-  { href: "/admin/listas", label: "Listas", icon: ListChecks },
+  { href: "/admin/viagens", label: "Roteiros", icon: Map, filhos: [
+    { href: "/admin/combos", label: "Combos", icon: Package },
+  ] },
+  { href: "/admin/reservas", label: "Reservas", icon: ClipboardList, filhos: [
+    { href: "/admin/listas", label: "Listas", icon: ListChecks },
+  ] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -93,22 +100,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {nav.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon, filhos }) => {
           const active = pathname === href || (href !== "/admin" && pathname.startsWith(href));
           return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                active
-                  ? "bg-gold-500 text-navy-900"
-                  : "text-navy-300 hover:bg-navy-800 hover:text-white"
-              }`}
-            >
-              <Icon size={17} />
-              <span className="flex-1">{label}</span>
-              {active && <ChevronRight size={13} />}
-            </Link>
+            <div key={href}>
+              <Link
+                href={href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-gold-500 text-navy-900"
+                    : "text-navy-300 hover:bg-navy-800 hover:text-white"
+                }`}
+              >
+                <Icon size={17} />
+                <span className="flex-1">{label}</span>
+                {active && <ChevronRight size={13} />}
+              </Link>
+              {filhos?.map(({ href: h, label: l, icon: I }) => {
+                const ativo = pathname === h || pathname.startsWith(h + "/");
+                return (
+                  <Link
+                    key={h}
+                    href={h}
+                    className={`mt-1 ml-5 flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors border-l border-navy-700 ${
+                      ativo
+                        ? "bg-gold-500/90 text-navy-900 border-gold-500"
+                        : "text-navy-400 hover:bg-navy-800 hover:text-white"
+                    }`}
+                  >
+                    <I size={15} />
+                    <span className="flex-1">{l}</span>
+                    {ativo && <ChevronRight size={12} />}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
