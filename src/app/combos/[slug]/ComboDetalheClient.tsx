@@ -17,6 +17,7 @@ import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
+import { contagemApos, type FaixaDoSeletor } from "@/components/pagamento/Viajantes";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
 
@@ -464,6 +465,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      estado. Duplicar o componente e não o estado: no celular a lateral não
      existe, e sem isto o cliente ficaria preso em uma pessoa, sem conseguir
      dizer que leva criança. Foi o que aconteceu ao testar em 375px. */
+  const faixasDoSeletor: FaixaDoSeletor[] = [
+    { label: ADULTO, price: 0, occupies_seat: true },
+    ...combo.price_tiers.map((f) => ({ label: rotuloFaixa(f), price: 0, occupies_seat: f.occupies_seat })),
+  ];
   const SeletorDePessoas = () => (
     <div className="px-5 py-3.5">
       {temFaixas ? (
@@ -475,6 +480,13 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
             {[{ name: ADULTO, age_range: "", occupies_seat: true }, ...combo.price_tiers].map((f) => {
               const rotulo = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
               const qtd = porFaixa[rotulo] ?? 0;
+              // A MESMA regra do checkout (`contagemApos`): o adulto nunca chega
+              // a zero, nunca fica ninguém, e as poltronas não passam da vaga.
+              // Este botão deixava zerar o adulto e só avisava embaixo.
+              const mudar = (delta: number) => {
+                const nova = contagemApos(porFaixa, faixasDoSeletor, rotulo, delta, vagaMinima);
+                if (nova) setPorFaixa(nova);
+              };
               return (
                 <div key={rotulo} className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
@@ -484,20 +496,18 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                     </p>
                   </div>
                   <button type="button"
-                    onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: Math.max(0, (a[rotulo] ?? 0) - 1) }))}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
+                    onClick={() => mudar(-1)}
+                    disabled={!contagemApos(porFaixa, faixasDoSeletor, rotulo, -1, vagaMinima)}
+                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">−</button>
                   <span className="w-6 text-center font-bold text-navy-800">{qtd}</span>
                   <button type="button"
-                    onClick={() => setPorFaixa((a) => ({ ...a, [rotulo]: (a[rotulo] ?? 0) + 1 }))}
-                    disabled={f.occupies_seat && poltronas >= vagaMinima}
+                    onClick={() => mudar(1)}
+                    disabled={!contagemApos(porFaixa, faixasDoSeletor, rotulo, 1, vagaMinima)}
                     className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">+</button>
                 </div>
               );
             })}
           </div>
-          {(porFaixa[ADULTO] ?? 0) < 1 && totalPessoas > 0 && (
-            <p className="text-[11px] text-gold-700 mt-2">Alguém precisa ser adulto na reserva.</p>
-          )}
         </>
       ) : (
         <>

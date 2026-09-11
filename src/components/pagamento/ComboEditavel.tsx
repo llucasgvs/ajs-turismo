@@ -117,12 +117,24 @@ export function ComboEditavel({
   useEffect(() => {
     const porRoteiro: Record<number, number> = {};
     const opc: Record<number, string[]> = {};
+    // Composição SALVA, para saber se o quarto de cada perna veio da regra ou
+    // da escolha do cliente.
+    const adultosSalvos = faixasAtuais.length
+      ? (faixasAtuais.find((f) => f.label === ADULTO)?.qty ?? 0)
+      : numViajantes;
+    const temHospedagem = (tripId: number) =>
+      combo?.roteiros.flatMap((r) => r.datas).find((d) => d.trip_id === tripId)?.tem_hospedagem;
     for (const p of pernas) {
       if (p.trip_template_id) porRoteiro[p.trip_template_id] = p.trip_id;
+      // O quarto OBRIGATÓRIO não é escolha: é derivado da composição, e
+      // guardá-lo aqui o deixaria preso mesmo quando a regra parasse de valer.
+      // Mas só ele. Tirar o quarto sempre fazia a escolha do cliente sumir da
+      // caixinha a cada salvamento, enquanto o servidor e o resumo o mantinham:
+      // "seleciona mas não fica selecionado". Enquanto o combo não chegou,
+      // assume hospedagem; o efeito roda de novo quando ele chega.
+      const forcado = quartoObrigatorio(temHospedagem(p.trip_id) ?? true, adultosSalvos, numViajantes);
       opc[p.trip_id] = (p.selected_optionals || [])
-        // O quarto obrigatório não é escolha: ele é derivado da composição, e
-        // guardá-lo aqui o deixaria preso mesmo quando a regra parasse de valer.
-        .filter((o) => o.name !== QUARTO_SINGLE)
+        .filter((o) => !(forcado && o.name === QUARTO_SINGLE))
         .map((o) => o.name);
     }
     setEscolha(porRoteiro);
@@ -132,7 +144,7 @@ export function ComboEditavel({
         ? Object.fromEntries(faixasAtuais.map((f) => [f.label, f.qty]))
         : { [ADULTO]: numViajantes },
     );
-  }, [pernas, faixasAtuais, numViajantes]);
+  }, [pernas, faixasAtuais, numViajantes, combo]);
 
   useEffect(() => {
     if (!slug || !editavel) return;
