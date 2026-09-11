@@ -49,7 +49,10 @@ type Booking = {
   seats_used?: number | null;
   price_per_person: number;
   total_amount: number;
+  /** O que o cliente pagou no total: a cobranca mais o que entrou por fora. */
   final_amount: number;
+  /** Valor da reserva A VISTA, sem os juros do parcelamento. */
+  base_amount?: number;
   payment_method: string | null;
   status: string;
   /** Confirmada sem passar pelo gateway (admin confirmou na mão). Derivado no
@@ -66,6 +69,10 @@ type Booking = {
   pago_por_fora?: number;
   /** Quanto ainda falta entrar. Zero quando a reserva esta quitada. */
   falta_receber?: number;
+  /** Juros do parcelamento realmente pagos, tirados da propria cobranca.
+   *  Nao calcule isso aqui pela sobra entre o recebido e o valor da reserva:
+   *  era assim que dinheiro pago por fora aparecia como juros do cartao. */
+  juros_amount?: number;
   optionals_amount: number;
   installments: number;
   is_external: boolean;
@@ -861,25 +868,59 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <span>− R$ {fmtBRL(booking.discount_amount)}</span>
                 </div>
               )}
+              {/* Daqui para baixo, cada linha precisa FECHAR com a de cima.
+                  Antes nao fechava: os juros eram calculados como a sobra entre
+                  o recebido e o valor da reserva, entao dinheiro que entrou por
+                  fora aparecia etiquetado como juros do cartao. Agora os juros
+                  vem da propria cobranca (`juros_amount`), e o que entrou por
+                  fora e detalhe do recebido, nao mais uma parcela do valor. */}
               {(() => {
-                const juros = booking.final_amount - (booking.total_amount + (booking.optionals_amount || 0) - (booking.discount_amount || 0));
-                return juros > 0.01 ? (
-                  <div className="flex justify-between text-gray-500">
-                    <span>Juros do parcelamento{booking.installments > 1 ? ` (${booking.installments}x)` : ""}</span>
-                    <span>+ R$ {fmtBRL(juros)}</span>
-                  </div>
-                ) : null;
+                const juros = booking.juros_amount || 0;
+                const fora = booking.pago_por_fora || 0;
+                const valor = booking.base_amount ?? booking.final_amount;
+                // Sem juros e sem dinheiro por fora, "Total" ja diz tudo: nao
+                // vale poluir a tela com um subtotal igual ao total.
+                if (juros <= 0.01 && fora <= 0.01) {
+                  return (
+                    <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
+                      <span>Total</span>
+                      <span>R$ {fmtBRL(booking.final_amount)}</span>
+                    </div>
+                  );
+                }
+                // "Total a pagar" e o valor da reserva mais os juros que o
+                // cartao ja cobrou. O que falta e a diferenca dele para o
+                // recebido, e por isso as duas linhas ficam uma sob a outra.
+                const aPagar = Math.round((valor + juros) * 100) / 100;
+                return (
+                  <>
+                    <div className="flex justify-between text-navy-700 border-t border-gray-200 pt-2">
+                      <span>Valor da reserva</span>
+                      <span>R$ {fmtBRL(valor)}</span>
+                    </div>
+                    {juros > 0.01 && (
+                      <div className="flex justify-between text-gray-500">
+                        <span>Juros do parcelamento{booking.installments > 1 ? ` (${booking.installments}x)` : ""}</span>
+                        <span>+ R$ {fmtBRL(juros)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
+                      <span>Total a pagar</span>
+                      <span>R$ {fmtBRL(aPagar)}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Recebido</span>
+                      <span>R$ {fmtBRL(booking.final_amount)}</span>
+                    </div>
+                    {fora > 0.01 && (
+                      <div className="flex justify-between gap-2 text-[11px] text-gray-500">
+                        <span className="shrink-0">Sendo por fora do site</span>
+                        <span className="text-right">R$ {fmtBRL(fora)}</span>
+                      </div>
+                    )}
+                  </>
+                );
               })()}
-              {(booking.pago_por_fora || 0) > 0 && (
-                <div className="flex justify-between text-emerald-600">
-                  <span>Recebido por fora</span>
-                  <span>+ R$ {fmtBRL(booking.pago_por_fora || 0)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-navy-800 border-t border-gray-200 pt-2">
-                <span>Total</span>
-                <span>R$ {fmtBRL(booking.final_amount)}</span>
-              </div>
               {/* O aviso que faltava.
                   Acrescentar um opcional depois do pagamento deixa a reserva
                   valendo mais do que entrou, e isso passava batido ate alguem
