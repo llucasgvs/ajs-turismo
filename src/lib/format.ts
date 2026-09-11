@@ -97,6 +97,21 @@ export function mesmoDia(a?: string | null, b?: string | null): boolean {
 /**
  * Tem vaga? `null` é "sobra vaga", então conta como sim. Só 0 é esgotado.
  */
+/**
+ * Data PURA ("2021-01-20", sem hora) em dd/mm/aaaa, sem passar por `Date`.
+ *
+ * `new Date("2021-01-20")` e meia-noite UTC, que em Brasilia ainda e dia 19:
+ * toda data de nascimento do painel aparecia um dia antes. Nascimento nao tem
+ * fuso, entao a string e reordenada e pronto. Para data-hora (criada em,
+ * saida), que vem em UTC e PRECISA do fuso, continue usando `Date`.
+ */
+export function fmtDia(iso?: string | null): string {
+  if (!iso) return "-";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
 export function temVaga(disponivel: number | null | undefined): boolean {
   return disponivel == null || disponivel > 0;
 }

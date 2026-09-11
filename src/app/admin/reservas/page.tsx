@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
+import { fmtDia, fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { valorNaData } from "@/lib/tiers";
@@ -783,7 +783,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                 </div>
               )}
               {booking.traveler_birth_date && (
-                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>
+                <p className="text-gray-500 text-xs flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmtDia(booking.traveler_birth_date)} <IdadeAoLado nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={booking.traveler_birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>
               )}
             </div>
           </section>
@@ -797,7 +797,7 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-1">
                     <p className="font-semibold text-navy-800 text-sm">{c.full_name}</p>
                     <p className="text-xs text-gray-500 font-mono flex items-center gap-1.5"><CreditCard size={11} className="text-gray-400" />{formatCPF(c.cpf)}</p>
-                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmt(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={c.birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>}
+                    {c.birth_date && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Cake size={11} className="text-gray-400" />{fmtDia(c.birth_date)} <IdadeAoLado nascimento={c.birth_date} saida={booking.trip_departure_date} quoteOnly={booking.trip_quote_only} /> <AniversarioTag nascimento={c.birth_date} saida={booking.trip_departure_date} retorno={booking.trip_return_date} quoteOnly={booking.trip_quote_only} /></p>}
                   </div>
                 ))}
               </div>
