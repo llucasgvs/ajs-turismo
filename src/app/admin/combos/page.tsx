@@ -51,14 +51,17 @@ type Combo = {
   roteiros_sem_data: number;
 };
 
-type Roteiro = { id: number; title: string; active_dates_count: number; is_active: boolean };
+type Roteiro = { id: number; title: string; active_dates_count: number; is_active: boolean; whatsapp_only?: boolean; quote_only?: boolean };
 
 type Faixa = { name: string; age_range: string; occupies_seat: boolean };
 
+type OQuePaga = { faixa: string | null; preco_desde: number | null } | null;
 type Sugestao = {
   colo: { faixa: Faixa | null; motivo: string | null; por_viagem?: string[] };
   crianca: { faixa: Faixa | null; motivo: string | null; por_viagem?: string[] };
   roteiros: string[];
+  /** Por viagem: o que a criança e o colo pagam nela. `null` = sem faixa, paga adulto. */
+  detalhe?: { titulo: string; crianca: OQuePaga; colo: OQuePaga }[];
 };
 
 /* O status vem pronto do servidor, derivado da janela mais o interruptor. A tela
@@ -425,7 +428,11 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
   // Enquanto ninguém digitar, o nome acompanha os roteiros escolhidos. Ao
   // primeiro toque no campo ele para de acompanhar: sobrescrever "Combo Verão"
   // porque o admin trocou um roteiro seria pior que não sugerir nada.
-  const [nomeManual, setNomeManual] = useState(!!combo);
+  // Na edição, se o nome gravado ainda é o automático, continua acompanhando:
+  // tirar um roteiro tirava a viagem do combo e o nome ficava mentindo.
+  const [nomeManual, setNomeManual] = useState(
+    () => !!combo && combo.nome !== nomeAutomatico(combo.roteiros.map((r) => r.title)),
+  );
   const [descricao, setDescricao] = useState(combo?.descricao ?? "");
   const [desconto, setDesconto] = useState(String(combo?.desconto_pct ?? 15));
   // "de X por Y" é como o dono precifica. O percentual continua sendo o que é
@@ -723,77 +730,84 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
               sugestão é a interseção, que é a única onde isso não acontece. */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-              Faixas de idade do combo
+              Quem é criança neste combo
             </label>
+            <p className="text-[11px] text-gray-400 mb-2">
+              Cada viagem tem a faixa dela; aqui você define a do combo, e é ela que vale
+              na compra. O preço da criança continua sendo o de cada viagem. Sem faixa
+              definida, todo mundo paga adulto.
+            </p>
 
-            {faixas.length > 0 ? (
-              <div className="space-y-2">
-                {faixas.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
-                    <span className="text-sm font-semibold text-navy-800 flex-shrink-0">{f.name}</span>
-                    <input
-                      value={f.age_range}
-                      onChange={(e) => setFaixas((a) => a.map((x, k) => k === i ? { ...x, age_range: e.target.value } : x))}
-                      placeholder="5 a 6 anos"
-                      className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-300"
-                    />
-                    <span className="text-[11px] text-gray-400 whitespace-nowrap">
-                      {f.occupies_seat ? "ocupa poltrona" : "não ocupa"}
-                    </span>
-                    <button type="button" onClick={() => setFaixas((a) => a.filter((_, k) => k !== i))}
-                      className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
-                      <X size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400">
-                Sem faixa, todo mundo paga o valor de adulto neste combo.
-              </p>
-            )}
-
-            {/* A sugestão, com as faixas de origem: o admin precisa ver de onde
-                o número saiu, senão é confiança cega num número inventado. */}
-            {sugestao && (
-              <div className="mt-2.5 space-y-1.5">
-                {(["crianca", "colo"] as const).map((tipo) => {
-                  const s = sugestao[tipo];
-                  const jaTem = s.faixa && faixas.some((f) => f.name === s.faixa!.name);
-                  return (
-                    <div key={tipo} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-                      {s.faixa ? (
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="min-w-0">
-                            <p className="text-xs text-navy-700">
-                              Sugestão: <strong>{s.faixa.name} ({s.faixa.age_range})</strong>
-                            </p>
-                            {s.por_viagem && (
-                              <p className="text-[11px] text-gray-400">
-                                nos roteiros: {s.por_viagem.join(" · ")}
-                              </p>
-                            )}
-                          </div>
-                          <button type="button" disabled={!!jaTem}
-                            onClick={() => setFaixas((a) => [...a, s.faixa!])}
-                            className="text-xs font-bold text-navy-700 border border-navy-200 px-2.5 py-1 rounded-lg hover:bg-navy-50 disabled:opacity-40 flex-shrink-0">
-                            {jaTem ? "já adicionada" : "usar"}
+            {/* Sempre as duas linhas, criança e colo: definida (com o campo) ou
+                por definir (com o botão). Antes só existia o botão "usar" da
+                sugestão, e quando a sugestão não vinha não havia como o dono
+                digitar a faixa dele, que é o que ele sempre quis. */}
+            <div className="space-y-2">
+              {(["crianca", "colo"] as const).map((tipo) => {
+                const rotulo = tipo === "crianca" ? "Criança" : "Criança de colo";
+                const i = faixas.findIndex((f) => f.name === rotulo);
+                const f = i >= 0 ? faixas[i] : null;
+                const sug = sugestao?.[tipo]?.faixa ?? null;
+                const detalhe = sugestao?.detalhe ?? [];
+                return (
+                  <div key={tipo} className="border border-gray-200 rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-navy-800 flex-shrink-0 w-32">{rotulo}</span>
+                      {f ? (
+                        <>
+                          <input
+                            value={f.age_range}
+                            onChange={(e) => setFaixas((a) => a.map((x, k) => k === i ? { ...x, age_range: e.target.value } : x))}
+                            placeholder={tipo === "crianca" ? "5 a 6 anos" : "0 a 2 anos"}
+                            className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-300"
+                          />
+                          <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                            {f.occupies_seat ? "ocupa poltrona" : "não ocupa"}
+                          </span>
+                          <button type="button" onClick={() => setFaixas((a) => a.filter((_, k) => k !== i))}
+                            className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0" title="Tirar esta faixa do combo">
+                            <X size={15} />
                           </button>
-                        </div>
+                        </>
                       ) : (
-                        <p className="text-xs text-gold-700 flex items-start gap-1.5">
-                          <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                          {tipo === "crianca" ? "Criança" : "Criança de colo"}: {s.motivo}
-                        </p>
+                        <>
+                          <span className="flex-1 text-xs text-gray-400">sem faixa: paga adulto</span>
+                          <button type="button"
+                            onClick={() => setFaixas((a) => [...a, sug ?? { name: rotulo, age_range: "", occupies_seat: tipo === "crianca" }])}
+                            className="text-xs font-bold text-navy-700 border border-navy-200 px-2.5 py-1 rounded-lg hover:bg-navy-50 flex-shrink-0">
+                            {sug ? `usar ${sug.age_range}` : "definir"}
+                          </button>
+                        </>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-            <p className="text-[11px] text-gray-400 mt-1.5">
-              O preço é sempre o da viagem. Aqui você define só quem é criança neste combo.
-            </p>
+                    {/* O que essa criança paga em cada viagem. É daqui que sai a
+                        sugestão, e é aqui que "não tem faixa" vira uma frase com
+                        nome de viagem: nela a criança paga adulto. */}
+                    {detalhe.length > 0 && (
+                      <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                        {detalhe.map((d, k) => {
+                          const q = d[tipo];
+                          return (
+                            <span key={k}>
+                              {k > 0 && <span className="text-gray-300"> · </span>}
+                              <span className="font-semibold text-navy-700">{nomeCurto(d.titulo)}</span>{" "}
+                              {q ? (
+                                <>{q.faixa ?? "faixa sem idade"}{q.preco_desde != null ? `, R$ ${fmtBRL(q.preco_desde)}` : ""}</>
+                              ) : (
+                                <span className="text-gold-700">sem faixa, paga adulto</span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </p>
+                    )}
+                    {sugestao && !sugestao[tipo].faixa && sugestao[tipo].motivo && !f && detalhe.length === 0 && (
+                      <p className="text-[11px] text-gold-700 mt-1">{sugestao[tipo].motivo}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -855,19 +869,30 @@ function ComboForm({ combo, roteiros, onClose, onSaved }: {
               )}
               {lista.map((r) => {
                 const marcado = escolhidos.includes(r.id);
+                // Combo é pago no site. Roteiro só-WhatsApp ou sob cotação não
+                // tem como ser cobrado ali, e o cliente só descobria no "Pagar".
+                // O servidor recusa; aqui a opção nem abre, e diz o motivo.
+                const bloqueio = r.quote_only ? "sob cotação" : r.whatsapp_only ? "só WhatsApp" : null;
                 return (
-                  <button key={r.id} onClick={() => alternar(r.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors">
+                  <button key={r.id} onClick={() => { if (!bloqueio || marcado) alternar(r.id); }}
+                    disabled={!!bloqueio && !marcado}
+                    title={bloqueio ? `Roteiro ${bloqueio}: não pode entrar em combo, porque o combo é pago no site.` : undefined}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                      bloqueio && !marcado ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>
                     <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                       marcado ? "bg-navy-700 border-navy-700" : "border-gray-300"}`}>
                       {marcado && <Check size={11} className="text-white" />}
                     </span>
                     <span className="flex-1 text-sm text-navy-800 truncate">{r.title}</span>
-                    {/* Sem data aberta o roteiro não tem o que vender, e o
-                        combo nasceria travado. Avisa aqui, na escolha. */}
-                    <span className={`text-[11px] whitespace-nowrap ${r.active_dates_count === 0 ? "text-gold-700 font-semibold" : "text-gray-400"}`}>
-                      {r.active_dates_count === 0 ? "sem data" : `${r.active_dates_count} datas`}
-                    </span>
+                    {bloqueio ? (
+                      <span className="text-[11px] whitespace-nowrap text-red-600 font-semibold">{bloqueio}</span>
+                    ) : (
+                      /* Sem data aberta o roteiro não tem o que vender, e o
+                         combo nasceria travado. Avisa aqui, na escolha. */
+                      <span className={`text-[11px] whitespace-nowrap ${r.active_dates_count === 0 ? "text-gold-700 font-semibold" : "text-gray-400"}`}>
+                        {r.active_dates_count === 0 ? "sem data" : `${r.active_dates_count} datas`}
+                      </span>
+                    )}
                   </button>
                 );
               })}

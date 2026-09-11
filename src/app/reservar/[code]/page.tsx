@@ -64,7 +64,7 @@ interface Booking {
                    trip_departure_date?: string | null; trip_return_date?: string | null;
                    status: string;
                    trip_template_id?: number | null;
-                   selected_optionals?: { name: string; price: number; total?: number }[] }[];
+                   selected_optionals?: { name: string; price: number; qty?: number; total?: number }[] }[];
   combo_total?: number | null;
   combo_desconto?: number | null;
 }
@@ -952,11 +952,15 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             {(booking.combo_pernas || []).flatMap(p =>
               (p.selected_optionals || []).map(o => (
                 <div key={`${p.booking_code}-${o.name}`} className="flex justify-between gap-2 text-gold-700">
-                  <span className="min-w-0 break-words">
-                    {o.name}
-                    {/* De QUAL viagem, senão "1× Transfer" três vezes na lista
-                        não diz nada. */}
-                    <span className="text-gray-400"> · {nomeCurtoDaViagem(p.trip_title)}</span>
+                  <span className="min-w-0">
+                    {/* Mesmo padrão da viagem avulsa: "3× Transfer". O servidor
+                        manda a quantidade (por pessoa ou por adulto, conforme o
+                        opcional), então a tela não refaz a regra. */}
+                    <span className="break-words">{o.qty ? `${o.qty}× ` : ""}{o.name}</span>
+                    {/* De QUAL viagem, senão "3× Transfer" três vezes na lista
+                        não diz nada. Em linha própria e pequena: "· FOZ DO
+                        IGUAÇU" no meio do texto grande quebrava a coluna. */}
+                    <span className="block text-[11px] text-gray-400 leading-tight">{nomeCurtoDaViagem(p.trip_title)}</span>
                   </span>
                   <span className="shrink-0 whitespace-nowrap">+ R$ {fmtBRL(o.total ?? o.price)}</span>
                 </div>

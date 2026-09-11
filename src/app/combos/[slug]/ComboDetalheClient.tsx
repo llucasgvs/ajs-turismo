@@ -106,11 +106,18 @@ const MAX_FOTOS = 5;
  *
  *  Intercalar as demais e não concatenar: com as fotos em blocos, os quatro
  *  menores viriam todos da primeira viagem, e a página de um combo de três
- *  destinos pareceria a de uma viagem só. Intercalando, as primeiras a entrar
- *  são a foto de capa de cada roteiro, e só depois as de galeria. */
+ *  destinos pareceria a de uma viagem só.
+ *
+ *  A foto de capa de cada roteiro NÃO entra: ela já está dentro da capa
+ *  montada, e aparecia de novo logo ao lado ("repetitivo", disse o dono). Só a
+ *  galeria de cada um; quando a capa montada não existe, a de capa do roteiro
+ *  volta a servir, senão a página ficaria sem foto nenhuma. */
 function galeriaDoCombo(capa: string | null, roteiros: RoteiroDoCombo[]): string[] {
   const fotos: string[] = [];
-  const listas = roteiros.map((r) => [r.image_url, ...(r.gallery ?? [])].filter(Boolean) as string[]);
+  const listas = roteiros.map((r) => {
+    const galeria = (r.gallery ?? []).filter(Boolean) as string[];
+    return capa ? galeria : [r.image_url, ...galeria].filter(Boolean) as string[];
+  });
   const maior = Math.max(0, ...listas.map((l) => l.length));
   for (let i = 0; i < maior; i++) {
     for (const l of listas) if (l[i]) fotos.push(l[i]);
