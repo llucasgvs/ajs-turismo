@@ -455,12 +455,14 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      (`contagemApos`: o adulto nunca chega a zero, ninguém passa da vaga). A
      página tinha um contador próprio, que deixava zerar o adulto. O preço de
      cada faixa é o do PACOTE (soma das viagens), igual ao que o checkout mostra. */
+  // O que cada pessoa custa no PACOTE: a soma das viagens já com o desconto.
+  const comDesconto = (cheio: number) => Math.round(cheio * (100 - combo.desconto_pct)) / 100;
   const faixasDoSeletor: FaixaDoSeletor[] = temFaixas
     ? [
-        { label: ADULTO, price: viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0), occupies_seat: true },
+        { label: ADULTO, price: comDesconto(viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0)), occupies_seat: true },
         ...combo.price_tiers.map((f) => ({
           label: rotuloFaixa(f),
-          price: viagensComData.reduce((s, d) => s + precoNaPerna(d, f), 0),
+          price: comDesconto(viagensComData.reduce((s, d) => s + precoNaPerna(d, f), 0)),
           occupies_seat: f.occupies_seat,
         })),
       ]
@@ -473,7 +475,9 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
         pessoas={pessoas}
         vagas={vagaMinima}
         editavel
-        precoPorPessoa={viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0)}
+        // Por pessoa JÁ com o desconto do combo: o cheio (R$ 469,00) ao lado de
+        // um total de R$ 375,20 parecia outro produto.
+        precoPorPessoa={comDesconto(viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0))}
         onFaixa={(label, delta) => {
           const nova = contagemApos(porFaixa, faixasDoSeletor, label, delta, vagaMinima);
           if (nova) setPorFaixa(nova);
