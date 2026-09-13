@@ -7,10 +7,12 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
-import { cpfValido, erroDaApi, fmtBRL, formatCPF, formatPhone } from "@/lib/format";
+import { cpfValido, erroDaApi, fmtBRL, fmtDia, formatCPF, formatPhone, precoDeTabela } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
 import { imgOtim } from "@/lib/imagem";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
+import { Opcionais } from "@/components/viagem/Opcionais";
+import { QUARTO_SINGLE, multiplicadorOpcional } from "@/lib/opcionais";
 
 type RoteiroDoCombo = {
   template_id: number;
@@ -926,7 +928,11 @@ type DataDoRoteiro = {
   trip_id: number;
   departure_date: string;
   price_per_person: number;
+  original_price?: number | null;
   available_spots: number;
+  /** Catálogo desta data, com preço: o balcão vende opcional junto. */
+  optionals?: { name: string; price: number; description?: string | null }[];
+  tem_hospedagem?: boolean;
 };
 
 type RoteiroComDatas = { template_id: number; title: string; datas: DataDoRoteiro[] };
@@ -938,6 +944,7 @@ type PernaVendida = {
   titulo: string;
   data: string | null;
   valor_cheio: number;
+  opcionais?: number;
   desconto: number;
   valor_final: number;
 };
@@ -951,9 +958,12 @@ type VendaFeita = {
   pernas: PernaVendida[];
 };
 
+/** Data pura ("2026-09-18") ou data-hora em UTC ("2026-09-18T23:00:00Z").
+ *  A data-hora precisa do fuso: 02:00Z já é o dia anterior em Brasília. A data
+ *  pura NÃO pode passar por `Date`, senão vira o dia anterior (ver `fmtDia`). */
 function dataLonga(iso: string): string {
-  const [a, m, d] = iso.split("-");
-  return `${d}/${m}/${a}`;
+  if (iso.includes("T")) return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  return fmtDia(iso);
 }
 
 function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void }) {
@@ -964,6 +974,8 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
   const [escolha, setEscolha] = useState<Record<number, string>>({});
   // template_id -> preço combinado, quando fugiu da tabela
   const [override, setOverride] = useState<Record<number, string>>({});
+  // Opcionais marcados por roteiro, só o nome: o preço é o da data, no servidor.
+  const [opcionais, setOpcionais] = useState<Record<number, string[]>>({});
   const [mostrarPreco, setMostrarPreco] = useState(false);
 
   const [cpf, setCpf] = useState("");
@@ -1046,9 +1058,12 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
     return datas.map((r) => {
       const escolhida = r.datas.find((d) => String(d.trip_id) === escolha[r.template_id]) ?? null;
       const combinado = parseFloat((override[r.template_id] ?? "").replace(",", "."));
+      // A base do desconto é a TABELA da data, não o preço promocional (regra
+      // do dono: não se aplica desconto em cima de desconto). O servidor grava
+      // assim; a prévia mostrava R$ 1.778,62 para uma venda que saía R$ 1.821,82.
       const preco = Number.isFinite(combinado) && combinado > 0
         ? combinado
-        : (escolhida?.price_per_person ?? 0);
+        : precoDeTabela(escolhida?.price_per_person ?? 0, escolhida?.original_price);
       return { roteiro: r, escolhida, preco };
     });
   }, [datas, escolha, override]);
@@ -1063,7 +1078,16 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
 
   const cheio = pernas.reduce((s, p) => s + p.preco * pessoas, 0);
   const desconto = Math.round(cheio * combo.desconto_pct) / 100;
-  const final = Math.round((cheio - desconto) * 100) / 100;
+  /* A mesma conta do site: por pessoa, quarto single por adulto (sem faixas no
+     balcão, adulto = todo mundo), e o desconto do combo NÃO encosta aqui. */
+  const totalOpcionais = pernas.reduce((s, p) => {
+    const marcados = opcionais[p.roteiro.template_id] ?? [];
+    return s + (p.escolhida?.optionals ?? [])
+      .filter((o) => marcados.includes(o.name))
+      .reduce((t, o) => t + o.price * multiplicadorOpcional(
+        { name: o.name, price: o.price, por_adulto: o.name === QUARTO_SINGLE }, pessoas, pessoas), 0);
+  }, 0);
+  const final = Math.round((cheio + totalOpcionais - desconto) * 100) / 100;
 
   const faltaData = pernas.some((p) => !p.escolhida);
   /* Trocar de data pode reduzir o teto de gente sem que `pessoas` acompanhe:
@@ -1096,6 +1120,7 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
             return {
               trip_id: p.escolhida!.trip_id,
               price_override: Number.isFinite(combinado) && combinado > 0 ? combinado : undefined,
+              selected_optionals: (opcionais[p.roteiro.template_id] ?? []).map((name) => ({ name })),
             };
           }),
           traveler_name: nome,
@@ -1103,7 +1128,11 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
           traveler_phone: telefone,
           traveler_birth_date: nascimento || undefined,
           num_travelers: pessoas,
-          companions: acompanhantes.filter((c) => c.full_name.trim()),
+          // Nascimento vazio vai como ausente: "" é recusado pelo servidor (422)
+          // e a venda simplesmente não acontecia.
+          companions: acompanhantes
+            .filter((c) => c.full_name.trim())
+            .map((c) => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date || undefined })),
           payment_method: pagamento,
           notes: obs || undefined,
         }),
@@ -1150,6 +1179,9 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
                     <p className="font-mono text-sm font-bold text-navy-800">{p.booking_code}</p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{p.titulo}</p>
                     {p.data && <p className="text-[11px] text-gray-400 mt-0.5">{dataLonga(p.data)}</p>}
+                    {(p.opcionais ?? 0) > 0 && (
+                      <p className="text-[11px] text-gold-700 mt-0.5">+ R$ {fmtBRL(p.opcionais!)} de opcionais</p>
+                    )}
                   </div>
                   <p className="text-sm text-navy-800 tabular-nums whitespace-nowrap">R$ {fmtBRL(p.valor_final)}</p>
                 </div>
@@ -1221,10 +1253,27 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
                         >
                           {r.datas.map((d) => (
                             <option key={d.trip_id} value={String(d.trip_id)}>
-                              {dataLonga(d.departure_date)} · R$ {fmtBRL(d.price_per_person)} · {d.available_spots} vagas
+                              {dataLonga(d.departure_date)} · R$ {fmtBRL(precoDeTabela(d.price_per_person, d.original_price))}{d.original_price && d.original_price > d.price_per_person ? " (tabela)" : ""} · {d.available_spots} vagas
                             </option>
                           ))}
                         </select>
+                        {/* Os opcionais DESTA data, depois da data e não antes,
+                            porque o preço deles muda de uma saída para outra.
+                            Mesmo bloco da página do combo e do checkout. */}
+                        {p.escolhida && (p.escolhida.optionals?.length ?? 0) > 0 && (
+                          <div className="mt-2">
+                            <Opcionais
+                              titulo="Opcionais desta viagem (por pessoa)"
+                              optionals={p.escolhida.optionals!}
+                              selecionados={opcionais[r.template_id] ?? []}
+                              onToggle={(nome) => setOpcionais((a) => {
+                                const atuais = a[r.template_id] ?? [];
+                                return { ...a, [r.template_id]: atuais.includes(nome)
+                                  ? atuais.filter((n) => n !== nome) : [...atuais, nome] };
+                              })}
+                            />
+                          </div>
+                        )}
                         {mostrarPreco && (
                           <div className="mt-2 flex items-center gap-2">
                             <span className="text-xs text-gray-500 whitespace-nowrap">Preço combinado</span>
@@ -1331,10 +1380,11 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
             <div className="text-xs text-gray-400">
               {pessoas} {pessoas === 1 ? "pessoa" : "pessoas"} · {pernas.length} viagens
               {desconto > 0 && <> · desconto de R$ {fmtBRL(desconto)}</>}
+              {totalOpcionais > 0 && <> · opcionais R$ {fmtBRL(totalOpcionais)}</>}
             </div>
             <div className="flex items-baseline gap-2">
               {desconto > 0 && (
-                <span className="text-gray-400 line-through text-sm tabular-nums">R$ {fmtBRL(cheio)}</span>
+                <span className="text-gray-400 line-through text-sm tabular-nums">R$ {fmtBRL(cheio + totalOpcionais)}</span>
               )}
               <span className="font-black text-navy-800 tabular-nums">R$ {fmtBRL(final)}</span>
             </div>
