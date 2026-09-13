@@ -301,7 +301,8 @@ export function CompactDateSelector<T extends DataSelecionavel>({
       <div className={`space-y-4 ${semMoldura ? "" : "px-4 pb-4"}`}>
         {visibleKeys.map(monthKey => (
           <div key={monthKey}>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 capitalize">
+            {/* `uppercase` e `capitalize` juntos brigavam e saía "Setembro De 2026". */}
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
               {fmtMonthLabel(monthKey)}
             </p>
             <div className="space-y-1.5">
