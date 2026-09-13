@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Package, Check, Loader2, AlertCircle,
@@ -220,6 +220,13 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      uma linha por categoria, exatamente como a página de viagem faz. */
   const temFaixas = (combo.price_tiers ?? []).length > 0;
   const [pessoas, setPessoas] = useState(1);
+  /* O usuário vem do localStorage, que o servidor não tem: lido na
+     renderização, o servidor manda "Entrar" e o navegador desenha o avatar,
+     e o React reclama que o HTML não bate (tela vermelha em dev, um piscar em
+     produção). Lido depois de montar, como a página de viagem faz. */
+  const [usuario, setUsuario] = useState<ReturnType<typeof getUser>>(null);
+  useEffect(() => { setUsuario(getUser()); }, []);
+
   const [porFaixa, setPorFaixa] = useState<Record<string, number>>({ [ADULTO]: 1 });
   /* trip_id -> nomes marcados. Por DATA e não por roteiro: o preço de um
      opcional pode mudar de uma saída para outra, e trocar a data tem que
@@ -492,7 +499,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
-      <TopoDaPagina usuario={getUser()} />
+      <TopoDaPagina usuario={usuario} />
 
       {galeriaAberta && fotos.length > 0 && (
         <GalleryModal images={fotos} startIndex={galeriaInicio} onClose={() => setGaleriaAberta(false)} />
