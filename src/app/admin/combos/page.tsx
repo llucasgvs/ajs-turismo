@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Package, Plus, Pencil, AlertCircle, AlertTriangle, Check,
-  Loader2, X, Power, Search, ShoppingCart,
+  Loader2, X, Power, Search,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
@@ -244,10 +244,12 @@ export default function CombosPage() {
                     botão para depois recusar seria pior que não oferecer. */}
                 {c.is_active && c.roteiros_sem_data === 0 && (
                   <button
-                    onClick={() => setVendendo(c)} title="Vender pelo balcão"
+                    onClick={() => setVendendo(c)} title="Registrar uma venda fechada por fora (WhatsApp ou presencial)"
                     className="flex items-center gap-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold py-2 px-3 rounded-xl transition-colors text-xs"
                   >
-                    <ShoppingCart size={13} /><span className="hidden sm:inline">Vender</span>
+                    {/* Mesmo nome do botão em Reservas ("Nova Venda Externa"): é a
+                        mesma ação, e um "Vender" solto parecia outra coisa. */}
+                    <Plus size={13} /><span className="hidden sm:inline">Venda Externa</span>
                   </button>
                 )}
                 <button
@@ -1211,7 +1213,7 @@ function VendaComboForm({ combo, onClose }: { combo: Combo; onClose: () => void 
 
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="min-w-0">
-            <h3 className="font-bold text-navy-800 text-base truncate">Vender {combo.nome}</h3>
+            <h3 className="font-bold text-navy-800 text-base truncate">Venda Externa: {combo.nome}</h3>
             <p className="text-xs text-gray-400 mt-0.5">
               WhatsApp ou presencial · {combo.desconto_pct.toString().replace(".", ",")}% off
             </p>
