@@ -223,3 +223,17 @@ export function erroDaApi(err: unknown, padrao = "Erro ao salvar."): string {
   }
   return padrao;
 }
+
+/**
+ * O dia (aaaa-mm-dd) de uma data-hora em UTC, no fuso da operação. Sem o fuso,
+ * a saída das 23:00 de sexta cai no sábado. Estava copiado em nove arquivos.
+ */
+export function spDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
+}
+
+/** "[TESTE] FOZ DO IGUAÇU - Opcionais..." vira "FOZ DO IGUAÇU": o que cabe numa linha pequena. */
+export function nomeCurtoDaViagem(titulo?: string | null): string {
+  const t = (titulo || "").replace(/^\[[^\]]*\]\s*/, "").trim();
+  return (t.split(/\s+[-|]\s+/)[0] || t).trim();
+}

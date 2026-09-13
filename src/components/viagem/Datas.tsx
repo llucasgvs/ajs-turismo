@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { Calendar, Check, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
-import { fmtBRL, precoDeTabela, spotsLabel, mesmoDia, poucasVagas, salesClosed } from "@/lib/format";
+import { spDay, fmtBRL, precoDeTabela, spotsLabel, mesmoDia, poucasVagas, salesClosed } from "@/lib/format";
 
 export type DataSelecionavel = {
   id: number;
@@ -58,7 +58,6 @@ export function DataEscolhida({ saida, retorno }: { saida: string; retorno?: str
 
 /** Dia da saída (YYYY-MM-DD) no fuso de Brasília. Fatiar o ISO cru usaria a
  *  data em UTC, que vira o dia seguinte em saídas de fim de noite. */
-const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 
 export function fmtDate(d: string) {
   // Data no fuso de Brasília: fatiar o ISO cru usaria a data em UTC, que vira o

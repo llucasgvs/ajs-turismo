@@ -22,21 +22,19 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, Loader2, Minus, Package, Plus } from "lucide-react";
-import {
-  COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector,
-  type DataSelecionavel,
-} from "@/components/viagem/Datas";
+import { Calendar, Package } from "lucide-react";
+import { COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector } from "@/components/viagem/Datas";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import {
   ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor,
 } from "@/components/pagamento/Viajantes";
 import { apiFetch } from "@/lib/api";
 import { QUARTO_SINGLE, quartoObrigatorio } from "@/lib/opcionais";
+import { type FaixaDoCombo, paraSelecao } from "@/lib/combos";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type Faixa = { name: string; age_range: string; occupies_seat: boolean };
+type Faixa = FaixaDoCombo;
 
 type DataDoRoteiro = {
   trip_id: number;
@@ -73,19 +71,7 @@ export type PernaAtual = {
   selected_optionals?: { name: string; price: number }[];
 };
 
-const rotuloFaixa = (f: Faixa) => (f.age_range ? `${f.name} (${f.age_range})` : f.name);
 
-/** A data do combo no formato que o seletor de viagem entende. */
-function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
-  return {
-    id: d.trip_id,
-    departure_date: d.departure_date,
-    return_date: d.return_date,
-    price_per_person: d.price_per_person,
-    original_price: d.original_price,
-    available_spots: d.available_spots,
-  };
-}
 
 export function ComboEditavel({
   slug, nome, pernas, faixas, faixasAtuais, numViajantes, vagas, editavel, aoSalvar,

@@ -11,12 +11,11 @@ import {
 } from "@/components/pagamento/Viajantes";
 import {
   QrCode, CreditCard, MessageCircle, Copy, Check, Loader2, CheckCircle2,
-  ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Minus, Plus, Calendar, Users, MapPin, Clock, AlertCircle, X, Package,
-} from "lucide-react";
+  ShieldCheck, ArrowLeft, Lock, User, ChevronRight, Calendar, Users, MapPin, Clock, AlertCircle, X, } from "lucide-react";
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { totalOpcionais, quartoObrigatorio, multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
-import { fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
+import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
 import { trackPurchaseOnce, trackBeginCheckout } from "@/lib/analytics";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
@@ -75,10 +74,6 @@ const ehCombo = (b: Booking | null) => !!b?.combo_pernas?.length;
 
 /** O destino, sem o prefixo do roteiro. "[TESTE] Bombinhas - SC" fica
  *  "Bombinhas": na linha do opcional só cabe dizer de qual viagem ele é. */
-function nomeCurtoDaViagem(titulo?: string | null): string {
-  const t = (titulo || "").replace(/^\[[^\]]*\]\s*/, "").trim();
-  return (t.split(/\s+[-|]\s+/)[0] || t).trim();
-}
 type Companion = { full_name: string; cpf: string; birth_date: string };
 type Method = "pix" | "card" | "whatsapp";
 
@@ -262,7 +257,6 @@ function InfoMsg({ children }: { children: React.ReactNode }) {
 
 // Data (YYYY-MM-DD) no fuso de Brasília. Fatiar o ISO cru usaria a data em UTC,
 // que vira o dia seguinte para saídas de fim de noite (23:45 BRT = 02:45 UTC).
-const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 
 /* Intervalo de datas compacto: "11 - 14 jul 2026" ou "30 jul - 2 ago 2026" */
 function fmtDateRange(dep?: string, ret?: string) {

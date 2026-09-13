@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown, Package } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { fmtDia, fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
+import { nomeCurtoDaViagem, fmtDia, fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { valorNaData } from "@/lib/tiers";
@@ -288,11 +288,6 @@ const PAYMENT_LABEL: Record<string, string> = {
   credit_card: "Cartão de crédito",
 };
 
-/** "[TESTE] FOZ DO IGUAÇU - Opcionais..." vira "FOZ DO IGUAÇU": o que cabe numa linha pequena. */
-function nomeCurtoDaViagem(titulo?: string | null): string {
-  const t = (titulo || "").replace(/^\[[^\]]*\]\s*/, "").trim();
-  return (t.split(/\s+[-|]\s+/)[0] || t).trim();
-}
 
 function paymentLabel(method: string | null, installments?: number): string {
   const base = PAYMENT_LABEL[method ?? ""] ?? method ?? "-";

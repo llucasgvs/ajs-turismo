@@ -2,22 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
-  ArrowLeft, MapPin, Package, Users, Check, Loader2, AlertCircle,
-  ArrowRight, ChevronDown, X, Plus,
-} from "lucide-react";
+  ArrowLeft, MapPin, Package, Check, Loader2, AlertCircle,
+  ArrowRight, ChevronDown, X, } from "lucide-react";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
-import {
-  COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector,
-  type DataSelecionavel,
-} from "@/components/viagem/Datas";
+import { COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector } from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
-import { contagemApos, type FaixaDoSeletor } from "@/components/pagamento/Viajantes";
+import { ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor } from "@/components/pagamento/Viajantes";
+import { type FaixaDoCombo, paraSelecao, rotuloFaixa } from "@/lib/combos";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
 
@@ -54,14 +50,9 @@ type RoteiroDoCombo = {
   datas: DataDoRoteiro[];
 };
 
-type Faixa = { name: string; age_range: string; occupies_seat: boolean };
+type Faixa = FaixaDoCombo;
 
 /** Rótulo mostrado ao cliente, igual ao da página de viagem. */
-function rotuloFaixa(f: Faixa): string {
-  return f.age_range ? `${f.name} (${f.age_range})` : f.name;
-}
-
-const ADULTO = "Adulto";
 
 type Combo = {
   id: number;
@@ -81,16 +72,6 @@ type Combo = {
 
 /* A data do combo no formato que o seletor de viagem entende. Converter aqui,
    e não no servidor, mantém a resposta da API enxuta. */
-function paraSelecao(d: DataDoRoteiro): DataSelecionavel {
-  return {
-    id: d.trip_id,
-    departure_date: d.departure_date,
-    return_date: d.return_date,
-    price_per_person: d.price_per_person,
-    original_price: d.original_price,
-    available_spots: d.available_spots,
-  };
-}
 
 
 /** Quantas fotos a página do combo mostra, a capa inclusa.
@@ -279,12 +260,6 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
 
   /* Poltronas, que não é o mesmo que pessoas: criança de colo não desconta
      vaga. É por poltrona que a viagem cabe ou não cabe. */
-  const poltronas = temFaixas
-    ? (combo.price_tiers ?? []).reduce(
-        (s, f) => s + (f.occupies_seat ? (porFaixa[rotuloFaixa(f)] ?? 0) : 0),
-        porFaixa[ADULTO] ?? 0,
-      )
-    : pessoas;
 
   /* Cabem tantas pessoas quanto a MENOR vaga entre as datas escolhidas: o combo
      não pode ser vendido para mais gente do que cabe na viagem mais cheia. */
@@ -356,14 +331,11 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     return s + deAdultos + demais;
   }, 0);
 
+  const viagensComData = pernas.map((p) => p.data).filter((d): d is DataDoRoteiro => !!d);
   const cheio = viagens + totalOpcionais;
   const desconto = Math.round(viagens * combo.desconto_pct) / 100;
   const final = Math.round((cheio - desconto) * 100) / 100;
   const faltaData = pernas.some((p) => !p.data);
-  const proxima = pernas
-    .map((p) => p.data?.departure_date)
-    .filter(Boolean)
-    .sort()[0] as string | undefined;
 
   /* O que o cliente escolheu, no formato que o checkout entende. */
   const paraOCheckout = () => ({
@@ -465,65 +437,35 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      estado. Duplicar o componente e não o estado: no celular a lateral não
      existe, e sem isto o cliente ficaria preso em uma pessoa, sem conseguir
      dizer que leva criança. Foi o que aconteceu ao testar em 375px. */
-  const faixasDoSeletor: FaixaDoSeletor[] = [
-    { label: ADULTO, price: 0, occupies_seat: true },
-    ...combo.price_tiers.map((f) => ({ label: rotuloFaixa(f), price: 0, occupies_seat: f.occupies_seat })),
-  ];
+  /* O MESMO seletor do checkout (`SeletorDeViajantes`), com as mesmas regras
+     (`contagemApos`: o adulto nunca chega a zero, ninguém passa da vaga). A
+     página tinha um contador próprio, que deixava zerar o adulto. O preço de
+     cada faixa é o do PACOTE (soma das viagens), igual ao que o checkout mostra. */
+  const faixasDoSeletor: FaixaDoSeletor[] = temFaixas
+    ? [
+        { label: ADULTO, price: viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0), occupies_seat: true },
+        ...combo.price_tiers.map((f) => ({
+          label: rotuloFaixa(f),
+          price: viagensComData.reduce((s, d) => s + precoNaPerna(d, f), 0),
+          occupies_seat: f.occupies_seat,
+        })),
+      ]
+    : [];
   const SeletorDePessoas = () => (
     <div className="px-5 py-3.5">
-      {temFaixas ? (
-        <>
-          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">
-            Pessoas por categoria
-          </p>
-          <div className="space-y-2">
-            {[{ name: ADULTO, age_range: "", occupies_seat: true }, ...combo.price_tiers].map((f) => {
-              const rotulo = f.name === ADULTO ? ADULTO : rotuloFaixa(f);
-              const qtd = porFaixa[rotulo] ?? 0;
-              // A MESMA regra do checkout (`contagemApos`): o adulto nunca chega
-              // a zero, nunca fica ninguém, e as poltronas não passam da vaga.
-              // Este botão deixava zerar o adulto e só avisava embaixo.
-              const mudar = (delta: number) => {
-                const nova = contagemApos(porFaixa, faixasDoSeletor, rotulo, delta, vagaMinima);
-                if (nova) setPorFaixa(nova);
-              };
-              return (
-                <div key={rotulo} className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-navy-800 truncate leading-tight">{rotulo}</p>
-                    <p className="text-[11px] text-gray-400 leading-tight">
-                      {f.occupies_seat ? "ocupa poltrona" : "não ocupa poltrona"}
-                    </p>
-                  </div>
-                  <button type="button"
-                    onClick={() => mudar(-1)}
-                    disabled={!contagemApos(porFaixa, faixasDoSeletor, rotulo, -1, vagaMinima)}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">−</button>
-                  <span className="w-6 text-center font-bold text-navy-800">{qtd}</span>
-                  <button type="button"
-                    onClick={() => mudar(1)}
-                    disabled={!contagemApos(porFaixa, faixasDoSeletor, rotulo, 1, vagaMinima)}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold flex-shrink-0">+</button>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setPessoas((n) => Math.max(1, n - 1))}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold">−</button>
-            <span className="flex-1 text-center font-bold text-navy-800">
-              {pessoas} pessoa{pessoas > 1 ? "s" : ""}
-            </span>
-            <button type="button" onClick={() => setPessoas((n) => Math.min(vagaMinima || 1, n + 1))}
-              disabled={pessoas >= vagaMinima}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 font-bold">+</button>
-          </div>
-        </>
-      )}
+      <SeletorDeViajantes
+        faixas={faixasDoSeletor}
+        contagem={porFaixa}
+        pessoas={pessoas}
+        vagas={vagaMinima}
+        editavel
+        precoPorPessoa={viagensComData.reduce((s, d) => s + precoNaPerna(d, null), 0)}
+        onFaixa={(label, delta) => {
+          const nova = contagemApos(porFaixa, faixasDoSeletor, label, delta, vagaMinima);
+          if (nova) setPorFaixa(nova);
+        }}
+        onPessoas={(delta) => setPessoas((n) => Math.min(Math.max(1, n + delta), vagaMinima || 1))}
+      />
       <p className="text-[11px] text-gray-400 mt-2">
         As mesmas pessoas viajam nas {combo.roteiros.length} viagens.
       </p>

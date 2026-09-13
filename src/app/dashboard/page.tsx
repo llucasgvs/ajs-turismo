@@ -9,7 +9,7 @@ import {
   Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2, Package,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
-import { fmtBRL, salesClosed } from "@/lib/format";
+import { spDay, fmtBRL, salesClosed } from "@/lib/format";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
@@ -76,7 +76,6 @@ const PAY: Record<string, string> = { whatsapp: "Presencial / WhatsApp", pix: "P
 
 // Data no fuso de Brasília (fatiar o ISO cru pega a data em UTC, que vira o dia
 // seguinte em saídas de fim de noite - ex.: 23:45 BRT = 02:45 UTC).
-const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 const fmtDate = (d: string) => { const [y, m, day] = spDay(d).split("-"); return `${day}/${m}/${y}`; };
 const fmtTime = (iso?: string | null) => { if (!iso) return ""; const t = new Date(iso); return isNaN(t.getTime()) ? "" : t.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }); };
 const daysUntil = (d: string) => Math.ceil((new Date(spDay(d) + "T12:00:00").getTime() - new Date().setHours(12, 0, 0, 0)) / 86400000);

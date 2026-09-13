@@ -10,6 +10,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
+import { spDay } from "@/lib/format";
 
 const RES = "/admin/reservas";
 
@@ -26,7 +27,6 @@ type TripInstance = { id: number; title: string; destination: string; departure_
 type Template = { id: number; title: string; is_active: boolean; active_dates_count: number; photos_count: number };
 
 /* ─── Helpers ─── */
-const spDay = (d: string) => new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 const fmt = (d: string) => new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 /** Horário no fuso da operação: o banco grava UTC, e sem isso a saída das 06:00
  *  apareceria como 09:00. Devolve "" quando a data não presta. */

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { fmtBRL, fmtInstallment, mesmoDia, semAcento } from "@/lib/format";
+import { spDay, fmtBRL, fmtInstallment, mesmoDia, semAcento } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -71,7 +71,6 @@ interface PublicTemplate {
 // Dia/mês da saída no fuso de Brasília. Fatiar o ISO cru usaria a data em UTC,
 // que vira o dia seguinte em saídas de fim de noite (23:45 BRT = 02:45 UTC),
 // desalinhando o calendário e os filtros do dia mostrado no card.
-const spDay = (iso: string) => new Date(iso).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 const spMonth = (iso: string) => spDay(iso).slice(0, 7);
 
 function fmtDate(d: string, mesLongo = false) {
@@ -81,8 +80,7 @@ function fmtDate(d: string, mesLongo = false) {
   // `mesLongo` é para o bate-e-volta, que mostra uma data só: como não precisa
   // caber ao lado de uma segunda data, o mês vai por extenso ("23 de agosto").
   // O ano continua entrando sozinho quando a saída não é deste ano.
-  const spDay = new Date(d).toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
-  const date = new Date(spDay + "T12:00:00");
+  const date = new Date(spDay(d) + "T12:00:00");
   const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: mesLongo ? "long" : "short" };
   if (date.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
   return date.toLocaleDateString("pt-BR", opts);
