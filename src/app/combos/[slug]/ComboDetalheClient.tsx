@@ -10,7 +10,7 @@ import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeri
 import { COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector } from "@/components/viagem/Datas";
 import { TopoDaPagina } from "@/components/viagem/Topo";
 import { apiFetch, getUser } from "@/lib/api";
-import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela } from "@/lib/format";
+import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela, salesClosed, nomeCurtoDaViagem } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor } from "@/components/pagamento/Viajantes";
 import { type FaixaDoCombo, paraSelecao, rotuloFaixa } from "@/lib/combos";
@@ -369,6 +369,15 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const continuar = async () => {
     setErro("");
     if (faltaData) { setErro("Escolha a data de cada viagem."); return; }
+    /* A lista de datas é de quando a página carregou. Numa aba aberta desde
+       ontem, a saída de daqui a 3 dias já encerrou vendas e o servidor vai
+       recusar. Confere aqui, dizendo QUAL viagem, e recarrega as datas. */
+    const encerrada = pernas.find((p) => p.data && salesClosed(p.data.departure_date));
+    if (encerrada) {
+      setErro(`${nomeCurtoDaViagem(encerrada.roteiro.title)}: as vendas para a data escolhida já encerraram. Escolha outra data.`);
+      router.refresh();
+      return;
+    }
     if (temFaixas && (porFaixa[ADULTO] ?? 0) < 1) {
       setErro("A reserva precisa de pelo menos um adulto."); return;
     }
@@ -392,7 +401,12 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
         }),
       });
       const d = await res.json();
-      if (!res.ok) { setErro(erroDaApi(d, "Não foi possível abrir a reserva.")); return; }
+      if (!res.ok) {
+        setErro(erroDaApi(d, "Não foi possível abrir a reserva."));
+        // Recusa por prazo ou por vaga: as datas da página estão velhas.
+        if (res.status === 400) router.refresh();
+        return;
+      }
       // O código da venda (CMB-...) entra no checkout de sempre.
       router.push(`/reservar/${d.combo_grupo}`);
     } catch {
