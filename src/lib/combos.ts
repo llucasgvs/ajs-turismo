@@ -57,5 +57,5 @@ export function textoDoPrazo(p: { dias: number; ate: string }): string {
   if (p.dias === 0) return `Último dia: o combo sai de venda hoje (${p.ate})`;
   if (p.dias === 1) return `Amanhã é o último dia do combo (até ${p.ate})`;
   if (p.dias <= 7) return `Últimos ${p.dias} dias do combo (até ${p.ate})`;
-  return `Combo à venda só até ${p.ate} · faltam ${p.dias} dias`;
+  return `Combo à venda por tempo limitado: só até ${p.ate}`;
 }
