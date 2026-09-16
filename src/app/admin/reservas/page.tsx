@@ -790,11 +790,13 @@ function TrocarDataModal({ booking, datas, onClose, onDone }: {
  * decisões são por poltrona (dá para cancelar uma perna e manter as outras), e
  * moram na janela de cada reserva, que se abre daqui.
  */
-function ComboDetailModal({ venda, onClose, onAbrirPerna, abrindo }: {
+function ComboDetailModal({ venda, onClose, onAbrirPerna, abrindo, onCancelar }: {
   venda: Booking;
   onClose: () => void;
   onAbrirPerna: (code: string) => void;
   abrindo: string | null;
+  /** Cancela a venda inteira. Só faz sentido enquanto ninguém pagou. */
+  onCancelar?: (venda: Booking) => void;
 }) {
   useFecharComEsc(true, onClose);
   const [copiado, setCopiado] = useState<string | null>(null);
@@ -1077,6 +1079,18 @@ function ComboDetailModal({ venda, onClose, onAbrirPerna, abrindo }: {
             </section>
           )}
         </div>
+
+        {/* Carrinho que ninguém pagou: dá para cancelar as N viagens daqui.
+            Venda paga não tem botão de venda inteira de propósito (estorno de
+            combo não existe no site ainda); as ações são por viagem, acima. */}
+        {onCancelar && ["interesse", "pending"].includes(venda.status) && (
+          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+            <button onClick={() => onCancelar(venda)}
+              className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-bold py-3 rounded-xl transition-colors text-sm">
+              <X size={15} /> Cancelar as {venda.combo_pernas?.length ?? 0} viagens desta venda
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1864,14 +1878,31 @@ function CancelConfirmModal({ booking, trip, onClose, onConfirm, loading }: {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
-            <p className="font-mono text-xs text-gray-400">{booking.booking_code}</p>
-            <p className="font-bold text-navy-800">{travelerName}</p>
-            {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
-            <p className="text-xs text-gray-400">
-              R$ {fmtBRL(booking.final_amount)} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
-            </p>
-          </div>
+          {/* Venda de combo: cancela as N viagens de uma vez, e o aviso diz
+              isso com todas as letras, porque "cancelar reserva" soaria como
+              uma viagem só. */}
+          {booking.combo_pernas?.length ? (
+            <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
+              <p className="font-mono text-xs text-gray-400">{booking.combo_grupo}</p>
+              <p className="font-bold text-navy-800">{travelerName}</p>
+              <p className="text-sm text-gray-500">{booking.combo_nome ?? "Combo"}</p>
+              <ul className="text-xs text-gray-500 space-y-0.5">
+                {booking.combo_pernas.map((p) => <li key={p.booking_code}>· {p.trip_title}</li>)}
+              </ul>
+              <p className="text-xs text-red-600 font-semibold pt-1">
+                As {booking.combo_pernas.length} viagens da venda serão canceladas juntas.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-xl p-3.5 space-y-1.5">
+              <p className="font-mono text-xs text-gray-400">{booking.booking_code}</p>
+              <p className="font-bold text-navy-800">{travelerName}</p>
+              {trip && <p className="text-sm text-gray-500">{trip.title}</p>}
+              <p className="text-xs text-gray-400">
+                R$ {fmtBRL(booking.final_amount)} · {booking.num_travelers} pessoa{booking.num_travelers !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose}
@@ -2657,9 +2688,12 @@ export default function AdminReservasPage() {
     if (!cancelTarget) return;
     setCancelLoading(true);
     try {
-      await apiFetch(`/bookings/${cancelTarget.booking_code}/cancel`, {
+      // Combo: o código da VENDA (CMB-) cancela as N pernas de uma vez.
+      const alvo = cancelTarget.combo_pernas?.length ? cancelTarget.combo_grupo : cancelTarget.booking_code;
+      await apiFetch(`/bookings/${alvo}/cancel`, {
         method: "POST",
       });
+      setComboSelecionado(null);
       invalidateAdminCache();
       setCancelTarget(null);
       fetchBookings();
@@ -2714,12 +2748,18 @@ export default function AdminReservasPage() {
      * primeira perna: o admin acharia que cancelou o combo e teria cancelado
      * uma viagem das três. Quem quiser agir abre a venda e escolhe a perna. */
     if (b.combo_pernas?.length) {
+      // Carrinho que ninguém pagou pode ser cancelado inteiro daqui: nada de
+      // vaga nem de dinheiro envolvido. Venda paga se resolve por viagem, na
+      // janela da venda. E "Ver combo" saiu: clicar na linha já abre a venda.
+      const carrinho = ["interesse", "pending"].includes(b.status);
       return (
         <div className={`flex items-center gap-1.5 ${compact ? "flex-nowrap" : "flex-wrap"}`} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => setComboSelecionado(b)} title="Ver a venda do combo"
-            className={`flex items-center gap-1 border border-gold-300 text-gold-700 hover:bg-gold-50 text-xs font-bold rounded-lg transition-colors ${sizing}`}>
-            <Package size={13} />{!compact && " Ver combo"}
-          </button>
+          {carrinho && (
+            <button onClick={() => promptCancel(b)} disabled={isLoading} title="Cancelar as viagens desta venda"
+              className={`flex items-center gap-1 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 ${sizing}`}>
+              <X size={13} />{!compact && " Cancelar"}
+            </button>
+          )}
           {b.traveler_phone && (
             <a href={buildWaUrl(b)} target="_blank" rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()} title="Falar no WhatsApp"
@@ -2828,6 +2868,7 @@ export default function AdminReservasPage() {
           venda={comboSelecionado}
           onClose={() => setComboSelecionado(null)}
           onAbrirPerna={abrirPerna}
+          onCancelar={promptCancel}
           abrindo={abrindoPerna}
         />
       )}
