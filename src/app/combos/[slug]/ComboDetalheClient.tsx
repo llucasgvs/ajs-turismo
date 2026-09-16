@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Package, Check, Loader2, AlertCircle,
-  ArrowRight, ChevronDown, X, } from "lucide-react";
+  ArrowRight, ChevronDown, X, Clock, } from "lucide-react";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
 import { COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector } from "@/components/viagem/Datas";
@@ -13,7 +13,7 @@ import { apiFetch, getUser } from "@/lib/api";
 import { fmtBRL, fmtInstallment, erroDaApi, precoDeTabela, salesClosed, nomeCurtoDaViagem } from "@/lib/format";
 import { QUARTO_SINGLE } from "@/lib/opcionais";
 import { ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor } from "@/components/pagamento/Viajantes";
-import { type FaixaDoCombo, paraSelecao, rotuloFaixa } from "@/lib/combos";
+import { type FaixaDoCombo, paraSelecao, rotuloFaixa, prazoDoCombo, textoDoPrazo } from "@/lib/combos";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
 
@@ -225,6 +225,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
      e o React reclama que o HTML não bate (tela vermelha em dev, um piscar em
      produção). Lido depois de montar, como a página de viagem faz. */
   const [usuario, setUsuario] = useState<ReturnType<typeof getUser>>(null);
+  const prazo = prazoDoCombo(combo.venda_fim);
   useEffect(() => { setUsuario(getUser()); }, []);
 
   const [porFaixa, setPorFaixa] = useState<Record<string, number>>({ [ADULTO]: 1 });
@@ -528,6 +529,16 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                 -{combo.desconto_pct.toString().replace(".", ",")}% OFF
               </span>
             </div>
+            {/* A janela de venda, dita na cara: o combo some depois dela, e a
+                pessoa que viu hoje precisa saber que não pode deixar para
+                depois. Fica vermelho na última semana. */}
+            {prazo && (
+              <div className={`mb-3 inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold ${
+                prazo.urgente ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                <Clock size={15} className="flex-shrink-0" />
+                {textoDoPrazo(prazo)}
+              </div>
+            )}
             <div className="flex items-start justify-between gap-4">
               <h1 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-navy-900 leading-tight">
                 {combo.nome}
@@ -726,6 +737,19 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                       <div className="mt-2 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center border border-emerald-100">
                         Você economiza R$ {fmtBRL(desconto)}
                       </div>
+                    )}
+                    {/* Urgência na lateral, ao lado do botão de comprar: o prazo
+                        do combo e, quando a data mais cheia está acabando, os
+                        lugares que restam. */}
+                    {prazo && (
+                      <p className={`mt-2 text-xs font-semibold text-center flex items-center justify-center gap-1.5 ${prazo.urgente ? "text-red-600" : "text-amber-700"}`}>
+                        <Clock size={12} /> {prazo.dias <= 7 ? textoDoPrazo(prazo) : `À venda até ${prazo.ate}`}
+                      </p>
+                    )}
+                    {!faltaData && vagaMinima > 0 && vagaMinima <= 5 && (
+                      <p className="mt-1.5 text-xs font-semibold text-center text-red-600">
+                        Só {vagaMinima} {vagaMinima === 1 ? "lugar" : "lugares"} na data escolhida
+                      </p>
                     )}
                   </div>
 

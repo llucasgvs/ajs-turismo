@@ -32,3 +32,30 @@ export function paraSelecao(d: {
     available_spots: d.available_spots,
   };
 }
+
+/**
+ * Quanto falta para o combo sair de venda, para a página e o card avisarem.
+ *
+ * O combo vende numa janela (ex.: 15/09 a 31/10) e depois some. Sem aviso, a
+ * pessoa que viu hoje volta em novembro e não entende para onde foi. Conta em
+ * dias de Brasília, inclusive o último dia: "até 31/10" vale o dia 31 inteiro.
+ */
+export function prazoDoCombo(vendaFim?: string | null): { dias: number; ate: string; urgente: boolean } | null {
+  if (!vendaFim) return null;
+  const [y, m, d] = vendaFim.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const hojeSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const hoje = Date.UTC(hojeSP.getFullYear(), hojeSP.getMonth(), hojeSP.getDate());
+  const fim = Date.UTC(y, m - 1, d);
+  const dias = Math.round((fim - hoje) / 86400000);
+  if (dias < 0) return null;
+  return { dias, ate: `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`, urgente: dias <= 7 };
+}
+
+/** O texto do aviso, um só para a página e o card, para não dizerem coisas diferentes. */
+export function textoDoPrazo(p: { dias: number; ate: string }): string {
+  if (p.dias === 0) return `Último dia: o combo sai de venda hoje (${p.ate})`;
+  if (p.dias === 1) return `Amanhã é o último dia do combo (até ${p.ate})`;
+  if (p.dias <= 7) return `Últimos ${p.dias} dias do combo (até ${p.ate})`;
+  return `Combo à venda só até ${p.ate} · faltam ${p.dias} dias`;
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
-import {
+import { Clock,
   MapPin, Search, ArrowRight,
   X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp, Package,
 } from "lucide-react";
@@ -10,6 +10,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, semAcento } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
+import { prazoDoCombo } from "@/lib/combos";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
@@ -557,6 +558,7 @@ function ComboCard({ c }: { c: ComboPublico }) {
   const fator = 1 - c.desconto_pct / 100;
   const de = c.preco_tabela_desde ?? c.preco_cheio_desde;
   const por = c.preco_com_desconto_desde ?? 0;
+  const prazo = prazoDoCombo(c.venda_fim);
 
   return (
     <Link
@@ -578,6 +580,12 @@ function ComboCard({ c }: { c: ComboPublico }) {
           <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
             -{c.desconto_pct.toString().replace(".", ",")}%
           </span>
+          {/* Até quando vende: o combo some depois da janela. */}
+          {prazo && (
+            <span className={`inline-flex items-center gap-1 text-white text-xs font-bold px-2.5 py-1 rounded-full ${prazo.urgente ? "bg-red-600" : "bg-navy-900/80"}`}>
+              <Clock size={10} /> {prazo.dias <= 7 ? (prazo.dias === 0 ? "último dia" : `últimos ${prazo.dias} dias`) : `até ${prazo.ate}`}
+            </span>
+          )}
         </div>
         <div className="absolute bottom-2.5 left-2.5 right-2.5">
           <h3 className="font-display font-black text-base text-white leading-tight drop-shadow">{c.nome}</h3>
