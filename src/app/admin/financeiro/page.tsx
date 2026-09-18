@@ -227,13 +227,15 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
   const [q, setQ] = useState("");
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
+  // Recorrentes têm 12 parcelas cada e afogam a lista: abre só com as avulsas.
+  const [rec, setRec] = useState<"sem" | "so" | "">("sem");
   const [parcelas, setParcelas] = useState<Parcela[] | null>(null);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
   const POR_PAGINA = 30;
 
   // Mudou filtro, volta para a primeira página.
-  useEffect(() => { setPagina(1); }, [tipo, status, categoria, q, de, ate]);
+  useEffect(() => { setPagina(1); }, [tipo, status, categoria, q, de, ate, rec]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -244,6 +246,7 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
       if (q.trim()) ps.set("q", q.trim());
       if (de) ps.set("de", de);
       if (ate) ps.set("ate", ate);
+      if (rec) ps.set("recorrentes", rec);
       ps.set("limit", String(POR_PAGINA));
       ps.set("skip", String((pagina - 1) * POR_PAGINA));
       setParcelas(null);
@@ -252,7 +255,7 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
         .catch(() => { setParcelas([]); setTotal(0); });
     }, 250);
     return () => clearTimeout(t);
-  }, [tipo, status, categoria, q, de, ate, versao, pagina]);
+  }, [tipo, status, categoria, q, de, ate, rec, versao, pagina]);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   const cats = tipo ? (categorias?.[tipo] ?? []) : [...(categorias?.pagar ?? []), ...(categorias?.receber ?? [])];
@@ -260,6 +263,11 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm font-bold text-navy-800">Lançamentos</p>
+        <Segmentado valor={rec} onChange={(v) => setRec(v as "sem" | "so" | "")}
+          opcoes={[{ k: "sem", label: "Avulsos" }, { k: "so", label: "Recorrentes" }, { k: "", label: "Todos" }]} />
+      </div>
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -280,7 +288,7 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
       </div>
       {parcelas === null ? <Skel className="h-40 rounded-2xl" /> : (
         <>
-          <Tabela parcelas={parcelas} onMudou={onMudou} onDuplicar={onDuplicar} vazio="Nada com esses filtros." mostrarTipo />
+          <Tabela parcelas={parcelas} onMudou={onMudou} onDuplicar={onDuplicar} vazio={rec === "sem" ? "Nenhum lançamento avulso com esses filtros. As contas que repetem estão em Recorrentes, ou troque para \"Todos\"." : "Nada com esses filtros."} mostrarTipo />
           {total > 0 && (
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>{total} {total === 1 ? "lançamento" : "lançamentos"} · página {pagina} de {paginas}</span>
