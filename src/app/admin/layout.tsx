@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet } from "lucide-react";
+import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet, PieChart } from "lucide-react";
 import { getUser, logout } from "@/lib/api";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
@@ -21,7 +21,9 @@ const nav: ItemDoMenu[] = [
   { href: "/admin/reservas", label: "Reservas", icon: ClipboardList, filhos: [
     { href: "/admin/listas", label: "Listas", icon: ListChecks },
   ] },
-  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
+  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet, filhos: [
+    { href: "/admin/financeiro/resumo", label: "Resumo", icon: PieChart },
+  ] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
