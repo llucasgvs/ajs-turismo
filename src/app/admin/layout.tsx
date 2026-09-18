@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet, PieChart } from "lucide-react";
+import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet, PieChart, ExternalLink } from "lucide-react";
 import { getUser, logout } from "@/lib/api";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
@@ -13,16 +13,24 @@ import { BrandedLoader } from "@/components/BrandedLoader";
 // subitens ficam sempre visíveis, indentados: menu que esconde item atrás de
 // clique faz a pessoa procurar.
 type ItemDoMenu = { href: string; label: string; icon: typeof Map; filhos?: ItemDoMenu[] };
-const nav: ItemDoMenu[] = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/viagens", label: "Roteiros", icon: Map, filhos: [
-    { href: "/admin/combos", label: "Combos", icon: Package },
+// Dois blocos: o dia a dia da venda (roteiros, reservas) e o dinheiro da
+// empresa (financeiro). O rótulo do bloco é só orientação, não é clicável.
+const blocos: { titulo: string | null; itens: ItemDoMenu[] }[] = [
+  { titulo: null, itens: [
+    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   ] },
-  { href: "/admin/reservas", label: "Reservas", icon: ClipboardList, filhos: [
-    { href: "/admin/listas", label: "Listas", icon: ListChecks },
+  { titulo: "Operação", itens: [
+    { href: "/admin/viagens", label: "Roteiros", icon: Map, filhos: [
+      { href: "/admin/combos", label: "Combos", icon: Package },
+    ] },
+    { href: "/admin/reservas", label: "Reservas", icon: ClipboardList, filhos: [
+      { href: "/admin/listas", label: "Listas", icon: ListChecks },
+    ] },
   ] },
-  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet, filhos: [
-    { href: "/admin/financeiro/resumo", label: "Resumo", icon: PieChart },
+  { titulo: "Financeiro", itens: [
+    { href: "/admin/financeiro", label: "Contas", icon: Wallet, filhos: [
+      { href: "/admin/financeiro/resumo", label: "Resumo", icon: PieChart },
+    ] },
   ] },
 ];
 
@@ -103,8 +111,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {nav.map(({ href, label, icon: Icon, filhos }) => {
-          const active = pathname === href || (href !== "/admin" && pathname.startsWith(href));
+        {blocos.map((bloco, bi) => (
+          <div key={bi} className={bi > 0 ? "pt-3" : ""}>
+            {bloco.titulo && (
+              <p className="px-3 pb-1.5 text-[10px] font-bold text-navy-500 uppercase tracking-widest">{bloco.titulo}</p>
+            )}
+            <div className="space-y-1">
+        {bloco.itens.map(({ href, label, icon: Icon, filhos }) => {
+          // Um destaque só por vez: com um subitem aberto, o pai fica "no
+          // caminho" (claro, sem fundo) e o subitem leva o amarelo. Os dois em
+          // amarelo confundiam onde a pessoa estava.
+          const filhoAtivo = (filhos ?? []).some((f) => pathname === f.href || pathname.startsWith(f.href + "/"));
+          const active = !filhoAtivo && (pathname === href || (href !== "/admin" && pathname.startsWith(href)));
           return (
             <div key={href}>
               <Link
@@ -112,6 +130,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   active
                     ? "bg-gold-500 text-navy-900"
+                    : filhoAtivo
+                    ? "text-white"
                     : "text-navy-300 hover:bg-navy-800 hover:text-white"
                 }`}
               >
@@ -140,10 +160,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           );
         })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="p-3 border-t border-navy-700">
         <p className="text-navy-400 text-xs px-3 mb-2 truncate">{userName}</p>
+        <a href="/" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-navy-300 hover:bg-navy-800 hover:text-white transition-colors">
+          <ExternalLink size={17} />
+          Ver o site
+        </a>
         <button
           onClick={logout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-navy-400 hover:text-red-400 hover:bg-navy-800 w-full transition-colors"
