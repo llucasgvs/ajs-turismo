@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownCircle, ArrowUpCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, Loader2,
-  Plus, Repeat, RotateCcw, Search, X, Pencil, Wallet, Ban,
+  Plus, Repeat, RotateCcw, Search, X, Pencil, Wallet, Ban, Copy,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { erroDaApi, fmtBRL, fmtDia } from "@/lib/format";
@@ -60,12 +60,29 @@ function hojeISO() {
   return new Date().toLocaleDateString("sv", { timeZone: "America/Sao_Paulo" });
 }
 
+/** Dias até o vencimento, em dias de calendário de Brasília. */
+function diasAte(iso: string): number {
+  const hoje = new Date(hojeISO() + "T00:00:00");
+  const alvo = new Date(iso.slice(0, 10) + "T00:00:00");
+  return Math.round((alvo.getTime() - hoje.getTime()) / 86400000);
+}
+
+/** Uma conta que vence hoje não pode parecer igual a uma de daqui a três
+ *  semanas: selo âmbar nos próximos 3 dias, só para as em aberto. */
+function Prazo({ p }: { p: Parcela }) {
+  if (p.status !== "pendente") return null;
+  const d = diasAte(p.vencimento);
+  if (d > 3) return null;
+  const texto = d <= 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `vence em ${d} dias`;
+  return <span className="ml-2 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">{texto}</span>;
+}
+
 /* ─── Página ─── */
 
 export default function FinanceiroPage() {
   const [aba, setAba] = useState<"mes" | "geral" | "lista" | "recorrentes">("mes");
   const [categorias, setCategorias] = useState<Categorias | null>(null);
-  const [novo, setNovo] = useState<Tipo | null>(null);
+  const [novo, setNovo] = useState<{ tipo: Tipo; base?: Parcela } | null>(null);
   const [versao, setVersao] = useState(0);         // incrementa para as abas recarregarem
   const recarregar = useCallback(() => setVersao((v) => v + 1), []);
 
@@ -81,11 +98,11 @@ export default function FinanceiroPage() {
           <p className="text-gray-500 text-sm mt-0.5">Contas a pagar e a receber, fora das vendas do site</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setNovo("receber")}
+          <button onClick={() => setNovo({ tipo: "receber" })}
             className="flex items-center gap-2 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm">
             <ArrowDownCircle size={16} /> A receber
           </button>
-          <button onClick={() => setNovo("pagar")}
+          <button onClick={() => setNovo({ tipo: "pagar" })}
             className="flex items-center gap-2 bg-navy-700 hover:bg-navy-600 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm">
             <Plus size={16} /> A pagar
           </button>
@@ -109,13 +126,13 @@ export default function FinanceiroPage() {
         ))}
       </div>
 
-      {aba === "mes" && <AbaMes versao={versao} onMudou={recarregar} />}
+      {aba === "mes" && <AbaMes versao={versao} onMudou={recarregar} onDuplicar={(p) => setNovo({ tipo: p.tipo, base: p })} />}
       {aba === "geral" && <AbaGeral versao={versao} />}
-      {aba === "lista" && <AbaLista versao={versao} onMudou={recarregar} categorias={categorias} />}
+      {aba === "lista" && <AbaLista versao={versao} onMudou={recarregar} categorias={categorias} onDuplicar={(p) => setNovo({ tipo: p.tipo, base: p })} />}
       {aba === "recorrentes" && <AbaRecorrentes versao={versao} onMudou={recarregar} categorias={categorias} />}
 
       {novo && categorias && (
-        <NovaContaModal tipo={novo} categorias={categorias[novo]} onClose={() => setNovo(null)}
+        <NovaContaModal tipo={novo.tipo} base={novo.base} categorias={categorias[novo.tipo]} onClose={() => setNovo(null)}
           onSaved={() => { setNovo(null); recarregar(); }} />
       )}
     </div>
@@ -124,7 +141,7 @@ export default function FinanceiroPage() {
 
 /* ─── Aba: Mês ─── */
 
-function AbaMes({ versao, onMudou }: { versao: number; onMudou: () => void }) {
+function AbaMes({ versao, onMudou, onDuplicar }: { versao: number; onMudou: () => void; onDuplicar: (p: Parcela) => void }) {
   const hoje = new Date(hojeISO() + "T12:00:00");
   const [ano, setAno] = useState(hoje.getFullYear());
   const [mes, setMes] = useState(hoje.getMonth() + 1);
@@ -196,7 +213,7 @@ function AbaMes({ versao, onMudou }: { versao: number; onMudou: () => void }) {
             />
           </div>
 
-          <Tabela parcelas={parcelas} onMudou={onMudou} vazio="Nenhuma conta neste mês. Lance a primeira nos botões acima." />
+          <Tabela parcelas={parcelas} onMudou={onMudou} onDuplicar={onDuplicar} vazio="Nenhuma conta neste mês. Lance a primeira nos botões acima." />
         </>
       )}
     </div>
@@ -352,7 +369,7 @@ function AbaGeral({ versao }: { versao: number }) {
 
 /* ─── Aba: Todas ─── */
 
-function AbaLista({ versao, onMudou, categorias }: { versao: number; onMudou: () => void; categorias: Categorias | null }) {
+function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number; onMudou: () => void; categorias: Categorias | null; onDuplicar: (p: Parcela) => void }) {
   const [tipo, setTipo] = useState<"" | Tipo>("");
   const [status, setStatus] = useState<"" | "aberta" | "atrasada" | "paga" | "cancelada">("aberta");
   const [categoria, setCategoria] = useState("");
@@ -412,7 +429,7 @@ function AbaLista({ versao, onMudou, categorias }: { versao: number; onMudou: ()
       </div>
       {parcelas === null ? <Skel className="h-40 rounded-2xl" /> : (
         <>
-          <Tabela parcelas={parcelas} onMudou={onMudou} vazio="Nada com esses filtros." mostrarTipo />
+          <Tabela parcelas={parcelas} onMudou={onMudou} onDuplicar={onDuplicar} vazio="Nada com esses filtros." mostrarTipo />
           {total > 0 && (
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>{total} {total === 1 ? "lançamento" : "lançamentos"} · página {pagina} de {paginas}</span>
@@ -492,7 +509,7 @@ function AbaRecorrentes({ versao, onMudou, categorias }: { versao: number; onMud
 
 /* ─── Tabela de parcelas (Mês e Todas) ─── */
 
-function Tabela({ parcelas, onMudou, vazio, mostrarTipo }: { parcelas: Parcela[]; onMudou: () => void; vazio: string; mostrarTipo?: boolean }) {
+function Tabela({ parcelas, onMudou, onDuplicar, vazio, mostrarTipo }: { parcelas: Parcela[]; onMudou: () => void; onDuplicar: (p: Parcela) => void; vazio: string; mostrarTipo?: boolean }) {
   const [quitando, setQuitando] = useState<Parcela | null>(null);
   const [editando, setEditando] = useState<Parcela | null>(null);
   const [cancelando, setCancelando] = useState<Parcela | null>(null);
@@ -537,6 +554,7 @@ function Tabela({ parcelas, onMudou, vazio, mostrarTipo }: { parcelas: Parcela[]
                     <td className="px-3 py-3 whitespace-nowrap tabular-nums text-navy-800 text-xs md:text-sm">
                       {fmtDia(p.vencimento)}
                       {p.recorrencia !== "nenhuma" && <Repeat size={12} className="inline ml-1.5 text-gold-500" strokeWidth={2.5} aria-label="recorrente" />}
+                      <Prazo p={p} />
                     </td>
                     <td className="px-3 py-3 min-w-[140px]">
                       <p className="font-semibold text-navy-800 leading-tight">
@@ -566,6 +584,10 @@ function Tabela({ parcelas, onMudou, vazio, mostrarTipo }: { parcelas: Parcela[]
                             className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg text-white transition-colors disabled:opacity-50 ${p.tipo === "pagar" ? "bg-navy-700 hover:bg-navy-600" : "bg-emerald-500 hover:bg-emerald-400"}`}>
                             <Check size={12} /><span className="hidden md:inline">{p.tipo === "pagar" ? "Pagar" : "Receber"}</span>
                           </button>
+                        )}
+                        {!p.cancelada && (
+                          <button onClick={() => onDuplicar(p)} title="Lançar outra igual a esta"
+                            className="w-8 h-8 rounded-lg border border-gray-200 text-navy-600 hover:bg-gray-50 flex items-center justify-center"><Copy size={12} /></button>
                         )}
                         {p.status === "paga" && (
                           <button onClick={() => reabrir(p)} disabled={ocupado === p.id} title="Desfazer a quitação"
@@ -626,12 +648,21 @@ function numero(v: string): number {
   return parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
 }
 
-function NovaContaModal({ tipo, categorias, onClose, onSaved }: { tipo: Tipo; categorias: string[]; onClose: () => void; onSaved: () => void }) {
-  const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState(categorias[0] ?? "");
-  const [contraparte, setContraparte] = useState("");
-  const [valor, setValor] = useState("");
-  const [vencimento, setVencimento] = useState(hojeISO());
+/** Vencimento sugerido ao duplicar: o mesmo dia, um mês depois (o caso
+ *  típico é "a mesma conta de novo no mês que vem"). */
+function umMesDepois(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const ultimo = new Date(y, m, 0).getDate();     // último dia do mês seguinte
+  const alvo = new Date(y, m, Math.min(d, ultimo));
+  return alvo.toLocaleDateString("sv");
+}
+
+function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Tipo; base?: Parcela; categorias: string[]; onClose: () => void; onSaved: () => void }) {
+  const [descricao, setDescricao] = useState(base?.descricao ?? "");
+  const [categoria, setCategoria] = useState(base?.categoria ?? categorias[0] ?? "");
+  const [contraparte, setContraparte] = useState(base?.contraparte ?? "");
+  const [valor, setValor] = useState(base ? fmtBRL(base.status === "paga" && base.valor_pago != null ? base.valor_pago : base.valor) : "");
+  const [vencimento, setVencimento] = useState(base ? umMesDepois(base.vencimento) : hojeISO());
   const [recorrencia, setRecorrencia] = useState<"nenhuma" | "mensal" | "anual">("nenhuma");
   const [fim, setFim] = useState("");
   const [obs, setObs] = useState("");
@@ -661,7 +692,7 @@ function NovaContaModal({ tipo, categorias, onClose, onSaved }: { tipo: Tipo; ca
   };
 
   return (
-    <Moldura titulo={tipo === "pagar" ? "Nova conta a pagar" : "Novo valor a receber"} onClose={onClose}>
+    <Moldura titulo={tipo === "pagar" ? "Nova conta a pagar" : "Novo valor a receber"} sub={base ? `Copiada de "${base.descricao}" (${fmtDia(base.vencimento)}). Ajuste o que mudou.` : undefined} onClose={onClose}>
       <form onSubmit={enviar} className="p-5 space-y-4">
         <div>
           <label className={rotulo}>{tipo === "pagar" ? "Conta" : "Descrição"}</label>
