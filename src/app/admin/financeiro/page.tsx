@@ -92,10 +92,18 @@ export default function FinanceiroPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {([["mes", "Mês"], ["geral", "Visão geral"], ["lista", "Todas"], ["recorrentes", "Recorrentes"]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setAba(k)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${aba === k ? "bg-navy-800 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+      {/* Abas com sublinhado, e não pílulas: as pílulas ficam para os filtros
+          dentro de cada aba, senão os dois níveis parecem a mesma coisa. */}
+      <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
+        {([
+          ["mes", "Mês a mês", "as contas de cada mês, para pagar e receber"],
+          ["geral", "Resumo", "totais por período e por categoria"],
+          ["lista", "Lançamentos", "todos, com busca e filtros"],
+          ["recorrentes", "Recorrentes", "as contas que repetem"],
+        ] as const).map(([k, label, dica]) => (
+          <button key={k} onClick={() => setAba(k)} title={dica}
+            className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${
+              aba === k ? "border-gold-500 text-navy-900" : "border-transparent text-gray-500 hover:text-navy-700"}`}>
             {label}
           </button>
         ))}
@@ -175,16 +183,37 @@ function AbaMes({ versao, onMudou }: { versao: number; onMudou: () => void }) {
               cor={dados.pagar.atrasado + dados.receber.atrasado > 0 ? "text-red-600" : "text-gray-400"} icone={AlertTriangle} />
           </div>
 
-          <div className="flex gap-2">
-            {([["todas", "Todas"], ["pagar", "A pagar"], ["receber", "A receber"]] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setFiltro(k)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${filtro === k ? "bg-navy-100 text-navy-800" : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{label}</button>
-            ))}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm font-bold text-navy-800">Contas de {MESES[mes - 1].toLowerCase()}</p>
+            <Segmentado
+              valor={filtro}
+              onChange={(v) => setFiltro(v as "todas" | Tipo)}
+              opcoes={[
+                { k: "todas", label: "Todas", n: dados.parcelas.length },
+                { k: "pagar", label: "A pagar", n: dados.parcelas.filter((p) => p.tipo === "pagar").length },
+                { k: "receber", label: "A receber", n: dados.parcelas.filter((p) => p.tipo === "receber").length },
+              ]}
+            />
           </div>
 
           <Tabela parcelas={parcelas} onMudou={onMudou} vazio="Nenhuma conta neste mês. Lance a primeira nos botões acima." />
         </>
       )}
+    </div>
+  );
+}
+
+/** Um seletor de uma escolha só, numa caixa única: é filtro, não aba. */
+function Segmentado({ valor, opcoes, onChange }: { valor: string; opcoes: { k: string; label: string; n?: number }[]; onChange: (k: string) => void }) {
+  return (
+    <div className="inline-flex bg-gray-100 rounded-xl p-1 gap-0.5 overflow-x-auto max-w-full">
+      {opcoes.map((o) => (
+        <button key={o.k} onClick={() => onChange(o.k)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+            valor === o.k ? "bg-white text-navy-900 shadow-sm" : "text-gray-500 hover:text-navy-700"}`}>
+          {o.label}{o.n != null && <span className={`ml-1.5 tabular-nums ${valor === o.k ? "text-gray-400" : "text-gray-400"}`}>{o.n}</span>}
+        </button>
+      ))}
     </div>
   );
 }
@@ -288,11 +317,9 @@ function AbaGeral({ versao }: { versao: number }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        {PERIODOS.map((p) => (
-          <button key={p.k} onClick={() => setPer(p.k)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${per === p.k ? "bg-navy-100 text-navy-800" : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{p.label}</button>
-        ))}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm font-bold text-navy-800">Período</p>
+        <Segmentado valor={per} onChange={(v) => setPer(v as typeof per)} opcoes={PERIODOS.map((p) => ({ k: p.k, label: p.label }))} />
       </div>
       {!dados ? <div className="grid md:grid-cols-2 gap-4">{[0, 1].map((i) => <Skel key={i} className="h-48 rounded-2xl" />)}</div> : (
         <>
