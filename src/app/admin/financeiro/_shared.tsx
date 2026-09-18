@@ -30,3 +30,35 @@ export function Segmentado({ valor, opcoes, onChange }: { valor: string; opcoes:
   );
 }
 
+
+/* ─── Cache de leitura ───────────────────────────────────────────────────────
+ * Cada chamada à API custa ~1,5 s (servidor nos EUA, banco em São Paulo), e o
+ * admin troca de mês e de aba o tempo todo. O que já foi carregado fica aqui,
+ * por URL, e aparece na hora; a busca de novo acontece só quando algo mudou
+ * (`versao` sobe a cada lançamento, pagamento, edição) ou quando o dado tem
+ * mais de 2 minutos. Vive só enquanto a página está aberta. */
+type Entrada = { versao: number; ts: number; dados: unknown };
+const cache = new Map<string, Entrada>();
+const emVoo = new Map<string, Promise<unknown>>();
+const VALIDADE_MS = 2 * 60 * 1000;
+
+export function lerCache<T>(chave: string, versao: number): T | null {
+  const e = cache.get(chave);
+  if (!e || e.versao !== versao || Date.now() - e.ts > VALIDADE_MS) return null;
+  return e.dados as T;
+}
+
+export function buscar<T>(chave: string, versao: number, fetcher: () => Promise<T>): Promise<T> {
+  const pronto = lerCache<T>(chave, versao);
+  if (pronto !== null) return Promise.resolve(pronto);
+  const k = `${chave}@${versao}`;
+  const andando = emVoo.get(k);
+  if (andando) return andando as Promise<T>;
+  const p = fetcher().then((dados) => {
+    cache.set(chave, { versao, ts: Date.now(), dados });
+    emVoo.delete(k);
+    return dados;
+  }).catch((e) => { emVoo.delete(k); throw e; });
+  emVoo.set(k, p);
+  return p;
+}
