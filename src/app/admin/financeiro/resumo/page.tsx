@@ -5,7 +5,7 @@
  * operação do dia (lançar, pagar, receber). */
 
 import { useEffect, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Wallet, ShoppingBag } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
@@ -13,6 +13,7 @@ import { Segmentado, hojeISO, type Tipo } from "../_shared";
 
 type Bloco = { em_aberto: number; qtd_em_aberto: number; atrasado: number; qtd_atrasadas: number; quitado: number; qtd_quitadas: number; previsto: number; total: number };
 type Resumo = { pagar: Bloco; receber: Bloco; saldo: number; saldo_realizado: number;
+  vendas: { bruto: number; liquido: number; taxas: number; qtd: number }; saldo_com_vendas: number;
   por_categoria: Record<Tipo, { categoria: string; quitado: number; em_aberto: number; total: number; qtd: number }[]> };
 
 const PERIODOS = [
@@ -102,7 +103,7 @@ export default function ResumoPage() {
     <div className="space-y-5">
       <div>
         <h1 className="font-display font-black text-2xl md:text-3xl text-navy-800">Resumo financeiro</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Totais por período e por categoria, fora das vendas do site</p>
+        <p className="text-gray-500 text-sm mt-0.5">Vendas, contas a pagar e a receber, por período e por categoria</p>
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm font-bold text-navy-800">Período</p>
@@ -110,7 +111,23 @@ export default function ResumoPage() {
       </div>
       {!dados ? <div className="grid md:grid-cols-2 gap-4">{[0, 1].map((i) => <Skel key={i} className="h-48 rounded-2xl" />)}</div> : (
         <>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* As vendas (site e balcão) pela MESMA conta do Dashboard, por
+                data de confirmação. Entram pelo LÍQUIDO no saldo: é o que cai
+                na conta depois da taxa do Asaas. */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-navy-600">Vendas de viagens</p>
+                <ShoppingBag size={16} className="text-navy-500" />
+              </div>
+              <p className="font-display font-black text-2xl tabular-nums text-navy-800">R$ {fmtBRL(dados.vendas.liquido)}</p>
+              <p className="text-[11px] text-gray-400 mb-3">líquido, já sem a taxa do Asaas</p>
+              <div className="divide-y divide-gray-50 border-t border-gray-100">
+                <Linha rotulo="Vendas confirmadas" valor={dados.vendas.bruto} qtd={dados.vendas.qtd} />
+                <Linha rotulo="Taxas do Asaas" valor={dados.vendas.taxas} cor="text-gray-500" />
+                <Linha rotulo="Fica para a AJS" valor={dados.vendas.liquido} cor="text-emerald-600" />
+              </div>
+            </div>
             <Painel tipo="receber" b={dados.receber} />
             <Painel tipo="pagar" b={dados.pagar} />
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -118,11 +135,12 @@ export default function ResumoPage() {
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Saldo do período</p>
                 <Wallet size={16} className="text-navy-500" />
               </div>
-              <p className={`font-display font-black text-2xl tabular-nums ${dados.saldo >= 0 ? "text-navy-800" : "text-red-600"}`}>R$ {fmtBRL(dados.saldo)}</p>
-              <p className="text-[11px] text-gray-400 mb-3">a receber menos a pagar (quitado + em aberto)</p>
+              <p className={`font-display font-black text-2xl tabular-nums ${dados.saldo_com_vendas >= 0 ? "text-navy-800" : "text-red-600"}`}>R$ {fmtBRL(dados.saldo_com_vendas)}</p>
+              <p className="text-[11px] text-gray-400 mb-3">vendas líquidas + a receber − a pagar</p>
               <div className="divide-y divide-gray-50 border-t border-gray-100">
-                <Linha rotulo="Já realizado" valor={dados.saldo_realizado} cor={dados.saldo_realizado >= 0 ? "text-emerald-600" : "text-red-600"} />
-                <Linha rotulo="Ainda em aberto" valor={dados.receber.em_aberto - dados.pagar.em_aberto} cor={dados.receber.em_aberto - dados.pagar.em_aberto >= 0 ? "text-navy-800" : "text-red-600"} />
+                <Linha rotulo="Vendas líquidas" valor={dados.vendas.liquido} cor="text-emerald-600" />
+                <Linha rotulo="A receber (contas)" valor={dados.receber.total} cor="text-emerald-600" />
+                <Linha rotulo="A pagar (contas)" valor={-dados.pagar.total} cor="text-red-600" />
                 <Linha rotulo="Atrasado (pagar + receber)" valor={dados.pagar.atrasado + dados.receber.atrasado} qtd={dados.pagar.qtd_atrasadas + dados.receber.qtd_atrasadas} cor={dados.pagar.atrasado + dados.receber.atrasado > 0 ? "text-red-600" : "text-gray-400"} />
               </div>
             </div>
