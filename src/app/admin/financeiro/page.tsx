@@ -38,7 +38,7 @@ type Conta = {
   parcelas_em_aberto: number; proximo_vencimento: string | null;
 };
 
-type ResumoTipo = { previsto: number; quitado: number; em_aberto: number; atrasado: number; qtd_atrasadas: number };
+type ResumoTipo = { previsto: number; total: number; quitado: number; em_aberto: number; atrasado: number; qtd_atrasadas: number };
 type Mes = { ano: number; mes: number; receber: ResumoTipo; pagar: ResumoTipo; saldo_previsto: number; saldo_realizado: number; parcelas: Parcela[] };
 type Categorias = Record<Tipo, string[]>;
 
@@ -158,9 +158,13 @@ function AbaMes({ versao, onMudou }: { versao: number; onMudou: () => void }) {
       {dados && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card titulo="A receber" valor={dados.receber.previsto} sub={`${fmtBRL(dados.receber.quitado)} já recebido`} cor="text-emerald-600" icone={ArrowDownCircle} />
-            <Card titulo="A pagar" valor={dados.pagar.previsto} sub={`${fmtBRL(dados.pagar.quitado)} já pago`} cor="text-red-600" icone={ArrowUpCircle} />
-            <Card titulo="Saldo previsto" valor={dados.saldo_previsto} sub={`realizado ${fmtBRL(dados.saldo_realizado)}`} cor={dados.saldo_previsto >= 0 ? "text-navy-700" : "text-red-600"} icone={Wallet} />
+            {/* O total é quitado + em aberto: o aluguel pago por 1.950 conta
+                1.950, não os 2.000 previstos. O previsto aparece quando difere. */}
+            <Card titulo="A receber" valor={dados.receber.total} cor="text-emerald-600" icone={ArrowDownCircle}
+              sub={`${fmtBRL(dados.receber.quitado)} recebido · ${fmtBRL(dados.receber.em_aberto)} em aberto${Math.abs(dados.receber.total - dados.receber.previsto) > 0.009 ? ` · previsto ${fmtBRL(dados.receber.previsto)}` : ""}`} />
+            <Card titulo="A pagar" valor={dados.pagar.total} cor="text-red-600" icone={ArrowUpCircle}
+              sub={`${fmtBRL(dados.pagar.quitado)} pago · ${fmtBRL(dados.pagar.em_aberto)} em aberto${Math.abs(dados.pagar.total - dados.pagar.previsto) > 0.009 ? ` · previsto ${fmtBRL(dados.pagar.previsto)}` : ""}`} />
+            <Card titulo="Saldo do mês" valor={dados.saldo_previsto} sub={`já realizado ${fmtBRL(dados.saldo_realizado)}`} cor={dados.saldo_previsto >= 0 ? "text-navy-700" : "text-red-600"} icone={Wallet} />
             <Card titulo="Atrasados"
               valor={dados.pagar.atrasado + dados.receber.atrasado}
               sub={`${dados.pagar.qtd_atrasadas + dados.receber.qtd_atrasadas} ${dados.pagar.qtd_atrasadas + dados.receber.qtd_atrasadas === 1 ? "conta" : "contas"}`}
@@ -204,6 +208,12 @@ function AbaLista({ versao, onMudou, categorias }: { versao: number; onMudou: ()
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
   const [parcelas, setParcelas] = useState<Parcela[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 30;
+
+  // Mudou filtro, volta para a primeira página.
+  useEffect(() => { setPagina(1); }, [tipo, status, categoria, q, de, ate]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -214,12 +224,16 @@ function AbaLista({ versao, onMudou, categorias }: { versao: number; onMudou: ()
       if (q.trim()) ps.set("q", q.trim());
       if (de) ps.set("de", de);
       if (ate) ps.set("ate", ate);
-      ps.set("limit", "500");
+      ps.set("limit", String(POR_PAGINA));
+      ps.set("skip", String((pagina - 1) * POR_PAGINA));
       setParcelas(null);
-      apiFetch(`/financeiro/parcelas?${ps}`).then((r) => r.json()).then(setParcelas).catch(() => setParcelas([]));
+      apiFetch(`/financeiro/parcelas?${ps}`).then((r) => r.json())
+        .then((d) => { setParcelas(d.items ?? []); setTotal(d.total ?? 0); })
+        .catch(() => { setParcelas([]); setTotal(0); });
     }, 250);
     return () => clearTimeout(t);
-  }, [tipo, status, categoria, q, de, ate, versao]);
+  }, [tipo, status, categoria, q, de, ate, versao, pagina]);
+  const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   const cats = tipo ? (categorias?.[tipo] ?? []) : [...(categorias?.pagar ?? []), ...(categorias?.receber ?? [])];
   const sel = "border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-200";
@@ -245,7 +259,20 @@ function AbaLista({ versao, onMudou, categorias }: { versao: number; onMudou: ()
         <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={sel} title="Vencimento até" />
       </div>
       {parcelas === null ? <Skel className="h-40 rounded-2xl" /> : (
-        <Tabela parcelas={parcelas} onMudou={onMudou} vazio="Nada com esses filtros." mostrarTipo />
+        <>
+          <Tabela parcelas={parcelas} onMudou={onMudou} vazio="Nada com esses filtros." mostrarTipo />
+          {total > 0 && (
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{total} {total === 1 ? "lançamento" : "lançamentos"} · página {pagina} de {paginas}</span>
+              <div className="flex gap-1.5">
+                <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina <= 1}
+                  className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center disabled:opacity-40 hover:bg-gray-50"><ChevronLeft size={14} /></button>
+                <button onClick={() => setPagina((p) => Math.min(paginas, p + 1))} disabled={pagina >= paginas}
+                  className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center disabled:opacity-40 hover:bg-gray-50"><ChevronRight size={14} /></button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -280,8 +307,8 @@ function AbaRecorrentes({ versao, onMudou, categorias }: { versao: number; onMud
     <div className="space-y-2">
       {contas.map((c) => (
         <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3">
-          <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${c.tipo === "pagar" ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>
-            <Repeat size={16} />
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-gold-100 text-gold-600">
+            <Repeat size={16} strokeWidth={2.5} />
           </span>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-navy-800 text-sm truncate">{c.descricao}{c.contraparte && <span className="text-gray-400 font-normal"> · {c.contraparte}</span>}</p>
@@ -357,7 +384,7 @@ function Tabela({ parcelas, onMudou, vazio, mostrarTipo }: { parcelas: Parcela[]
                   <tr key={p.id} className={`${p.cancelada ? "opacity-50" : ""} hover:bg-gray-50/60`}>
                     <td className="px-3 py-3 whitespace-nowrap tabular-nums text-navy-800 text-xs md:text-sm">
                       {fmtDia(p.vencimento)}
-                      {p.recorrencia !== "nenhuma" && <Repeat size={11} className="inline ml-1.5 text-gray-300" />}
+                      {p.recorrencia !== "nenhuma" && <Repeat size={12} className="inline ml-1.5 text-gold-500" strokeWidth={2.5} aria-label="recorrente" />}
                     </td>
                     <td className="px-3 py-3 min-w-[140px]">
                       <p className="font-semibold text-navy-800 leading-tight">
@@ -367,12 +394,17 @@ function Tabela({ parcelas, onMudou, vazio, mostrarTipo }: { parcelas: Parcela[]
                       {p.contraparte && <p className="text-xs text-gray-400">{p.contraparte}</p>}
                       <span className={`md:hidden inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${STATUS_CLS[p.status]}`}>{STATUS_TXT[p.status]}</span>
                       {p.status === "paga" && p.pago_em && (
-                        <p className="text-[11px] text-emerald-600">{p.tipo === "pagar" ? "pago" : "recebido"} em {fmtDia(p.pago_em)}{p.valor_pago != null && Math.abs(p.valor_pago - p.valor) > 0.009 && <> · R$ {fmtBRL(p.valor_pago)}</>}</p>
+                        <p className="text-[11px] text-emerald-600">{p.tipo === "pagar" ? "pago" : "recebido"} em {fmtDia(p.pago_em)}</p>
                       )}
                     </td>
                     <td className="px-3 py-3 text-gray-500 hidden xl:table-cell whitespace-nowrap">{p.categoria}</td>
                     <td className={`px-3 py-3 text-right whitespace-nowrap tabular-nums font-bold text-xs md:text-sm ${p.tipo === "pagar" ? "text-red-600" : "text-emerald-600"}`}>
-                      {p.tipo === "pagar" ? "−" : "+"} R$ {fmtBRL(p.valor)}
+                      {/* Quitada: o que de fato saiu/entrou é o número principal;
+                          o previsto fica embaixo quando difere. */}
+                      {p.tipo === "pagar" ? "−" : "+"} R$ {fmtBRL(p.status === "paga" && p.valor_pago != null ? p.valor_pago : p.valor)}
+                      {p.status === "paga" && p.valor_pago != null && Math.abs(p.valor_pago - p.valor) > 0.009 && (
+                        <p className="text-[10px] font-normal text-gray-400">previsto {fmtBRL(p.valor)}</p>
+                      )}
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell"><span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_CLS[p.status]}`}>{STATUS_TXT[p.status]}</span></td>
                     <td className="px-3 py-3">
