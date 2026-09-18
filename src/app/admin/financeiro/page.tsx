@@ -510,7 +510,9 @@ function umMesDepois(iso: string): string {
 
 function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Tipo; base?: Parcela; categorias: string[]; onClose: () => void; onSaved: () => void }) {
   const [descricao, setDescricao] = useState(base?.descricao ?? "");
-  const [categoria, setCategoria] = useState(base?.categoria ?? categorias[0] ?? "");
+  const [categoria, setCategoria] = useState(base?.categoria.startsWith("Outros") ? "Outros" : (base?.categoria ?? categorias[0] ?? ""));
+  // "Outros" pede o que é: vai como "Outros: Papelaria".
+  const [outra, setOutra] = useState(base?.categoria.startsWith("Outros: ") ? base.categoria.slice(8) : "");
   const [contraparte, setContraparte] = useState(base?.contraparte ?? "");
   const [valor, setValor] = useState(base ? fmtBRL(base.status === "paga" && base.valor_pago != null ? base.valor_pago : base.valor) : "");
   const [vencimento, setVencimento] = useState(base ? umMesDepois(base.vencimento) : hojeISO());
@@ -530,7 +532,9 @@ function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Ti
       const r = await apiFetch("/financeiro/contas", {
         method: "POST",
         body: JSON.stringify({
-          tipo, descricao: descricao.trim(), categoria, contraparte: contraparte.trim() || null,
+          tipo, descricao: descricao.trim(),
+          categoria: categoria === "Outros" && outra.trim() ? `Outros: ${outra.trim().slice(0, 32)}` : categoria,
+          contraparte: contraparte.trim() || null,
           observacao: obs.trim() || null, valor: numero(valor), recorrencia,
           primeiro_vencimento: vencimento, recorrencia_fim: recorrencia !== "nenhuma" && fim ? fim : null,
         }),
@@ -562,6 +566,12 @@ function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Ti
             <input value={contraparte} onChange={(e) => setContraparte(e.target.value)} maxLength={200} placeholder={tipo === "pagar" ? "Copel" : "Hotel Recanto"} className={campo} />
           </div>
         </div>
+        {categoria === "Outros" && (
+          <div>
+            <label className={rotulo}>Qual? <span className="text-gray-300 normal-case font-normal">(opcional)</span></label>
+            <input value={outra} onChange={(e) => setOutra(e.target.value)} maxLength={32} placeholder="Papelaria, cartório, presente..." className={campo} autoFocus />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={rotulo}>Valor</label>
