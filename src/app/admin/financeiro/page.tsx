@@ -28,13 +28,13 @@ type Parcela = {
   id: number; conta_id: number; tipo: Tipo; descricao: string; categoria: string;
   contraparte: string | null; vencimento: string; valor: number;
   pago_em: string | null; valor_pago: number | null; observacao: string | null;
-  cancelada: boolean; status: Status; recorrencia: "nenhuma" | "mensal" | "anual";
+  cancelada: boolean; automatica: boolean; status: Status; recorrencia: "nenhuma" | "mensal" | "anual";
 };
 
 type Conta = {
   id: number; tipo: Tipo; descricao: string; categoria: string; contraparte: string | null;
   observacao: string | null; valor: number; recorrencia: "nenhuma" | "mensal" | "anual";
-  primeiro_vencimento: string; recorrencia_fim: string | null; ativa: boolean;
+  primeiro_vencimento: string; recorrencia_fim: string | null; automatica: boolean; ativa: boolean;
   parcelas_em_aberto: number; proximo_vencimento: string | null;
 };
 
@@ -333,7 +333,7 @@ function AbaRecorrentes({ versao, onMudou, categorias }: { versao: number; onMud
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-navy-800 text-sm truncate">{c.descricao}{c.contraparte && <span className="text-gray-400 font-normal"> · {c.contraparte}</span>}</p>
             <p className="text-xs text-gray-400">
-              {RECORRENCIA[c.recorrencia]} · dia {c.primeiro_vencimento.slice(8, 10)} · {c.categoria}
+              {RECORRENCIA[c.recorrencia]} · dia {c.primeiro_vencimento.slice(8, 10)} · {c.categoria}{c.automatica && " · débito automático"}
               {c.proximo_vencimento && <> · próxima em {fmtDia(c.proximo_vencimento)}</>}
               {c.recorrencia_fim && <> · até {fmtDia(c.recorrencia_fim)}</>}
             </p>
@@ -405,6 +405,7 @@ function Tabela({ parcelas, onMudou, onDuplicar, vazio, mostrarTipo }: { parcela
                     <td className="px-3 py-3 whitespace-nowrap tabular-nums text-navy-800 text-xs md:text-sm">
                       {fmtDia(p.vencimento)}
                       {p.recorrencia !== "nenhuma" && <Repeat size={12} className="inline ml-1.5 text-gold-500" strokeWidth={2.5} aria-label="recorrente" />}
+                      {p.automatica && <span className="ml-1.5 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-navy-50 text-navy-600 whitespace-nowrap" title="Débito automático: dá-se por paga no vencimento">automático</span>}
                       <Prazo p={p} />
                     </td>
                     <td className="px-3 py-3 min-w-[140px]">
@@ -519,6 +520,7 @@ function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Ti
   const [recorrencia, setRecorrencia] = useState<"nenhuma" | "mensal" | "anual">("nenhuma");
   const [fim, setFim] = useState("");
   const [obs, setObs] = useState("");
+  const [automatica, setAutomatica] = useState(base?.automatica ?? false);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -537,6 +539,7 @@ function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Ti
           contraparte: contraparte.trim() || null,
           observacao: obs.trim() || null, valor: numero(valor), recorrencia,
           primeiro_vencimento: vencimento, recorrencia_fim: recorrencia !== "nenhuma" && fim ? fim : null,
+          automatica: tipo === "pagar" ? automatica : false,
         }),
       });
       const d = await r.json();
@@ -603,6 +606,15 @@ function NovaContaModal({ tipo, base, categorias, onClose, onSaved }: { tipo: Ti
             </div>
           )}
         </div>
+        {tipo === "pagar" && (
+          <label className={`flex items-start gap-3 rounded-xl border px-3.5 py-3 cursor-pointer transition-colors ${automatica ? "border-navy-300 bg-navy-50" : "border-gray-200 hover:bg-gray-50"}`}>
+            <input type="checkbox" checked={automatica} onChange={(e) => setAutomatica(e.target.checked)} className="mt-0.5 accent-navy-700" />
+            <span className="text-sm">
+              <span className="font-semibold text-navy-800">Débito automático</span>
+              <span className="block text-xs text-gray-500">Cartão ou débito em conta: dá-se por paga sozinha no vencimento, pelo valor previsto. Se a fatura vier diferente, é só ajustar a parcela.</span>
+            </span>
+          </label>
+        )}
         <div>
           <label className={rotulo}>Observação <span className="text-gray-300 normal-case font-normal">(opcional)</span></label>
           <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} className={campo} />
@@ -725,6 +737,7 @@ function EditarContaModal({ conta, categorias, onClose, onSaved }: { conta: Cont
   const [contraparte, setContraparte] = useState(conta.contraparte ?? "");
   const [valor, setValor] = useState(fmtBRL(conta.valor));
   const [fim, setFim] = useState(conta.recorrencia_fim ?? "");
+  const [automatica, setAutomatica] = useState(conta.automatica);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -735,7 +748,7 @@ function EditarContaModal({ conta, categorias, onClose, onSaved }: { conta: Cont
     try {
       const r = await apiFetch(`/financeiro/contas/${conta.id}`, {
         method: "PUT",
-        body: JSON.stringify({ descricao: descricao.trim(), categoria, contraparte: contraparte.trim() || null, valor: numero(valor), recorrencia_fim: fim || null }),
+        body: JSON.stringify({ descricao: descricao.trim(), categoria, contraparte: contraparte.trim() || null, valor: numero(valor), recorrencia_fim: fim || null, automatica: conta.tipo === "pagar" ? automatica : false }),
       });
       const d = await r.json();
       if (!r.ok) { setErro(erroDaApi(d, "Não foi possível salvar.")); return; }
@@ -759,6 +772,12 @@ function EditarContaModal({ conta, categorias, onClose, onSaved }: { conta: Cont
               <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" className={`${campo} pl-9 tabular-nums`} /></div></div>
           <div><label className={rotulo}>Até <span className="text-gray-300 normal-case font-normal">(vazio = sem fim)</span></label><input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className={campo} /></div>
         </div>
+        {conta.tipo === "pagar" && (
+          <label className="flex items-center gap-3 text-sm cursor-pointer">
+            <input type="checkbox" checked={automatica} onChange={(e) => setAutomatica(e.target.checked)} className="accent-navy-700" />
+            <span className="text-navy-800 font-semibold">Débito automático</span>
+          </label>
+        )}
         {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erro}</p>}
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 text-sm">Cancelar</button>
