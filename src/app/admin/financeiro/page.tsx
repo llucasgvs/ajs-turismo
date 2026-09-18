@@ -20,7 +20,7 @@ import { apiFetch } from "@/lib/api";
 import { erroDaApi, fmtBRL, fmtDia } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
-import { Segmentado, hojeISO, diasAte, type Tipo } from "./_shared";
+import { Segmentado, hojeISO, diasAte, buscar, lerCache, type Tipo } from "./_shared";
 
 type Status = "pendente" | "paga" | "atrasada" | "cancelada";
 
@@ -134,15 +134,26 @@ function AbaMes({ versao, onMudou, onDuplicar }: { versao: number; onMudou: () =
   const [erro, setErro] = useState("");
   const [filtro, setFiltro] = useState<"todas" | Tipo>("todas");
 
+  const carregarMes = useCallback((a: number, m: number) => buscar<Mes>(
+    `/financeiro/mes?ano=${a}&mes=${m}`, versao,
+    () => apiFetch(`/financeiro/mes?ano=${a}&mes=${m}`).then(async (r) => { if (!r.ok) throw new Error(); return r.json(); }),
+  ), [versao]);
+
   useEffect(() => {
     let cancelado = false;
-    setDados(null); setErro("");
-    apiFetch(`/financeiro/mes?ano=${ano}&mes=${mes}`)
-      .then(async (r) => { if (!r.ok) throw new Error(); return r.json(); })
+    setErro("");
+    // Já visto: aparece na hora, sem piscar o esqueleto.
+    const pronto = lerCache<Mes>(`/financeiro/mes?ano=${ano}&mes=${mes}`, versao);
+    if (pronto) setDados(pronto); else setDados(null);
+    carregarMes(ano, mes)
       .then((d) => { if (!cancelado) setDados(d); })
-      .catch(() => { if (!cancelado) setErro("Não foi possível carregar o mês."); });
+      .catch(() => { if (!cancelado && !pronto) setErro("Não foi possível carregar o mês."); });
+    // O mês anterior e o seguinte vêm por baixo dos panos: as setas respondem na hora.
+    const ant = new Date(ano, mes - 2, 1), seg = new Date(ano, mes, 1);
+    carregarMes(ant.getFullYear(), ant.getMonth() + 1).catch(() => {});
+    carregarMes(seg.getFullYear(), seg.getMonth() + 1).catch(() => {});
     return () => { cancelado = true; };
-  }, [ano, mes, versao]);
+  }, [ano, mes, versao, carregarMes]);
 
   const mudarMes = (delta: number) => {
     const d = new Date(ano, mes - 1 + delta, 1);
@@ -249,10 +260,12 @@ function AbaLista({ versao, onMudou, categorias, onDuplicar }: { versao: number;
       if (rec) ps.set("recorrentes", rec);
       ps.set("limit", String(POR_PAGINA));
       ps.set("skip", String((pagina - 1) * POR_PAGINA));
-      setParcelas(null);
-      apiFetch(`/financeiro/parcelas?${ps}`).then((r) => r.json())
+      const chave = `/financeiro/parcelas?${ps}`;
+      const pronto = lerCache<{ items: Parcela[]; total: number }>(chave, versao);
+      if (pronto) { setParcelas(pronto.items ?? []); setTotal(pronto.total ?? 0); } else setParcelas(null);
+      buscar<{ items: Parcela[]; total: number }>(chave, versao, () => apiFetch(chave).then((r) => r.json()))
         .then((d) => { setParcelas(d.items ?? []); setTotal(d.total ?? 0); })
-        .catch(() => { setParcelas([]); setTotal(0); });
+        .catch(() => { if (!pronto) { setParcelas([]); setTotal(0); } });
     }, 250);
     return () => clearTimeout(t);
   }, [tipo, status, categoria, q, de, ate, rec, versao, pagina]);
@@ -315,8 +328,10 @@ function AbaRecorrentes({ versao, onMudou, categorias }: { versao: number; onMud
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
-    setContas(null);
-    apiFetch("/financeiro/contas?recorrentes=true&ativas=true").then((r) => r.json()).then(setContas).catch(() => setContas([]));
+    const chave = "/financeiro/contas?recorrentes=true&ativas=true";
+    const pronto = lerCache<Conta[]>(chave, versao);
+    setContas(pronto ?? null);
+    buscar<Conta[]>(chave, versao, () => apiFetch(chave).then((r) => r.json())).then(setContas).catch(() => { if (!pronto) setContas([]); });
   }, [versao]);
 
   const encerrar = async () => {

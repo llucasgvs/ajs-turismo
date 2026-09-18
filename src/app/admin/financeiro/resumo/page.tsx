@@ -9,7 +9,7 @@ import { ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { fmtBRL } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
-import { Segmentado, hojeISO, type Tipo } from "../_shared";
+import { Segmentado, hojeISO, buscar, lerCache, type Tipo } from "../_shared";
 
 type Bloco = { em_aberto: number; qtd_em_aberto: number; atrasado: number; qtd_atrasadas: number; quitado: number; qtd_quitadas: number; previsto: number; total: number };
 type Resumo = { pagar: Bloco; receber: Bloco; saldo: number; saldo_realizado: number;
@@ -37,12 +37,14 @@ export default function ResumoPage() {
   const [dados, setDados] = useState<Resumo | null>(null);
 
   useEffect(() => {
-    setDados(null);
     const { de, ate } = periodo(per);
     const ps = new URLSearchParams();
     if (de) ps.set("de", de);
     if (ate) ps.set("ate", ate);
-    apiFetch(`/financeiro/resumo?${ps}`).then((r) => r.json()).then(setDados).catch(() => setDados(null));
+    const chave = `/financeiro/resumo?${ps}`;
+    const pronto = lerCache<Resumo>(chave, versao);
+    setDados(pronto ?? null);
+    buscar<Resumo>(chave, versao, () => apiFetch(chave).then((r) => r.json())).then(setDados).catch(() => { if (!pronto) setDados(null); });
   }, [per, versao]);
 
   const Linha = ({ rotulo, valor, qtd, cor }: { rotulo: string; valor: number; qtd?: number; cor?: string }) => (
