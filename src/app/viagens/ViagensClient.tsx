@@ -111,6 +111,10 @@ export type RoteiroDoCombo = {
   image_url: string | null;
   preco_desde: number | null;
   preco_tabela_desde: number | null;
+  /** Calculados no servidor: a tabela da data mais barata e ela menos o
+   *  desconto do combo. O card imprime, não calcula. */
+  preco_tabela: number | null;
+  preco_no_pacote: number | null;
 };
 
 export type ComboPublico = {
@@ -555,7 +559,6 @@ function ComboCard({ c }: { c: ComboPublico }) {
   // A capa montada mostra os N destinos de uma vez. A foto de um roteiro só,
   // que era o que dava para fazer antes, fazia o combo parecer uma viagem.
   const capa = c.image_url ?? c.roteiros.find((r) => r.image_url)?.image_url;
-  const fator = 1 - c.desconto_pct / 100;
   const de = c.preco_tabela_desde ?? c.preco_cheio_desde;
   const por = c.preco_com_desconto_desde ?? 0;
   const prazo = prazoDoCombo(c.venda_fim);
@@ -601,16 +604,21 @@ function ComboCard({ c }: { c: ComboPublico }) {
         </p>
         <div className="space-y-1.5">
           {c.roteiros.map((r) => {
-            const cheio = r.preco_tabela_desde ?? r.preco_desde;
-            const comDesc = r.preco_desde != null ? r.preco_desde * fator : null;
+            // Tabela riscada e o preço no pacote, os dois vindos do servidor.
+            // A conta ficava aqui (`preco_desde × (1 − desconto)`) e aplicava
+            // o desconto do combo sobre o preço já promocional da viagem: a
+            // Ilha (216, de 240) aparecia a R$ 194,40 num pacote que cobra
+            // 216,00 por ela, e as linhas não fechavam com o total.
+            const cheio = r.preco_tabela;
+            const noPacote = r.preco_no_pacote;
             return (
               <div key={r.template_id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50 text-xs">
                 <span className="font-semibold text-navy-800 truncate">{r.title}</span>
                 <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  {cheio != null && comDesc != null && cheio > comDesc && (
+                  {cheio != null && noPacote != null && cheio > noPacote && (
                     <span className="text-gray-400 line-through">R$ {fmtBRL(cheio)}</span>
                   )}
-                  {comDesc != null && <span className="font-bold text-gold-600">R$ {fmtBRL(comDesc)}</span>}
+                  {noPacote != null && <span className="font-bold text-gold-600">R$ {fmtBRL(noPacote)}</span>}
                 </span>
               </div>
             );
