@@ -183,6 +183,27 @@ export function semAcento(texto: string | null | undefined): string {
 }
 
 /**
+ * Quão bem um texto responde ao que a pessoa digitou na busca da vitrine.
+ *
+ * Compara por COMEÇO de palavra, não por pedaço em qualquer posição: "rio"
+ * tem que achar "Rio de Janeiro" e não "Lavandario". Cada palavra digitada
+ * precisa começar alguma palavra do texto ("foz iguacu" acha "Foz do Iguaçu").
+ *
+ * Devolve 0 quando não casa; 2 quando o texto inteiro começa com o que foi
+ * digitado (é o resultado que a pessoa está esperando ver primeiro); 1 para
+ * os demais casamentos.
+ */
+export function relevanciaDaBusca(texto: string | null | undefined, busca: string): number {
+  const q = semAcento(busca);
+  if (!q) return 0;
+  const t = semAcento(texto);
+  if (t.startsWith(q)) return 2;
+  const palavras = t.split(/[^a-z0-9]+/).filter(Boolean);
+  const termos = q.split(/[^a-z0-9]+/).filter(Boolean);
+  return termos.every((termo) => palavras.some((p) => p.startsWith(termo))) ? 1 : 0;
+}
+
+/**
  * Dígitos verificadores do CPF.
  *
  * Mora aqui porque a venda de combo precisou dela e cada tela que pede CPF tem

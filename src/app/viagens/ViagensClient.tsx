@@ -8,7 +8,7 @@ import { Clock,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { spDay, fmtBRL, fmtInstallment, mesmoDia, semAcento } from "@/lib/format";
+import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 import { prazoDoCombo } from "@/lib/combos";
 
@@ -221,13 +221,15 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
 
   useEffect(() => {
     let result = templates;
-    if (search) {
-      // Compara sem acento dos dois lados: quem procura "gramado" ou "foz do
-      // iguacu" no celular encontra igual a quem digita com acento.
-      const q = semAcento(search);
-      result = result.filter(
-        (t) => semAcento(t.title).includes(q) || semAcento(t.destination).includes(q)
-      );
+    // Relevância por começo de palavra (ver relevanciaDaBusca): "rio" acha
+    // "Rio de Janeiro" e não "Lavandario". Guardada para ordenar no fim.
+    const relevancia = new Map<number, number>();
+    if (search.trim()) {
+      result = result.filter((t) => {
+        const r = Math.max(relevanciaDaBusca(t.title, search), relevanciaDaBusca(t.destination, search));
+        if (r > 0) relevancia.set(t.id, r);
+        return r > 0;
+      });
     }
     if (selectedDate) {
       result = result.filter((t) =>
@@ -239,7 +241,11 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
         t.is_open_date || t.dates.some((d) => spMonth(d.departure_date) === selectedMonth)
       );
     }
-    setFiltered(sortTemplates(result, sort));
+    const ordenado = sortTemplates(result, sort);
+    // Com texto digitado, o que começa com o termo vem antes; dentro do mesmo
+    // nível vale a ordenação escolhida.
+    if (relevancia.size) ordenado.sort((a, b) => (relevancia.get(b.id) ?? 0) - (relevancia.get(a.id) ?? 0));
+    setFiltered(ordenado);
   }, [templates, search, sort, selectedDate, selectedMonth]);
 
   const clearFilters = () => { setSearch(""); setSelectedDate(""); setSelectedMonth(""); };
@@ -251,10 +257,9 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
   const combosVisiveis = useMemo(() => {
     if (selectedDate || selectedMonth) return [];
     if (!search.trim()) return combos;
-    const alvo = semAcento(search);
     return combos.filter((c) =>
-      semAcento(c.nome).includes(alvo) ||
-      c.roteiros.some((r) => semAcento(r.title).includes(alvo) || semAcento(r.destination ?? "").includes(alvo)),
+      relevanciaDaBusca(c.nome, search) > 0 ||
+      c.roteiros.some((r) => relevanciaDaBusca(r.title, search) > 0 || relevanciaDaBusca(r.destination, search) > 0),
     );
   }, [combos, search, selectedDate, selectedMonth]);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
@@ -500,12 +505,17 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
           <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} />
         ) : (
           <div key={`${search}|${selectedDate}|${selectedMonth}|${sort}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-in">
-            {/* Primeiro os combos: é a oferta que o cliente não sabe que existe. */}
-            {combosVisiveis.map((c) => (
+            {/* Sem busca, os combos vêm primeiro: é a oferta que o cliente não
+                sabe que existe. Com busca, quem digitou "rio" quer ver o Rio
+                antes de um combo que só passa perto do termo. */}
+            {!search.trim() && combosVisiveis.map((c) => (
               <ComboCard key={`combo-${c.id}`} c={c} />
             ))}
             {filtered.map((tmpl) => (
               <TemplateCard key={tmpl.id} tmpl={tmpl} highlightDate={selectedDate} highlightMonth={selectedMonth} />
+            ))}
+            {!!search.trim() && combosVisiveis.map((c) => (
+              <ComboCard key={`combo-${c.id}`} c={c} />
             ))}
           </div>
         )}
