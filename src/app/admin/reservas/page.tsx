@@ -73,6 +73,10 @@ type Booking = {
    *  Nao calcule isso aqui pela sobra entre o recebido e o valor da reserva:
    *  era assim que dinheiro pago por fora aparecia como juros do cartao. */
   juros_amount?: number;
+  /** Quanto entrou de fato, ja descontada a taxa do Asaas. Nas vendas do site
+   *  quem grava e o webhook; no balcao, o admin, e so quando houve taxa. Nulo
+   *  significa "nao sabemos", e ai bruto e liquido sao o mesmo. */
+  net_amount?: number | null;
   optionals_amount: number;
   installments: number;
   is_external: boolean;
@@ -1342,6 +1346,30 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
                   </>
                 );
               })()}
+              {/* O que sobra depois da taxa.
+                  Vinha faltando: o card mostrava so o bruto, e a taxa do cartao
+                  (R$ 30,04 numa venda de R$ 964,00) so aparecia no Resumo, onde
+                  ninguem liga a taxa a reserva que a gerou. Sem `net_amount` a
+                  linha nao aparece, que e o caso do balcao em dinheiro: ali nao
+                  houve taxa nenhuma e inventar "liquido" seria mentira. */}
+              {(() => {
+                const liq = booking.net_amount;
+                if (liq == null) return null;
+                const taxa = Math.round((booking.final_amount - liq) * 100) / 100;
+                if (taxa <= 0.01) return null;
+                return (
+                  <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                    <div className="flex justify-between text-gray-500 text-xs">
+                      <span>Taxa do pagamento</span>
+                      <span>− R$ {fmtBRL(taxa)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-navy-700">
+                      <span>Fica para a AJS</span>
+                      <span>R$ {fmtBRL(liq)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* O aviso que faltava.
                   Acrescentar um opcional depois do pagamento deixa a reserva
                   valendo mais do que entrou, e isso passava batido ate alguem
@@ -1513,6 +1541,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const [price, setPrice] = useState(String(booking.price_per_person));
   const [discount, setDiscount] = useState(String(booking.discount_amount || ""));
   const [porFora, setPorFora] = useState(String(booking.pago_por_fora || ""));
+  const [liquido, setLiquido] = useState(String(booking.net_amount || ""));
   const [paymentMethod, setPaymentMethod] = useState(booking.payment_method || "whatsapp");
   const [notes, setNotes] = useState(booking.notes || "");
   const [phone, setPhone] = useState(booking.traveler_phone || "");
@@ -1578,9 +1607,11 @@ function EditBookingModal({ booking, onClose, onSaved }: {
     opcionais.map((o) => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
   );
   const foraNum = parseFloat(porFora) || 0;
+  const liquidoNum = parseFloat(liquido) || 0;
   const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0)
     || people !== booking.num_travelers || opcionaisAgora !== opcionaisOriginais
-    || foraNum !== (booking.pago_por_fora || 0);
+    || foraNum !== (booking.pago_por_fora || 0)
+    || liquidoNum !== (booking.net_amount || 0);
 
   const PAYMENT_LABEL: Record<string, string> = {
     whatsapp: "Presencial / WhatsApp", pix: "PIX", transfer: "Transferência", credit_card: "Cartão de crédito",
@@ -1598,6 +1629,9 @@ function EditBookingModal({ booking, onClose, onSaved }: {
           price_per_person: !temFaixas && priceNum !== booking.price_per_person ? priceNum : undefined,
           discount_amount: discNum,
           pago_por_fora: foraNum,
+          // Só na venda sem cobrança pelo site: lá o líquido vem do Asaas e o
+          // backend recusa, então nem mandamos o campo.
+          net_amount: booking.confirmado_manual ? liquidoNum : undefined,
           // Linha em branco não vira opcional de R$ 0 na reserva.
           selected_optionals: opcionais
             .filter((o) => o.name.trim().length >= 2)
@@ -1681,6 +1715,30 @@ function EditBookingModal({ booking, onClose, onSaved }: {
               </div>
               <p className="text-[10px] text-gray-400 mt-1">
                 Entra no faturamento junto com a cobranca. Anote na observacao como veio.
+              </p>
+            </div>
+          )}
+
+          {/* O que sobrou depois da taxa.
+              Venda sem cobranca pelo site: o sistema nao tem como saber se
+              houve taxa, entao assume que nao houve. Quando houve (maquininha,
+              ou uma cobranca do Asaas que virou venda de balcao numa troca de
+              viagem), e aqui que o numero real entra. */}
+          {booking.confirmado_manual && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                Fica para a AJS <span className="text-gray-400 font-normal normal-case">(depois da taxa)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                <input type="number" min="0" step="0.01" placeholder={fmtBRL(booking.final_amount)} value={liquido}
+                  onChange={(e) => setLiquido(e.target.value)}
+                  className={`w-full pl-9 pr-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 ${
+                    liquidoNum > 0 ? "border-emerald-300 bg-emerald-50" : "border-gray-200"}`} />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Preencha so se o dinheiro entrou com taxa descontada. Em branco, o painel
+                considera que entrou cheio.
               </p>
             </div>
           )}
@@ -2099,6 +2157,8 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   const [notes, setNotes] = useState("");
   const [priceOverride, setPriceOverride] = useState("");
   const [showPriceOverride, setShowPriceOverride] = useState(false);
+  const [liquido, setLiquido] = useState("");
+  const [showLiquido, setShowLiquido] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [cpfStatus, setCpfStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
@@ -2201,6 +2261,9 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           })),
           payment_method: paymentMethod,
           price_override: priceOverride ? parseFloat(priceOverride) : undefined,
+          // Só vai quando o campo está aberto E preenchido: fechar o campo é o
+          // jeito de dizer "entrou cheio", e aí o backend não grava nada.
+          net_amount: showLiquido && liquido ? parseFloat(liquido) : undefined,
           notes: notes || undefined,
         }),
       });
@@ -2407,6 +2470,33 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
               </div>
             )}
           </div>
+
+          {/* 5b. Líquido recebido.
+              Só aparece em cartão e PIX, que são os meios que chegam com taxa
+              descontada. No presencial e na transferência entra o valor cheio,
+              e perguntar ali só confundiria quem está vendendo. */}
+          {(paymentMethod === "credit_card" || paymentMethod === "pix") && (
+            <div>
+              <button type="button" onClick={() => setShowLiquido((v) => !v)}
+                className="text-xs text-navy-500 hover:text-navy-700 underline underline-offset-2 transition-colors">
+                {showLiquido ? "O valor entrou cheio, sem taxa" : "Entrou com taxa descontada?"}
+              </button>
+              {showLiquido && (
+                <div className="mt-2">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">R$</span>
+                    <input type="number" min="0" step="0.01" placeholder={String(total || "0")}
+                      value={liquido} onChange={(e) => setLiquido(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Quanto caiu na conta depois da taxa. A venda continua valendo R$ {fmtBRL(total)};
+                    isto é só para o painel saber o que sobra para a AJS.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 6. Obs */}
           <div className="relative">
