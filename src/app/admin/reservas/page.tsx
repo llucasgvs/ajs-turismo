@@ -2698,7 +2698,7 @@ export default function AdminReservasPage() {
       setTrips(_tripsCache.data);
       return;
     }
-    apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`)
+    apiFetch(`/trips/admin-resumo`)
       .then((r) => r.json())
       .then((d) => {
         const list = d?.items ?? (Array.isArray(d) ? d : []);

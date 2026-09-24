@@ -227,7 +227,7 @@ export default function AdminDashboard() {
         apiFetch(`/bookings/admin/all?booking_status=pending&limit=6`),
       ];
       if (!usarCatalogoDoCache) {
-        rotas.push(apiFetch(`/trips/admin-list?futuras=true&ordem=proximidade&limit=500`));
+        rotas.push(apiFetch(`/trips/admin-resumo`));
         rotas.push(apiFetch(`/templates/admin-list`));
       }
       const R = await Promise.all(rotas);

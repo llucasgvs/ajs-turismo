@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check, Copy } from "lucide-react";
 import { apiFetch, getToken } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
+import { imgOtim } from "@/lib/imagem";
 
 /** Espelha QUARTO_SINGLE em app/core/opcionais.py. O backend reconhece o
  *  opcional por este nome; mudar aqui sem mudar lá quebra a regra. */
@@ -780,7 +781,7 @@ export default function TemplateForm({
           {form.image_url && (
             <Section title="Preview do Card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={form.image_url} alt={form.title} className="w-full h-36 object-cover rounded-xl mb-3" />
+              <img loading="lazy" decoding="async" src={imgOtim(form.image_url)} alt={form.title} className="w-full h-36 object-cover rounded-xl mb-3" />
               <p className="font-bold text-navy-800 text-sm leading-tight">{form.title || "Nome do roteiro"}</p>
               <p className="text-gray-500 text-xs mt-1">{form.destination || "Destino"}</p>
               {form.is_featured && (
@@ -987,7 +988,7 @@ function UnifiedGallery({ images, onChange }: {
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy" decoding="async" src={img} alt="" className="w-full h-28 object-cover" />
+            <img loading="lazy" decoding="async" src={imgOtim(img, 640)} alt="" className="w-full h-28 object-cover" />
 
             {/* Principal badge */}
             {i === 0 && (
