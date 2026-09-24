@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Loader2, Save, ChevronLeft, ChevronRight, Calendar, Users, DollarSign, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
+import { spDay } from "@/lib/format";
 import { SUGESTOES_FAIXA, type SugestaoFaixa } from "@/lib/faixas";
 
 /* ── types ── */
@@ -450,7 +451,9 @@ export default function TripDateForm({
     if (form.ret_date < form.dep_date || (form.ret_date === form.dep_date && form.ret_time < form.dep_time)) {
       setError("A data/hora de retorno deve ser igual ou posterior à saída."); return;
     }
-    if (form.dep_date < new Date().toISOString().slice(0, 10)) {
+    // "Hoje" no fuso de Brasília: `toISOString` é UTC, e depois das 21h daqui
+    // lá já é amanhã, o que barrava cadastrar uma saída para o próprio dia.
+    if (form.dep_date < spDay(new Date().toISOString())) {
       setError("A data de saída não pode ser no passado."); return;
     }
     const priceVal = parseFloat(form.price_per_person);
