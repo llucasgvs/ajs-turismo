@@ -345,6 +345,19 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
   const final = Math.round((cheio - desconto) * 100) / 100;
   const faltaData = pernas.some((p) => !p.data);
 
+  /* O preço de UMA pessoa desta faixa no pacote: a soma da tabela das N
+     viagens, pela mesma tradução do total acima. É a conta de
+     `_faixas_do_pacote` no servidor, que é o que o checkout mostra depois do
+     login. Vai só para a prévia antes do login: sem ele a linha "1× Adulto"
+     saía como "Grátis". O servidor nunca lê este preço. */
+  const precoDaFaixaNoPacote = (label: string): number =>
+    pernas.reduce((s, p) => {
+      if (!p.data) return s;
+      if (label === ADULTO) return s + precoDeTabela(p.data.price_per_person, p.data.original_price);
+      const faixa = (combo.price_tiers ?? []).find((f) => rotuloFaixa(f) === label) ?? null;
+      return s + precoNaPerna(p.data, faixa);
+    }, 0);
+
   /* O que o cliente escolheu, no formato que o checkout entende. */
   const paraOCheckout = () => ({
     pernas: pernas.map((p) => ({
@@ -363,7 +376,8 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     })),
     num_travelers: totalPessoas,
     tier_breakdown: temFaixas
-      ? Object.entries(porFaixa).filter(([, q]) => q > 0).map(([label, qty]) => ({ label, qty }))
+      ? Object.entries(porFaixa).filter(([, q]) => q > 0)
+          .map(([label, qty]) => ({ label, qty, price: precoDaFaixaNoPacote(label) }))
       : [],
     nome: combo.nome,
     // `base` é a soma de TABELA mais os opcionais, e `total` é o que se paga.
@@ -405,7 +419,8 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
           combo_id: combo.id,
           pernas: e.pernas.map((p) => ({ trip_id: p.trip_id, selected_optionals: p.selected_optionals })),
           num_travelers: e.num_travelers,
-          tier_breakdown: e.tier_breakdown,
+          // Só faixa e quantidade: o preço é da prévia, quem cobra é o servidor.
+          tier_breakdown: e.tier_breakdown.map(({ label, qty }) => ({ label, qty })),
         }),
       });
       const d = await res.json();

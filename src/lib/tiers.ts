@@ -30,6 +30,10 @@ export function tierOccupiesSeat(t?: { occupies_seat?: boolean } | null): boolea
  * No admin não use isto, lá o zero precisa aparecer como número.
  */
 export function tierPriceLabel(price: number, fmt: (v: number) => string): string {
+  // "Grátis" só para zero DE VERDADE. Preço ausente (NaN, undefined) não é de
+  // graça, é dado que não chegou: já aconteceu na prévia do combo, e dizer
+  // "Grátis" ao cliente é pior que não dizer nada.
+  if (typeof price !== "number" || !Number.isFinite(price)) return "";
   return price > 0 ? `R$ ${fmt(price)}` : "Grátis";
 }
 

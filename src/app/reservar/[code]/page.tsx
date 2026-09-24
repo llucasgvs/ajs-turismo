@@ -1643,7 +1643,9 @@ function PreCheckout() {
               selected_optionals: p.selected_optionals || [],
             })),
             num_travelers: sel.num_travelers || 1,
-            tier_breakdown: sel.tier_breakdown || [],
+            // Só faixa e quantidade: o preço que veio na URL é da prévia.
+            tier_breakdown: ((sel.tier_breakdown || []) as { label: string; qty: number }[])
+              .map(({ label, qty }) => ({ label, qty })),
           }),
         });
         const d = await res.json();

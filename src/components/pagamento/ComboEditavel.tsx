@@ -349,7 +349,10 @@ export function ComboEditavel({
       <SeletorDeViajantes
         faixas={temFaixas ? faixas : []}
         contagem={porFaixa}
-        pessoas={porFaixa[ADULTO] ?? numViajantes}
+        // Sem faixas o bloco mostra este número como o total de pessoas. Antes
+        // do login o combo ainda não carregou (`temFaixas` falso) mas a
+        // composição já tem criança, e só os adultos dava "2 viajantes" para 3.
+        pessoas={Object.values(porFaixa).reduce((a, b) => a + b, 0) || numViajantes}
         vagas={vagas}
         editavel={editavel && !!combo}
         ocupado={salvando}
