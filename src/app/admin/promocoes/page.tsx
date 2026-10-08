@@ -43,14 +43,35 @@ const SITUACAO: Record<Situacao, { txt: string; cls: string }> = {
 const campo = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-300";
 const rotulo = "block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5";
 
-/* O Brasil não tem mais horário de verão: Brasília é sempre -03:00. Os campos
- * de data e hora do formulário são de Brasília, e vão ao servidor já com fuso. */
-const FUSO = "-03:00";
-function paraISO(dia: string, hora: string): string { return `${dia}T${hora}:00${FUSO}`; }
+/* Os campos de data e hora do formulário são de Brasília. O fuso sai do
+ * próprio navegador ("America/Sao_Paulo") e não de um -03:00 fixo: se o
+ * horário de verão voltar, uma promoção marcada no verão continua certa. */
+const TZ = "America/Sao_Paulo";
+
+/** O relógio de parede de Brasília num instante, como se fosse UTC (para comparar). */
+function paredeEmBrasilia(ms: number): number {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+
+/** "2026-10-10" + "00:00" em Brasília -> instante em UTC (ISO). */
+function paraISO(dia: string, hora: string): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  const [h, mi] = hora.split(":").map(Number);
+  const alvo = Date.UTC(a, m - 1, d, h, mi);
+  let t = alvo + 3 * 3600_000;                    // palpite: -03:00
+  for (let i = 0; i < 3; i++) t += alvo - paredeEmBrasilia(t);
+  return new Date(t).toISOString();
+}
+
+/** Instante -> dia e hora de Brasília. hourCycle h23: meia-noite é 00, nunca 24. */
 function partes(iso: string): { dia: string; hora: string } {
   const d = new Date(iso);
-  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", ...o }).format(d);
-  return { dia: f({ year: "numeric", month: "2-digit", day: "2-digit" }), hora: f({ hour: "2-digit", minute: "2-digit", hour12: false }) };
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, ...o }).format(d);
+  return { dia: f({ year: "numeric", month: "2-digit", day: "2-digit" }), hora: f({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) };
 }
 function quando(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
