@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, BadgePercent, CalendarClock, Clock, Eye, Globe2, Hourglass, ListChecks, Loader2, Map as MapIcon, Pencil, Plus, Search, Sparkles, Square, Tag, Trash2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { erroDaApi, fmtBRL } from "@/lib/format";
+import { erroDaApi, fmtBRL, nomeCurtoDaViagem } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 import { Segmentado } from "../financeiro/_shared";
@@ -23,6 +23,8 @@ type Promocao = {
   id: number; nome: string; percentual: number; inicio: string; fim: string | null;
   alcance: Alcance; template_ids: number[]; trip_ids: number[]; excluir_template_ids: number[];
   situacao: Situacao; datas_com_desconto: number;
+  /** Nome dos roteiros citados, vindo do servidor (vale até para roteiro sem data futura). */
+  nomes_roteiros?: Record<string, string>;
 };
 type DataOpcao = { id: number; saida: string; preco: number; original: number | null };
 type Roteiro = { id: number; titulo: string; datas: DataOpcao[] };
@@ -61,12 +63,18 @@ function hojeBRT(somaDias = 0): string {
   return partes(d.toISOString()).dia;
 }
 
-/** Quanto falta, em palavras: "faltam 3 dias", "termina hoje às 23:59". */
+/** Quanto falta, em palavras: "faltam 3 dias", "termina amanhã às 23:59".
+ *  Conta por DIA DO CALENDÁRIO de Brasília, e não por blocos de 24 horas:
+ *  algo às 10h de amanhã é "amanhã" mesmo faltando menos de 24 horas. */
 function quantoFalta(iso: string, verbo: "termina" | "começa"): string {
   const ms = new Date(iso).getTime() - Date.now();
-  const dias = Math.floor(ms / 86400000);
-  const hora = new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   if (ms <= 0) return verbo === "termina" ? "terminando" : "começando";
+  const dia = (d: Date) => {
+    const [a, m, x] = partes(d.toISOString()).dia.split("-").map(Number);
+    return Date.UTC(a, m - 1, x) / 86400000;
+  };
+  const dias = dia(new Date(iso)) - dia(new Date());
+  const hora = partes(iso).hora;
   if (dias === 0) return `${verbo} hoje às ${hora}`;
   if (dias === 1) return `${verbo} amanhã às ${hora}`;
   return verbo === "termina" ? `faltam ${dias} dias` : `começa em ${dias} dias`;
@@ -84,13 +92,17 @@ function IconeAlcance({ a }: { a: Alcance }) {
   return <I size={12} className="flex-shrink-0" />;
 }
 
+function nomeDoRoteiro(p: Promocao, id: number, nomes: Map<number, string>): string {
+  return nomeCurtoDaViagem(p.nomes_roteiros?.[String(id)] ?? nomes.get(id) ?? `Roteiro #${id}`);
+}
+
 function descreveAlcance(p: Promocao, nomes: Map<number, string>): string {
   if (p.alcance === "site") {
     const n = p.excluir_template_ids.length;
     return n ? `Site todo, exceto ${n} ${n === 1 ? "roteiro" : "roteiros"}` : "Site todo";
   }
   if (p.alcance === "roteiros") {
-    const ts = p.template_ids.map((id) => nomes.get(id) ?? `#${id}`);
+    const ts = p.template_ids.map((id) => nomeDoRoteiro(p, id, nomes));
     return ts.length <= 2 ? ts.join(" e ") : `${ts.slice(0, 2).join(", ")} e mais ${ts.length - 2}`;
   }
   return `${p.trip_ids.length} ${p.trip_ids.length === 1 ? "data escolhida" : "datas escolhidas"}`;
@@ -271,6 +283,9 @@ function CartaoPromocao({ p, nomes, onDatas, onEditar, onEncerrar, onExcluir }: 
 }) {
   const frac = p.situacao === "ativa" ? decorrido(p) : null;
   const apagado = p.situacao === "encerrada";
+  const [todasExcecoes, setTodasExcecoes] = useState(false);
+  const excecoes = p.alcance === "site" ? p.excluir_template_ids.map((id) => nomeDoRoteiro(p, id, nomes)) : [];
+  const visiveisExcecoes = todasExcecoes ? excecoes : excecoes.slice(0, 3);
   return (
     <div className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col ${
       p.situacao === "ativa" ? "border-gold-200" : "border-gray-100"}`}>
@@ -296,6 +311,17 @@ function CartaoPromocao({ p, nomes, onDatas, onEditar, onEncerrar, onExcluir }: 
               </span>
             )}
           </div>
+          {excecoes.length > 0 && (
+            <div className="mt-2 text-xs">
+              <span className="font-bold text-red-700">Fora da promoção: </span>
+              <span className="text-navy-700">{visiveisExcecoes.join(", ")}</span>
+              {excecoes.length > 3 && (
+                <button onClick={() => setTodasExcecoes((v) => !v)} className="ml-1.5 font-bold text-navy-600 hover:text-navy-800 underline underline-offset-2">
+                  {todasExcecoes ? "mostrar menos" : `+${excecoes.length - 3}`}
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-xs text-gray-500 mt-2.5 flex items-center gap-1.5">
             <CalendarClock size={12} className="text-gray-400" />
             {quando(p.inicio)} {p.fim ? `até ${quando(p.fim)}` : "· sem prazo de fim"}
