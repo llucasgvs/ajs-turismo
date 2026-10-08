@@ -45,6 +45,11 @@ interface TripTemplate {
   open_date_spots_per_day: number;
 }
 
+/** "20/10" no horário de Brasília. */
+function fmtDiaMes(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+}
+
 interface TripDate {
   id: number;
   template_id: number;
@@ -58,6 +63,8 @@ interface TripDate {
   available_spots: number;
   /** Passageiros confirmados que não ocupam poltrona (criança de colo). */
   lap_passengers?: number;
+  /** Promoção que está mudando o preço desta data agora (aba Promoções). */
+  promocao?: { id: number; nome: string; percentual: number; fim: string | null; preco_antes: number } | null;
   status: string;
   is_active: boolean;
   created_at: string;
@@ -518,10 +525,23 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
             </div>
           </div>
 
+          {/* Data em promoção: o preço não é editado aqui (o fim da promoção
+              devolveria o valor antigo por cima). O servidor também recusa. */}
+          {date.promocao && (
+            <div className="bg-gold-50 border border-gold-200 rounded-xl px-3.5 py-3 text-xs text-navy-700">
+              <p className="font-bold text-navy-800 mb-0.5">
+                Em promoção: {date.promocao.nome} ({date.promocao.percentual.toLocaleString("pt-BR")}%)
+                {date.promocao.fim ? ` até ${fmtDiaMes(date.promocao.fim)}` : ", sem prazo de fim"}
+              </p>
+              Sem a promoção, esta data custa R$ {fmtBRL(date.promocao.preco_antes)}. Para mudar o preço, tire a data
+              da promoção ou encerre a promoção na aba Promoções. Vagas, horários e parcelas continuam editáveis.
+            </div>
+          )}
+
           {/* Preço */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Preço</label>
-            <div className="space-y-2.5">
+            <fieldset disabled={!!date.promocao} className="space-y-2.5 min-w-0 disabled:opacity-50">
               <div>
                 <p className="text-[11px] text-gray-400 mb-1">Por pessoa</p>
                 <div className="relative">
@@ -531,7 +551,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
                 </div>
               </div>
               <DiscountFields price={price} original={originalPrice} onOriginal={setOriginalPrice} />
-            </div>
+            </fieldset>
             <div className="mt-2">
               <p className="text-[11px] text-gray-400 mb-1">Parcelamento máximo</p>
               <select value={maxInst} onChange={(e) => setMaxInst(parseInt(e.target.value))}
@@ -570,7 +590,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
           </div>
 
           {/* Valores por idade (faixas) */}
-          <div>
+          <fieldset disabled={!!date.promocao} className="min-w-0 disabled:opacity-50">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><DollarSign size={11} /> Valores por idade</label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {SUGESTOES_FAIXA.filter(s => !tiers.some(t => t.name.trim().toLowerCase() === s.rotulo.toLowerCase())).map(s => (
@@ -621,7 +641,7 @@ function QuickEditModal({ date, templateId, isOpenDate, onClose, onSaved }: {
               className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-navy-600 hover:text-navy-800 transition-colors">
               <Plus size={14} /> Adicionar categoria
             </button>
-          </div>
+          </fieldset>
 
           {/* Link para edição completa (só faz sentido alterar datas em roteiros não-open_date) */}
           {!isOpenDate && (
@@ -1659,6 +1679,13 @@ function DateCard({ date, templateId, onHide, onReactivate, onQuickEdit, reactiv
           </span>
         )}
         <span className="text-gray-400 text-xs">/ pessoa · até {date.max_installments}x</span>
+        {date.promocao && (
+          <span title={`Sem a promoção: R$ ${fmtBRL(date.promocao.preco_antes)}`}
+            className="ml-auto inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold-100 text-gold-800 whitespace-nowrap">
+            {date.promocao.percentual.toLocaleString("pt-BR")}% {date.promocao.nome}
+            {date.promocao.fim ? ` · até ${fmtDiaMes(date.promocao.fim)}` : ""}
+          </span>
+        )}
       </div>
 
       {/* Linha 4: barra de vagas full-width */}

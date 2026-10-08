@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet, PieChart, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Map, LogOut, ChevronRight, ClipboardList, ListChecks, Package, Menu, X, Wallet, PieChart, ExternalLink, BadgePercent } from "lucide-react";
 import { getUser, logout } from "@/lib/api";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
@@ -22,6 +22,7 @@ const blocos: { titulo: string | null; itens: ItemDoMenu[] }[] = [
   { titulo: "Operação", itens: [
     { href: "/admin/viagens", label: "Roteiros", icon: Map, filhos: [
       { href: "/admin/combos", label: "Combos", icon: Package },
+      { href: "/admin/promocoes", label: "Promoções", icon: BadgePercent },
     ] },
     { href: "/admin/reservas", label: "Reservas", icon: ClipboardList, filhos: [
       { href: "/admin/listas", label: "Listas", icon: ListChecks },

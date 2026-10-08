@@ -236,7 +236,9 @@ export function erroDaApi(err: unknown, padrao = "Erro ao salvar."): string {
       .map((d: unknown) => {
         if (d && typeof d === "object") {
           const de = d as Record<string, unknown>;
-          return typeof de.msg === "string" ? de.msg : JSON.stringify(de);
+          // O Pydantic prefixa "Value error, " nas mensagens dos nossos
+          // validadores; o texto que interessa vem depois.
+          return typeof de.msg === "string" ? de.msg.replace(/^Value error,\s*/, "") : JSON.stringify(de);
         }
         return String(d);
       })
