@@ -7,7 +7,7 @@ import {
   MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   ArrowLeft, AlertTriangle,
   Shield, Headphones, Award, Camera, Sun, Mountain, Waves,
-  TreePine, Globe, Plane, Utensils, Star,
+  TreePine, Landmark, Earth, Utensils, Star,
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import Footer from "@/components/Footer";
@@ -75,10 +75,11 @@ const DESC_RULES: { keys: string[]; icon: React.ElementType; label: string; sub:
   { keys: ["praia", "mar", "litoral", "costa", "areia", "cristalino", "mergulho", "snorkel"], icon: Waves, label: "Praias", sub: "Águas cristalinas" },
   { keys: ["romântico", "romantico", "romance", "casal", "lua de mel", "intimidade"], icon: Star, label: "Romântico", sub: "Clima acolhedor" },
   { keys: ["aventura", "radical", "adrenalina", "esporte", "rapel", "rafting", "tirolesa", "bungee"], icon: Sun, label: "Aventura", sub: "Emoção garantida" },
-  { keys: ["cultura", "cultural", "história", "historia", "museu", "patrimônio", "patrimonio", "tradição", "tradicao", "histórico", "historico"], icon: Globe, label: "Cultura e história", sub: "Riqueza cultural" },
+  { keys: ["cultura", "cultural", "história", "historia", "museu", "patrimônio", "patrimonio", "tradição", "tradicao", "histórico", "historico"], icon: Landmark, label: "Cultura e história", sub: "Riqueza cultural" },
   { keys: ["família", "familia", "crianças", "criancas", "parque temático", "parque tematico", "aquático", "aquatico", "beto carrero"], icon: Users, label: "Família", sub: "Para toda a família" },
   { keys: ["compras", "shopping", "lojas", "outlet", "artesanato", "feira"], icon: Camera, label: "Compras", sub: "Muitas opções" },
-  { keys: ["internacional", "exterior", "europa", "disney", "orlando", "cancún", "cancun", "miami", "paris", "fronteira", "paraguai", "argentina", "três países", "tres paises", "país vizinho"], icon: Plane, label: "Internacional", sub: "Experiência global" },
+  // Globo e não avião: Uruguai e Foz são viagens internacionais de ônibus.
+  { keys: ["internacional", "exterior", "europa", "disney", "orlando", "cancún", "cancun", "miami", "paris", "fronteira", "paraguai", "argentina", "três países", "tres paises", "país vizinho"], icon: Earth, label: "Internacional", sub: "Experiência global" },
   { keys: ["lago", "rio", "barco", "lancha", "cruzeiro", "náutico", "nautico", "ferry"], icon: Waves, label: "Passeio náutico", sub: "Beleza das águas" },
   { keys: ["shows", "festival", "evento", "natal luz", "natal de luz", "carnatal", "reveillon", "carnaval"], icon: Star, label: "Eventos", sub: "Experiências únicas" },
 ];
