@@ -9,7 +9,7 @@
  * está, e qualquer mudança no formulário pede uma prévia nova. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, BadgePercent, CalendarClock, Clock, Eye, Globe2, Hourglass, ListChecks, Loader2, Map as MapIcon, Pencil, Plus, Search, Sparkles, Square, Tag, Trash2, X } from "lucide-react";
+import { AlertCircle, BadgePercent, CalendarClock, Clock, Eye, Globe2, Hourglass, ListChecks, Loader2, Map as MapIcon, Pencil, Plus, Search, Square, Tag, Trash2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { erroDaApi, fmtBRL, nomeCurtoDaViagem } from "@/lib/format";
 import { Skel } from "@/components/admin/Skeleton";
@@ -117,6 +117,7 @@ export default function PromocoesPage() {
   const [vendoDatas, setVendoDatas] = useState<Promocao | null>(null);
   const [confirmar, setConfirmar] = useState<{ p: Promocao; acao: "encerrar" | "excluir" } | null>(null);
   const [erro, setErro] = useState("");
+  const [regraAberta, setRegraAberta] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -140,34 +141,32 @@ export default function PromocoesPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+        <div className="min-w-0">
           <h1 className="font-display font-black text-2xl md:text-3xl text-navy-800">Promoções</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Descontos com prazo, aplicados e retirados sozinhos nas datas</p>
+          <p className="text-gray-500 text-sm mt-0.5">
+            Descontos com prazo, aplicados e retirados sozinhos.{" "}
+            <strong className="text-navy-800">Em cada data vale o maior desconto, sem somar.</strong>{" "}
+            <button onClick={() => setRegraAberta((v) => !v)} className="text-gold-700 hover:text-gold-800 font-semibold underline underline-offset-2 whitespace-nowrap">
+              {regraAberta ? "Fechar" : "Como funciona"}
+            </button>
+          </p>
+          {regraAberta && (
+            <div className="mt-3 max-w-2xl text-sm text-navy-700 leading-relaxed bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 space-y-1.5">
+              <p>Exemplo: a Ilha tem 5% e o site todo entra com 4%. A Ilha continua com <strong>5%</strong>, e não 9%.</p>
+              <p>Se o site todo tivesse 7%, a Ilha ficaria com 7% enquanto ele durasse e voltaria sozinha para os 5% no fim.</p>
+              <p>Para uma data nunca receber a promoção do site todo, marque o roteiro como &ldquo;fora da promoção&rdquo; ao criar.</p>
+            </div>
+          )}
         </div>
         <button onClick={() => setEditando("nova")}
-          className="flex items-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm self-start shadow-sm">
+          className="flex items-center gap-2 bg-navy-800 hover:bg-navy-700 text-white font-bold px-4 py-2.5 rounded-xl transition-colors text-sm self-start shadow-sm whitespace-nowrap flex-shrink-0">
           <Plus size={16} /> Nova promoção
         </button>
       </div>
 
-      <PainelAgora lista={lista} />
-
-      {/* A regra que decide o preço quando duas promoções se encontram. */}
-      <div className="mt-4 rounded-2xl border border-gold-300 bg-gold-50 px-4 sm:px-5 py-4 flex gap-3">
-        <BadgePercent size={20} className="text-gold-700 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-navy-800 leading-relaxed">
-          <p className="font-bold">Em cada data vale a promoção de MAIOR desconto. As promoções nunca somam.</p>
-          <p className="mt-1">
-            Exemplo: a Ilha tem 5% e o site todo entra com 4%. A Ilha continua com <strong>5%</strong>, e não 9%.
-            Se o site todo tivesse 7%, a Ilha ficaria com 7% enquanto ele durasse e voltaria sozinha para os 5% no fim.
-          </p>
-          <p className="mt-1 text-navy-600">Para uma data nunca receber a promoção do site todo, marque o roteiro como &ldquo;fora da promoção&rdquo;.</p>
-        </div>
-      </div>
-
       {/* No celular o título vai em cima e o filtro rola de lado sem barra visível. */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-4 mt-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-4 mt-2">
         <p className="text-[11px] font-black tracking-[0.15em] text-gold-600 uppercase">Suas promoções</p>
         <div className="max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>div]:[scrollbar-width:none]">
         <Segmentado valor={filtro} onChange={(k) => setFiltro(k as typeof filtro)} opcoes={[
@@ -222,55 +221,6 @@ export default function PromocoesPage() {
           onClose={() => setConfirmar(null)}
           onDone={() => { setConfirmar(null); carregar(); }}
         />
-      )}
-    </div>
-  );
-}
-
-
-/** O topo da aba: o que o cliente está vendo AGORA no site. */
-function PainelAgora({ lista }: { lista: Promocao[] | null }) {
-  const ativas = (lista ?? []).filter((p) => p.situacao === "ativa").sort((a, b) => b.percentual - a.percentual);
-  const proxima = (lista ?? []).filter((p) => p.situacao === "agendada").sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
-  const datas = ativas.reduce((s, p) => s + p.datas_com_desconto, 0);
-  const destaque = ativas[0];
-  const frac = destaque ? decorrido(destaque) : null;
-  return (
-    <div className="bg-gradient-to-br from-navy-800 to-navy-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg relative overflow-hidden">
-      <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-gold-400/15 blur-2xl pointer-events-none" />
-      <p className="text-[11px] font-black tracking-[0.15em] text-gold-300 uppercase flex items-center gap-1.5"><Sparkles size={12} /> Agora no site</p>
-      {lista === null ? (
-        <Skel className="h-16 w-64 bg-white/20 mt-3" />
-      ) : destaque ? (
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 items-end relative">
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="font-display font-black text-5xl text-gold-300 tabular-nums leading-none">{destaque.percentual.toLocaleString("pt-BR")}%</span>
-              <span className="font-display font-black text-xl sm:text-2xl leading-tight truncate">{destaque.nome}</span>
-            </div>
-            <p className="text-navy-100 text-sm mt-2">
-              {destaque.fim ? <>Até {quando(destaque.fim)} · {quantoFalta(destaque.fim, "termina")}</> : "Sem prazo de fim"}
-              {ativas.length > 1 && <> · e mais {ativas.length - 1} {ativas.length === 2 ? "promoção" : "promoções"} valendo</>}
-            </p>
-            {frac !== null && (
-              <div className="mt-3 h-1.5 bg-white/15 rounded-full overflow-hidden max-w-md">
-                <div className="h-full rounded-full bg-gradient-to-r from-gold-300 to-gold-500" style={{ width: `${Math.max(3, frac * 100)}%` }} />
-              </div>
-            )}
-          </div>
-          <div className="flex gap-6 md:text-right">
-            <div><p className="font-display font-black text-3xl tabular-nums leading-none">{datas}</p><p className="text-[11px] text-navy-200 mt-1 uppercase tracking-wide font-semibold">datas com desconto</p></div>
-            <div><p className="font-display font-black text-3xl tabular-nums leading-none">{ativas.length}</p><p className="text-[11px] text-navy-200 mt-1 uppercase tracking-wide font-semibold">{ativas.length === 1 ? "promoção" : "promoções"}</p></div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-3 relative">
-          <p className="font-display font-black text-2xl">Nenhuma promoção valendo</p>
-          <p className="text-navy-100 text-sm mt-1">
-            {proxima ? <>Próxima: <strong className="text-gold-300">{proxima.nome}</strong> ({proxima.percentual.toLocaleString("pt-BR")}%), {quantoFalta(proxima.inicio, "começa")}, {quando(proxima.inicio)}.</>
-              : "O site está com os preços normais de cada data."}
-          </p>
-        </div>
       )}
     </div>
   );
