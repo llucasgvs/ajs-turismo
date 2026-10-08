@@ -141,6 +141,19 @@ export default function PromocoesPage() {
 
       <PainelAgora lista={lista} />
 
+      {/* A regra que decide o preço quando duas promoções se encontram. */}
+      <div className="mt-4 rounded-2xl border border-gold-300 bg-gold-50 px-4 sm:px-5 py-4 flex gap-3">
+        <BadgePercent size={20} className="text-gold-700 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-navy-800 leading-relaxed">
+          <p className="font-bold">Em cada data vale a promoção de MAIOR desconto. As promoções nunca somam.</p>
+          <p className="mt-1">
+            Exemplo: a Ilha tem 5% e o site todo entra com 4%. A Ilha continua com <strong>5%</strong>, e não 9%.
+            Se o site todo tivesse 7%, a Ilha ficaria com 7% enquanto ele durasse e voltaria sozinha para os 5% no fim.
+          </p>
+          <p className="mt-1 text-navy-600">Para uma data nunca receber a promoção do site todo, marque o roteiro como &ldquo;fora da promoção&rdquo;.</p>
+        </div>
+      </div>
+
       {/* No celular o título vai em cima e o filtro rola de lado sem barra visível. */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-4 mt-8">
         <p className="text-[11px] font-black tracking-[0.15em] text-gold-600 uppercase">Suas promoções</p>
@@ -477,8 +490,15 @@ function Formulario({ promocao, roteiros, onClose, onSaved }: {
 
   return (
     <Moldura largo titulo={promocao ? "Editar promoção" : "Nova promoção"}
-      sub="O desconto é aplicado sobre o preço cheio. Vale o maior desconto da data, sem somar." onClose={onClose}>
+      sub="O desconto é calculado sobre o preço cheio de cada data." onClose={onClose}>
       <div className="p-5 space-y-6">
+        <div className="rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 flex gap-3">
+          <BadgePercent size={18} className="text-gold-700 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-navy-800 leading-snug">
+            <strong>Em cada data vale a promoção de maior desconto, sem somar.</strong>{" "}
+            Se uma data já tem um desconto igual ou maior, ela fica como está. A prévia mostra quais.
+          </p>
+        </div>
         <section>
           <div className="flex items-baseline gap-2 mb-2.5"><span className="w-5 h-5 rounded-full bg-navy-800 text-gold-300 text-[11px] font-black flex items-center justify-center flex-shrink-0">1</span><p className="font-bold text-navy-800 text-sm">O desconto</p></div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px] gap-3">
@@ -592,7 +612,7 @@ function Formulario({ promocao, roteiros, onClose, onSaved }: {
                 </div>
                 <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
                   <p className="font-display font-black text-2xl text-navy-800 tabular-nums leading-none">{previa.datas_que_nao_mudam}</p>
-                  <p className="text-[11px] text-gray-500 mt-1">ficam como estão (já têm desconto igual ou maior)</p>
+                  <p className="text-[11px] text-gray-500 mt-1">ficam como estão: já têm desconto igual ou maior, e vale o maior</p>
                 </div>
               </div>
               <div className="border border-gray-100 rounded-xl overflow-x-auto">
