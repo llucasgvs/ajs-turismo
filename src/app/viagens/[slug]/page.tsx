@@ -5,6 +5,7 @@ import TripDetailClient from "@/components/TripDetailClient";
 import type { Trip } from "@/types/trip";
 import { fmtBRL } from "@/lib/format";
 import { imgOg } from "@/lib/imagem";
+import { tituloNoGoogle, descricaoNoGoogle } from "@/lib/seoViagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -75,13 +76,25 @@ export async function generateMetadata({
   if (!data) return { title: "Viagem não encontrada" };
 
   const { roteiro, trip } = data;
-  const description =
+  const descricaoAntiga =
     roteiro.short_description ||
     (roteiro.quote_only
       ? `Pacote para ${roteiro.destination} sob consulta. Solicite sua cotação com a AJS Turismo, saindo de Curitiba.`
       : trip
         ? `Pacote para ${roteiro.destination}. A partir de R$ ${fmtBRL(trip.price_per_person)} por pessoa. ${roteiro.duration_nights + 1} dias / ${roteiro.duration_nights} noites saindo de Curitiba.`
         : `Pacote para ${roteiro.destination} saindo de Curitiba. Consulte as próximas saídas com a AJS Turismo.`);
+
+  // Texto do Google montado do cadastro (ver lib/seoViagem). Qualquer falha
+  // volta para o texto de antes: a página nunca fica sem título.
+  let titulo = roteiro.title;
+  let description = descricaoAntiga;
+  try {
+    titulo = tituloNoGoogle(roteiro) || roteiro.title;
+    description = descricaoNoGoogle(roteiro, trip) || descricaoAntiga;
+  } catch {
+    titulo = roteiro.title;
+    description = descricaoAntiga;
+  }
 
   const capaOg = imgOg(roteiro.image_url, SITE);
   const ogImage = capaOg
@@ -91,7 +104,9 @@ export async function generateMetadata({
   const pageUrl = `${SITE}/viagens/${slug}`;
 
   return {
-    title: roteiro.title,
+    // Completo e explícito: o layout de /viagens define o título como texto
+    // simples, o que desliga o " - AJS Turismo" do layout raiz aqui embaixo.
+    title: { absolute: `${titulo} - AJS Turismo` },
     description,
     keywords: [
       roteiro.destination,
@@ -103,7 +118,7 @@ export async function generateMetadata({
     ],
     alternates: { canonical: pageUrl },
     openGraph: {
-      title: `${roteiro.title} - AJS Turismo`,
+      title: `${titulo} - AJS Turismo`,
       description,
       url: pageUrl,
       siteName: "AJS Turismo",
@@ -113,7 +128,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${roteiro.title} - AJS Turismo`,
+      title: `${titulo} - AJS Turismo`,
       description,
       images: ogImage.map((i) => i.url),
     },
