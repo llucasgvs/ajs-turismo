@@ -157,17 +157,17 @@ export function descricaoAutomatica(r: Roteiro, data: Data): string {
   if (r.quote_only) return reserva;
   const { nome, complemento, opcionais, aereo } = partes(r);
 
-  const n = dias(data);
-  // Ônibus que sai à noite e volta no dia seguinte ainda é "bate e volta"
+  // Quantidade de dias NUNCA entra (decisão do dono): fica errada quando uma
+  // saída tem duração diferente. "Bate e volta" não é quantidade e é busca
+  // comum. Ônibus que sai à noite e volta no dia seguinte ainda é bate e volta
   // quando o próprio roteiro diz isso.
-  const duracao = /bate e volta/.test(complemento) || n === 1
-    ? "bate e volta" : n && n > 1 ? `${n} dias` : "viagem";
+  const bateVolta = /bate e volta/.test(complemento) || dias(data) === 1;
   const cidades = cidadesDeEmbarque(r.departure_locations || []);
   const saida = aereo
     ? " com aéreo saindo de Curitiba"
     : /curitiba/i.test(nome) ? "" : ` saindo de ${lista(cidades.length ? cidades : ["Curitiba"])}`;
   const nomeDoTitulo = /^r[ée]veillon/i.test(nome) ? nome : nome.replace(/^Trem\s*-\s*/i, "Trem ");
-  let texto = `${nomeDoTitulo}: ${duracao}${saida}.`;
+  let texto = bateVolta ? `${nomeDoTitulo}: bate e volta${saida}.` : `${nomeDoTitulo}${saida}.`;
 
   const itens = (r.includes || [])
     .map((i) => arrumaMaiusculas(i.split(" - ")[0].split("(")[0].replace(/\s+/g, " ").trim()))
