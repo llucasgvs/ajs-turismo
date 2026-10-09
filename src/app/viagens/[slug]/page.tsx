@@ -17,7 +17,7 @@ type BySlug = {
   trip: Trip | null;
   roteiro: {
     id: number; slug: string | null; title: string; destination: string; description: string;
-    short_description: string | null; image_url: string | null; gallery: string[];
+    short_description: string | null; seo_titulo?: string | null; seo_descricao?: string | null; image_url: string | null; gallery: string[];
     duration_nights: number; includes: string[]; excludes: string[]; optionals: unknown[];
     itinerary: unknown[]; departure_locations: string[]; required_documents: string | null;
     category: string; tag: string | null; whatsapp_only?: boolean; quote_only?: boolean;

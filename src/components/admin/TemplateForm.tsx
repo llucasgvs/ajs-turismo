@@ -7,6 +7,7 @@ import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check, Copy 
 import { apiFetch, getToken } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { imgOtim } from "@/lib/imagem";
+import NoGoogle from "@/components/admin/NoGoogle";
 
 /** Espelha QUARTO_SINGLE em app/core/opcionais.py. O backend reconhece o
  *  opcional por este nome; mudar aqui sem mudar lá quebra a regra. */
@@ -42,6 +43,9 @@ interface TemplateFormData {
   category: string;
   tag: string;
   short_description: string;
+  /** Texto da página no Google. Vazio = automático (ver NoGoogle). */
+  seo_titulo: string;
+  seo_descricao: string;
   description: string;
   required_documents: string;
   image_url: string;
@@ -106,7 +110,7 @@ const PRESET_DEPARTURE_LOCATIONS = [
 
 const EMPTY: TemplateFormData = {
   title: "", destination: "", category: "praia", tag: "",
-  short_description: "", description: "", required_documents: "", image_url: "",
+  short_description: "", seo_titulo: "", seo_descricao: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
   tem_hospedagem: false, quarto_single: "",
   is_featured: false, is_active: true, whatsapp_only: false, allow_pix: false, quote_only: false, parent_id: null,
@@ -143,6 +147,9 @@ export default function TemplateForm({
     // normaliza itinerário: suporta formato antigo {day,title,description} e novo {title,items}
     itinerary: normalizeItinerary((initialData?.itinerary as unknown[]) ?? []),
     departure_locations: (initialData?.departure_locations as string[] | undefined) ?? [],
+    // A API devolve null quando está no automático; o campo da tela quer texto.
+    seo_titulo: String(initialData?.seo_titulo ?? ""),
+    seo_descricao: String(initialData?.seo_descricao ?? ""),
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
     open_date_max_installments: String((initialData as Record<string, unknown>)?.open_date_max_installments ?? "12"),
@@ -709,6 +716,20 @@ export default function TemplateForm({
                 <Plus size={16} /> Adicionar seção ao roteiro
               </button>
             </div>
+          </Section>
+
+          <Section title="No Google">
+            <NoGoogle
+              slug={(initialData as { slug?: string | null } | undefined)?.slug}
+              roteiro={{
+                title: form.title, destination: form.destination, short_description: form.short_description,
+                includes: form.includes, departure_locations: form.departure_locations, quote_only: form.quote_only,
+              }}
+              titulo={form.seo_titulo}
+              descricao={form.seo_descricao}
+              onTitulo={(v) => set("seo_titulo", v)}
+              onDescricao={(v) => set("seo_descricao", v)}
+            />
           </Section>
         </div>
 

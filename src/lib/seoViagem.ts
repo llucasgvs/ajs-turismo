@@ -9,12 +9,15 @@
  * Regras de propósito:
  *  - sem preço: o Google guarda o texto por dias, e a promoção muda o valor;
  *  - Réveillon e "sob cotação" mantêm o nome que já tinham;
+ *  - o texto escrito à mão no admin (seo_titulo / seo_descricao) vale por cima;
  *  - função pura e sem exceção: quem chama cai no texto antigo se algo falhar.
  */
 
 type Roteiro = {
   title: string;
   destination?: string | null;
+  seo_titulo?: string | null;
+  seo_descricao?: string | null;
   short_description?: string | null;
   includes?: string[] | null;
   departure_locations?: string[] | null;
@@ -127,6 +130,19 @@ function dias(data: Data): number | null {
 }
 
 export function tituloNoGoogle(r: Roteiro): string {
+  const manual = (r.seo_titulo || "").trim();
+  if (manual) return manual;
+  return tituloAutomatico(r);
+}
+
+export function descricaoNoGoogle(r: Roteiro, data: Data): string {
+  const manual = (r.seo_descricao || "").trim();
+  if (manual) return manual;
+  return descricaoAutomatica(r, data);
+}
+
+/** O que o site escreve sozinho. O admin mostra isto quando o campo está vazio. */
+export function tituloAutomatico(r: Roteiro): string {
   const t = arrumaMaiusculas(r.title.replace(/\s+/g, " ").trim());
   if (r.quote_only || /^r[ée]veillon/i.test(t)) return t;
   const { nome, complemento, aereo } = partes(r);
@@ -136,7 +152,7 @@ export function tituloNoGoogle(r: Roteiro): string {
   return /curitiba/i.test(nome) ? comComplemento : `${comComplemento} saindo de Curitiba`;
 }
 
-export function descricaoNoGoogle(r: Roteiro, data: Data): string {
+export function descricaoAutomatica(r: Roteiro, data: Data): string {
   const reserva = (r.short_description || "").trim();
   if (r.quote_only) return reserva;
   const { nome, complemento, opcionais, aereo } = partes(r);
