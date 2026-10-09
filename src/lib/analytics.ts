@@ -146,3 +146,42 @@ export function trackPurchaseOnce(dados: {
     // Silêncio proposital: medição nunca pode atrapalhar a compra.
   }
 }
+
+/**
+ * Quem é este visitante no Google Analytics, lido dos cookies que o próprio GA
+ * grava. Vai junto ao abrir a reserva para que, quando o PIX confirmar pelo
+ * servidor (longe do navegador), a compra caia na mesma pessoa e na mesma
+ * sessão que veio do anúncio, e não como "acesso direto".
+ *
+ * Mesma regra do resto do arquivo: nunca lança erro. Sem GA (bloqueador, aba
+ * anônima), devolve um objeto vazio e o checkout segue igual.
+ */
+export function visitanteGA(): { ga_client_id?: string; ga_session_id?: string } {
+  try {
+    if (typeof document === "undefined") return {};
+    const cookies: Record<string, string> = {};
+    for (const par of document.cookie.split(";")) {
+      const i = par.indexOf("=");
+      if (i > 0) cookies[par.slice(0, i).trim()] = decodeURIComponent(par.slice(i + 1).trim());
+    }
+    // _ga = "GA1.1.<numero>.<numero>": o id do visitante são as duas últimas partes.
+    const ga = (cookies["_ga"] || "").split(".");
+    const client = ga.length >= 4 ? `${ga[ga.length - 2]}.${ga[ga.length - 1]}` : "";
+    if (!/^\d+\.\d+$/.test(client)) return {};
+
+    // _ga_<ID> guarda a sessão em um de dois formatos:
+    //   antigo "GS1.1.<sessao>.<...>"   novo "GS2.1.s<sessao>$o3$g1$t..."
+    let sessao = "";
+    const nome = Object.keys(cookies).find((k) => k.startsWith("_ga_"));
+    const valor = nome ? cookies[nome] : "";
+    if (valor.startsWith("GS1.")) {
+      sessao = valor.split(".")[2] || "";
+    } else if (valor.startsWith("GS2.")) {
+      const resto = valor.split(".").slice(2).join(".");
+      sessao = (resto.split("$").find((p) => p.startsWith("s")) || "").slice(1);
+    }
+    return /^\d+$/.test(sessao) ? { ga_client_id: client, ga_session_id: sessao } : { ga_client_id: client };
+  } catch {
+    return {};
+  }
+}
