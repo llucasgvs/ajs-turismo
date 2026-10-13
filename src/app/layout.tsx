@@ -139,7 +139,7 @@ const jsonLd = {
     streetAddress: "Rua Pedro Spisla Filho, 215",
     addressLocality: "Curitiba",
     addressRegion: "PR",
-    postalCode: "82640-050",
+    postalCode: "82640-610",
     addressCountry: "BR",
   },
   geo: {
