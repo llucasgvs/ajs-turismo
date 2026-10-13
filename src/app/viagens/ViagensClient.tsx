@@ -11,7 +11,7 @@ import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 import { prazoDoCombo } from "@/lib/combos";
-import { ehDoTipo, tiposDisponiveis, cabecalho, type TipoId } from "@/lib/tiposDeViagem";
+import { ehDoTipo, tiposDisponiveis, cabecalho, tipoValido, type TipoId } from "@/lib/tiposDeViagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
@@ -134,6 +134,9 @@ export type ComboPublico = {
   preco_com_desconto_ate: number | null;
 };
 
+const CHAVE_FILTROS = "ajs_viagens_filtros";
+const VALIDADE_FILTROS = 2 * 60 * 60 * 1000; // 2 h: aba esquecida aberta não traz filtro velho
+
 /** Lista de um atalho de tipo. "Combos" esconde os roteiros: lá só aparecem os combos. */
 function doTipo(lista: PublicTemplate[], tipo: TipoId | null): PublicTemplate[] {
   if (!tipo) return lista;
@@ -174,6 +177,69 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
   }, []);
 
   const today = spDay(new Date().toISOString());
+
+  /* Filtros guardados enquanto a aba está aberta: o cliente entra numa viagem,
+     volta, e encontra a mesma busca, data, ordenação e ponto da lista. Fica no
+     navegador (sessionStorage), não no endereço: o Google não vê uma página
+     por busca digitada e o link compartilhado continua limpo. Só é aplicado se
+     o atalho for o mesmo de quando foi guardado; chegou por outro link,
+     começa limpo. */
+  // Só passa a guardar DEPOIS de aplicar o que estava guardado: gravar antes
+  // sobrescrevia a busca do cliente com o estado vazio da abertura da página.
+  const [restaurado, setRestaurado] = useState(false);
+  const rolagem = useRef(0);
+  useEffect(() => {
+    // O atalho vale o que está no ENDEREÇO. Ao voltar de uma viagem, o Next
+    // reaproveita a página da memória, que pode ter sido aberta antes de o
+    // cliente tocar num atalho (a troca de atalho só muda o endereço). Sem esta
+    // leitura, a tela mostrava "Todas" com ?tipo=... no endereço.
+    let tipoAtual: TipoId | null = tipoInicial ?? null;
+    try {
+      tipoAtual = tipoValido(new URLSearchParams(window.location.search).get("tipo"));
+      if (tipoAtual !== tipo) {
+        setTipo(tipoAtual);
+        const c = tipoAtual && tipoAtual !== "combos" ? cabecalho(tipoAtual, templates) : null;
+        document.title = c ? `${c.titulo} ${c.destaque} - AJS Turismo` : "Todas as Viagens - AJS Turismo";
+      }
+    } catch { /* sem window.location: fica o que veio do servidor */ }
+    try {
+      const salvo = JSON.parse(sessionStorage.getItem(CHAVE_FILTROS) || "null");
+      if (salvo && (salvo.tipo ?? null) === tipoAtual && Date.now() - (salvo.t || 0) < VALIDADE_FILTROS) {
+        if (typeof salvo.search === "string") setSearch(salvo.search);
+        if (typeof salvo.sort === "string" && SORT_OPTIONS.some((o) => o.value === salvo.sort)) setSort(salvo.sort);
+        // Data que já passou não volta: filtraria por um dia sem saídas.
+        if (typeof salvo.selectedDate === "string" && salvo.selectedDate >= today) setSelectedDate(salvo.selectedDate);
+        if (typeof salvo.selectedMonth === "string" && salvo.selectedMonth >= today.slice(0, 7)) setSelectedMonth(salvo.selectedMonth);
+        const y = Number(salvo.scrollY) || 0;
+        // Depois que a lista filtrada desenhar, volta ao ponto onde estava.
+        if (y > 0) setTimeout(() => requestAnimationFrame(() => window.scrollTo(0, y)), 80);
+      }
+    } catch { /* sem armazenamento (aba anônima, bloqueio): segue sem guardar */ }
+    setRestaurado(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!restaurado) return;
+    try {
+      sessionStorage.setItem(CHAVE_FILTROS, JSON.stringify({
+        tipo, search, sort, selectedDate, selectedMonth, scrollY: rolagem.current, t: Date.now(),
+      }));
+    } catch { /* idem */ }
+  }, [restaurado, tipo, search, sort, selectedDate, selectedMonth]);
+
+  // Ponto da lista: anotado ao rolar e gravado ao sair da página.
+  useEffect(() => {
+    const onScroll = () => { rolagem.current = window.scrollY; };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      try {
+        const salvo = JSON.parse(sessionStorage.getItem(CHAVE_FILTROS) || "null");
+        if (salvo) sessionStorage.setItem(CHAVE_FILTROS, JSON.stringify({ ...salvo, scrollY: rolagem.current, t: Date.now() }));
+      } catch { /* idem */ }
+    };
+  }, []);
 
   // Map de datas → contagem (apenas templates com data fixa; open_date não polui o calendário)
   const datesByDate = useMemo(() => {
@@ -340,6 +406,10 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
               <input
                 className="w-full text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none bg-transparent"
                 placeholder="Para onde você quer ir?"
+                // Sem isto, ao voltar de uma viagem o navegador "devolve" ao
+                // campo o valor que ele lembra, depois que a busca guardada já
+                // foi restaurada, e apaga a busca do cliente.
+                autoComplete="off"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -369,10 +439,15 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
                 </p>
               </div>
               {(selectedDate || selectedMonth) ? (
-                <button onClick={(e) => { e.stopPropagation(); setSelectedDate(""); setSelectedMonth(""); }}
-                  className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors">
+                // span, e não button: está DENTRO do botão "Quando", e botão
+                // dentro de botão é HTML inválido (o toque podia abrir o
+                // calendário em vez de limpar a data).
+                <span role="button" tabIndex={0} aria-label="Limpar data"
+                  onClick={(e) => { e.stopPropagation(); setSelectedDate(""); setSelectedMonth(""); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setSelectedDate(""); setSelectedMonth(""); } }}
+                  className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer">
                   <X size={11} className="text-gray-500" />
-                </button>
+                </span>
               ) : (
                 <ChevronDown size={14} className={`text-gray-400 transition-transform flex-shrink-0 ${showWhenPicker ? "rotate-180" : ""}`} />
               )}
