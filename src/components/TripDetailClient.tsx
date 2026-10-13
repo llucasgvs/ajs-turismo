@@ -7,9 +7,10 @@ import {
   MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   ArrowLeft, AlertTriangle,
   Shield, Headphones, Award, Camera, Sun, Mountain, Waves,
-  TreePine, Landmark, Earth, Utensils, Star,
+  TreePine, Landmark, Earth, Utensils, Star, Bus, Plane,
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
+import PerguntasFrequentes, { montarPerguntas } from "@/components/viagem/PerguntasFrequentes";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, isUnlimitedSpots, salesClosed, temVaga, poucasVagas, marcadoBateVolta } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
@@ -777,6 +778,17 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
   // Roteiro sob cotação: sem data/preço. CTA leva direto ao checkout (cadastro
   // + solicitar cotação pelo WhatsApp), usando o placeholder como alvo.
   const isQuote = !!trip.quote_only;
+  // Frase da busca embaixo do nome ("Excursão bate e volta saindo de
+  // Curitiba"). O nome do roteiro fica como o dono escreveu.
+  const comAereo = (trip.departure_locations || []).some((l) => /aeroporto/i.test(l));
+  const subtitulo = isQuote ? null
+    : comAereo ? "Viagem com aéreo saindo de Curitiba"
+    // Sem data aberta, saída e volta vêm preenchidas com "agora" (só para ter
+    // valor): seriam o mesmo dia e todo roteiro viraria "bate e volta".
+    : /bate e volta/i.test(trip.title)
+      || (!semDatas && trip.departure_date && trip.return_date && spDay(trip.departure_date) === spDay(trip.return_date))
+      ? "Excursão bate e volta saindo de Curitiba"
+      : "Excursão saindo de Curitiba";
   // Sem data aberta: mesma página, sem preço/data e com o WhatsApp no lugar da compra.
   const semCompra = isQuote || semDatas;
   const waDatas = `https://wa.me/5541998348766?text=${encodeURIComponent(`Olá! Tenho interesse no roteiro *${trip.title}*. Quando abrem as próximas saídas?`)}`;
@@ -798,7 +810,7 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
 
       {/* Gallery Modal */}
       {galleryOpen && allImages.length > 0 && (
-        <GalleryModal images={allImages} startIndex={galleryStart} onClose={() => setGalleryOpen(false)} />
+        <GalleryModal images={allImages} startIndex={galleryStart} onClose={() => setGalleryOpen(false)} nome={trip.title} />
       )}
 
 
@@ -834,14 +846,25 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
               <h1 className="font-display font-black text-2xl sm:text-3xl md:text-4xl text-navy-900 leading-tight">{trip.title}</h1>
               <div className="hidden lg:block flex-shrink-0 mt-1"><ShareButton title={trip.title} /></div>
             </div>
-            <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-1.5">
+            {/* O tipo da viagem e o destino como uma lista de detalhes, com o
+                mesmo ícone e o mesmo cinza: a frase da busca faz parte do
+                desenho em vez de parecer um texto colado embaixo do nome. */}
+            {subtitulo && (
+              <p className="flex items-center gap-1.5 text-gray-500 text-sm mt-2">
+                {comAereo
+                  ? <Plane size={14} className="text-gold-500 flex-shrink-0" />
+                  : <Bus size={14} className="text-gold-500 flex-shrink-0" />}
+                {subtitulo}
+              </p>
+            )}
+            <div className={`flex items-center gap-1.5 text-gray-500 text-sm ${subtitulo ? "mt-1" : "mt-1.5"}`}>
               <MapPin size={14} className="text-gold-500" /> {trip.destination}
             </div>
           </div>
 
           {/* Photo Grid */}
           <div className="mb-6">
-            <PhotoGrid images={allImages} onOpen={openGallery} />
+            <PhotoGrid images={allImages} onOpen={openGallery} nome={trip.title} />
           </div>
 
           {/* Date Selector - mobile: before key info; desktop: in right sidebar */}
@@ -1245,6 +1268,8 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
                   </div>
                 </div>
               )}
+
+              <PerguntasFrequentes perguntas={montarPerguntas(trip, activeTrip, !semCompra)} />
 
               {/* Trust Block - hidden on mobile */}
               {!semDatas && (

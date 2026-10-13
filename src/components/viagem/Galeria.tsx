@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, Camera, Share2, CheckCheck } from "lucide-react";
 import { imgOtim } from "@/lib/imagem";
 
-export function GalleryModal({ images, startIndex, onClose }: { images: string[]; startIndex: number; onClose: () => void }) {
+export function GalleryModal({ images, startIndex, onClose, nome = "" }: { images: string[]; startIndex: number; onClose: () => void; nome?: string }) {
   const [idx, setIdx] = useState(startIndex);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function GalleryModal({ images, startIndex, onClose }: { images: string[]
       {/* Main image */}
       <div className="flex-1 flex items-center justify-center relative px-14 min-h-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async" src={imgOtim(images[idx], 2048, 100)} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+        <img loading="lazy" decoding="async" src={imgOtim(images[idx], 2048, 100)} alt={nome ? `${nome}, foto ${idx + 1}` : ""} className="max-w-full max-h-full object-contain rounded-lg" />
         {images.length > 1 && (
           <>
             <button onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
@@ -77,7 +77,7 @@ export function GalleryModal({ images, startIndex, onClose }: { images: string[]
 /* ═══════════════════════════════════════════
    2. Photo Grid (Airbnb-style)
 ═══════════════════════════════════════════ */
-export function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: number) => void }) {
+export function PhotoGrid({ images, onOpen, nome = "" }: { images: string[]; onOpen: (idx: number) => void; nome?: string }) {
   if (images.length === 0) return <div className="w-full h-72 sm:h-[480px] bg-navy-800 rounded-2xl" />;
 
   return (
@@ -85,7 +85,7 @@ export function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: 
       {/* Mobile: single large image */}
       <div className="sm:hidden relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async" src={imgOtim(images[0], 828, 90)} alt="" className="w-full h-full object-cover" />
+        <img loading="lazy" decoding="async" src={imgOtim(images[0], 828, 90)} alt={nome ? `${nome}, foto 1` : ""} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         {images.length > 1 && (
           <button
@@ -102,7 +102,7 @@ export function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: 
         {/* Large left */}
         <div className="col-span-2 row-span-2 relative cursor-pointer overflow-hidden" onClick={() => onOpen(0)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img loading="lazy" decoding="async" src={imgOtim(images[0], 1200, 90)} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+          <img loading="lazy" decoding="async" src={imgOtim(images[0], 1200, 90)} alt={nome ? `${nome}, foto 1` : ""} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
         </div>
         {/* 4 small right - fill with placeholders if < 5 images */}
         {[1, 2, 3, 4].map((pos) => {
@@ -111,7 +111,7 @@ export function PhotoGrid({ images, onOpen }: { images: string[]; onOpen: (idx: 
           return img ? (
             <div key={pos} className="relative cursor-pointer overflow-hidden" onClick={() => onOpen(pos)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={imgOtim(img, 640, 85)} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+              <img loading="lazy" decoding="async" src={imgOtim(img, 640, 85)} alt={nome ? `${nome}, foto ${pos + 1}` : ""} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
               {isLast && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white font-bold text-xl">+{images.length - 5}</span>

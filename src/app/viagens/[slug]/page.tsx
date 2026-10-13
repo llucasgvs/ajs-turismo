@@ -135,6 +135,21 @@ export async function generateMetadata({
   };
 }
 
+/** Caminho de navegação (Início › Viagens › roteiro) para o Google, que pode
+ *  mostrá-lo no resultado no lugar do endereço. Não aparece na tela. */
+function Trilha({ titulo, slug }: { titulo: string; slug: string }) {
+  const dados = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Início", item: SITE },
+      { "@type": "ListItem", position: 2, name: "Viagens", item: `${SITE}/viagens` },
+      { "@type": "ListItem", position: 3, name: titulo, item: `${SITE}/viagens/${slug}` },
+    ],
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(dados) }} />;
+}
+
 export default async function TripDetailPage({
   params,
 }: {
@@ -187,6 +202,7 @@ export default async function TripDetailPage({
 
     return (
       <Suspense>
+        <Trilha titulo={r.title} slug={slug} />
         <TripDetailClient trip={semData} semDatas />
       </Suspense>
     );
@@ -194,6 +210,7 @@ export default async function TripDetailPage({
 
   return (
     <Suspense>
+      <Trilha titulo={data.roteiro.title} slug={slug} />
       <TripDetailClient trip={data.trip} />
     </Suspense>
   );
