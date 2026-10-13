@@ -79,19 +79,23 @@ interface TemplateFormData {
   open_date_return_time: string;    // "HH:MM"
 }
 
+// Categoria = tipo de passeio, não região. "Nordeste", "Litoral" e "Sul do
+// Brasil" saíram em 13/10/2026: misturavam região com tipo (Maceió ficava fora
+// de Praia, Gramado dividido entre Sul e Serra). A categoria "praia" alimenta o
+// atalho Praia da página de viagens (lib/tiposDeViagem.ts).
 const PRESET_CATEGORIES: [string, string][] = [
   ["praia", "Praia"],
-  ["nordeste", "Nordeste"],
-  ["litoral", "Litoral"],
-  ["sul", "Sul do Brasil"],
   ["serra", "Serra / Montanha"],
-  ["aventura", "Aventura"],
-  ["natureza", "Natureza / Ecoturismo"],
   ["cultural", "Cultural"],
-  ["gastronomia", "Gastronomia"],
-  ["religioso", "Religioso / Romaria"],
+  ["natureza", "Natureza / Ecoturismo"],
+  ["rural", "Turismo rural"],
+  ["aventura", "Aventura"],
   ["parque", "Parque Temático"],
+  ["termas", "Termas e resorts"],
+  ["religioso", "Religioso / Romaria"],
+  ["gastronomia", "Gastronomia"],
   ["internacional", "Internacional"],
+  ["cruzeiro", "Cruzeiro"],
   ["outros", "Outros"],
 ];
 const PRESET_VALUES = new Set(PRESET_CATEGORIES.map(([v]) => v));
