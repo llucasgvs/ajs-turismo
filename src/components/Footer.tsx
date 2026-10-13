@@ -72,7 +72,7 @@ export default function Footer() {
                 { label: "Criar conta", href: "/cadastro" },
                 { label: "Fazer login", href: "/login" },
                 { label: "Minhas viagens", href: "/dashboard" },
-                { label: "Minhas reservas", href: "/dashboard/reservas" },
+                { label: "Minhas reservas", href: "/dashboard" },
                 { label: "Política de privacidade", href: "/privacidade" },
                 { label: "Termos de uso", href: "/termos" },
               ].map(({ label, href }) => (
