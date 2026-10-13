@@ -11,6 +11,7 @@ import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
 import { prazoDoCombo } from "@/lib/combos";
+import { ehDoTipo, tiposDisponiveis, cabecalho, type TipoId } from "@/lib/tiposDeViagem";
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEK_DAYS = ["D","S","T","Q","Q","S","S"];
@@ -133,11 +134,22 @@ export type ComboPublico = {
   preco_com_desconto_ate: number | null;
 };
 
-export default function ViagensClient({ initialTemplates, combos = [] }:
-  { initialTemplates: PublicTemplate[]; combos?: ComboPublico[] }) {
+/** Lista de um atalho de tipo. "Combos" esconde os roteiros: lá só aparecem os combos. */
+function doTipo(lista: PublicTemplate[], tipo: TipoId | null): PublicTemplate[] {
+  if (!tipo) return lista;
+  if (tipo === "combos") return [];
+  return lista.filter((t) => ehDoTipo(tipo, t));
+}
+
+export default function ViagensClient({ initialTemplates, combos = [], tipoInicial = null }:
+  { initialTemplates: PublicTemplate[]; combos?: ComboPublico[]; tipoInicial?: TipoId | null }) {
   const [templates, setTemplates] = useState<PublicTemplate[]>(initialTemplates);
-  // Inicializa já ordenado para evitar flash de ordem errada no primeiro render
-  const [filtered, setFiltered] = useState<PublicTemplate[]>(() => sortTemplates(initialTemplates, "date_asc"));
+  // Atalho de tipo ("Bate e volta", "Réveillon"...). Vem do endereço
+  // (/viagens?tipo=...) para o servidor já mandar a lista filtrada ao Google.
+  const [tipo, setTipo] = useState<TipoId | null>(tipoInicial);
+  // Inicializa já filtrado e ordenado: o HTML do servidor sai igual ao que a
+  // tela mostra, sem flash de ordem errada nem de lista completa.
+  const [filtered, setFiltered] = useState<PublicTemplate[]>(() => sortTemplates(doTipo(initialTemplates, tipoInicial), "date_asc"));
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("date_asc");
@@ -220,7 +232,7 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
   }, []);
 
   useEffect(() => {
-    let result = templates;
+    let result = doTipo(templates, tipo);
     // Relevância por começo de palavra (ver relevanciaDaBusca): "rio" acha
     // "Rio de Janeiro" e não "Lavandario". Guardada para ordenar no fim.
     const relevancia = new Map<number, number>();
@@ -246,22 +258,37 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
     // nível vale a ordenação escolhida.
     if (relevancia.size) ordenado.sort((a, b) => (relevancia.get(b.id) ?? 0) - (relevancia.get(a.id) ?? 0));
     setFiltered(ordenado);
-  }, [templates, search, sort, selectedDate, selectedMonth]);
+  }, [templates, tipo, search, sort, selectedDate, selectedMonth]);
 
-  const clearFilters = () => { setSearch(""); setSelectedDate(""); setSelectedMonth(""); };
-  const hasFilters = !!(search || selectedDate || selectedMonth);
+  // Troca de atalho sem recarregar a página: só o endereço muda, para o link
+  // poder ser compartilhado (anúncio, Instagram, WhatsApp) já filtrado.
+  const escolherTipo = (novo: TipoId | null) => {
+    setTipo(novo);
+    try {
+      window.history.replaceState(null, "", novo ? `/viagens?tipo=${novo}` : "/viagens");
+      // A aba acompanha o atalho, como se a página tivesse sido aberta nele.
+      const c = novo && novo !== "combos" ? cabecalho(novo, templates) : null;
+      document.title = c ? `${c.titulo} ${c.destaque} - AJS Turismo` : "Todas as Viagens - AJS Turismo";
+    } catch { /* sem histórico, o filtro funciona do mesmo jeito */ }
+  };
+  const atalhos = useMemo(() => tiposDisponiveis(templates, combos.length), [templates, combos.length]);
+  const topo = tipo ? cabecalho(tipo, templates) : null;
+
+  const clearFilters = () => { setSearch(""); setSelectedDate(""); setSelectedMonth(""); if (tipo) escolherTipo(null); };
+  const hasFilters = !!(search || selectedDate || selectedMonth || tipo);
 
   /* Combos entram na busca por texto, mas somem quando o filtro é de DATA: o
      combo não tem uma data só, ele tem uma por viagem, e fingir que casa com o
      dia escolhido enganaria quem filtrou. */
   const combosVisiveis = useMemo(() => {
+    if (tipo && tipo !== "combos") return [];
     if (selectedDate || selectedMonth) return [];
     if (!search.trim()) return combos;
     return combos.filter((c) =>
       relevanciaDaBusca(c.nome, search) > 0 ||
       c.roteiros.some((r) => relevanciaDaBusca(r.title, search) > 0 || relevanciaDaBusca(r.destination, search) > 0),
     );
-  }, [combos, search, selectedDate, selectedMonth]);
+  }, [combos, tipo, search, selectedDate, selectedMonth]);
   const sortLabel = SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Ordenar";
 
   return (
@@ -280,15 +307,22 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
           <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-900/80 to-navy-900" />
         </div>
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle, #C9A84C 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-        <div className="relative container-custom py-12 md:py-16 text-center">
+        {/* Altura mínima igual à do atalho mais alto em cada largura de tela
+            (medida em 13/10/2026): trocar de atalho não faz o topo pular.
+            Texto mais longo que isso só cresce, nunca corta. */}
+        <div className="relative container-custom py-12 md:py-16 text-center flex flex-col items-center justify-center min-h-[420px] min-[360px]:min-h-[380px] min-[375px]:min-h-[356px] md:min-h-[404px] lg:min-h-[356px]">
           <div className="inline-flex items-center gap-2 bg-gold-500/20 border border-gold-500/30 text-gold-400 text-xs font-semibold px-4 py-2 rounded-full mb-6">
             <Plane size={12} /> Saindo de Curitiba - PR
           </div>
-          <h1 className="font-display font-black text-4xl md:text-6xl text-white mb-4 leading-tight">
-            Explore Nossas <span className="text-gold-400">Viagens</span>
+          {/* Com atalho escolhido, o topo fala daquele tipo: é o título que o
+              Google lê no endereço do atalho. Sem atalho, igual a sempre. */}
+          <h1 className={`font-display font-black text-white mb-4 leading-tight ${topo ? "text-3xl md:text-5xl" : "text-4xl md:text-6xl"}`}>
+            {topo
+              ? <>{topo.titulo} <span className="text-gold-400">{topo.destaque}</span></>
+              : <>Explore Nossas <span className="text-gold-400">Viagens</span></>}
           </h1>
           <p className="text-navy-300 text-base md:text-lg max-w-xl mx-auto">
-            Destinos nacionais e internacionais. Parcele no cartão ou pague no PIX, com atendimento personalizado.
+            {topo ? topo.texto : "Destinos nacionais e internacionais. Parcele no cartão ou pague no PIX, com atendimento personalizado."}
           </p>
         </div>
       </section>
@@ -430,6 +464,32 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
 
       {/* Main content */}
       <main className="flex-1 w-full container-custom py-8">
+        {/* Atalhos de tipo. São links de verdade (o Google segue cada um até a
+            página filtrada), mas o toque troca a lista na hora, sem recarregar. */}
+        {atalhos.length > 0 && (
+          <nav aria-label="Tipos de viagem" className="-mx-4 px-4 mb-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* Celular: começa na esquerda e desliza (centralizado, o "Todas"
+                ficaria cortado). Telas maiores: centralizado, alinhado à busca. */}
+            <div className="flex items-center gap-2 w-max md:w-full md:flex-wrap md:justify-center">
+              {[{ id: null as TipoId | null, rotulo: "Todas" }, ...atalhos].map((a) => {
+                const ativo = tipo === a.id;
+                return (
+                  <a key={a.id ?? "todas"} href={a.id ? `/viagens?tipo=${a.id}` : "/viagens"}
+                    aria-current={ativo ? "page" : undefined}
+                    onClick={(e) => { e.preventDefault(); escolherTipo(a.id); }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium border whitespace-nowrap transition-colors ${
+                      ativo
+                        ? "bg-navy-800 text-white border-navy-800"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}>
+                    {a.rotulo}
+                  </a>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+
         {/* Sort + filter bar */}
         <div className="flex items-center mb-4">
           <div className="relative" ref={sortRef}>
@@ -476,8 +536,17 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
         {!loading && (
           <div className="flex items-center gap-3 py-2 mb-4 border-b border-gray-200">
             <p className="text-sm text-gray-500">
-              <span className="font-bold text-navy-800">{filtered.length}</span>{" "}
-              {filtered.length !== 1 ? "roteiros" : "roteiro"} disponíve{filtered.length !== 1 ? "is" : "l"}
+              {tipo === "combos" ? (
+                <>
+                  <span className="font-bold text-navy-800">{combosVisiveis.length}</span>{" "}
+                  {combosVisiveis.length !== 1 ? "combos" : "combo"} disponíve{combosVisiveis.length !== 1 ? "is" : "l"}
+                </>
+              ) : (
+                <>
+                  <span className="font-bold text-navy-800">{filtered.length}</span>{" "}
+                  {filtered.length !== 1 ? "roteiros" : "roteiro"} disponíve{filtered.length !== 1 ? "is" : "l"}
+                </>
+              )}
               {search && <span> para <strong>&ldquo;{search}&rdquo;</strong></span>}
             </p>
             {hasFilters && (
@@ -504,7 +573,7 @@ export default function ViagensClient({ initialTemplates, combos = [] }:
         ) : filtered.length === 0 && combosVisiveis.length === 0 ? (
           <EmptyState hasFilters={!!hasFilters} onClear={clearFilters} />
         ) : (
-          <div key={`${search}|${selectedDate}|${selectedMonth}|${sort}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-in">
+          <div key={`${tipo}|${search}|${selectedDate}|${selectedMonth}|${sort}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-in">
             {/* Sem busca, os combos vêm primeiro: é a oferta que o cliente não
                 sabe que existe. Com busca, quem digitou "rio" quer ver o Rio
                 antes de um combo que só passa perto do termo. */}

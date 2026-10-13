@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { tiposDisponiveis, tipoIndexavel } from "@/lib/tiposDeViagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -51,7 +52,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // Combo fora do sitemap não quebra o resto.
     }
 
-    return [...staticRoutes, ...roteiroRoutes, ...comboRoutes];
+    // Atalhos de tipo com viagem à venda (/viagens?tipo=reveillon...). Os que
+    // não valem como página (combos) e os vazios ficam de fora.
+    let atalhoRoutes: MetadataRoute.Sitemap = [];
+    try {
+      const rt = await fetch(`${API}/templates/public`, { next: { revalidate: 3600 } });
+      if (rt.ok) {
+        const lista = await rt.json();
+        if (Array.isArray(lista)) {
+          atalhoRoutes = tiposDisponiveis(lista, 0)
+            .filter((t) => tipoIndexavel(t.id))
+            .map((t) => ({
+              url: `${SITE}/viagens?tipo=${t.id}`,
+              lastModified: new Date(),
+              changeFrequency: "daily" as const,
+              priority: 0.85,
+            }));
+        }
+      }
+    } catch {
+      // Atalho fora do sitemap não quebra o resto.
+    }
+
+    return [...staticRoutes, ...atalhoRoutes, ...roteiroRoutes, ...comboRoutes];
   } catch {
     return staticRoutes;
   }
