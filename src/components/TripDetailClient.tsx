@@ -10,6 +10,7 @@ import {
   TreePine, Landmark, Earth, Utensils, Star, Bus, Plane,
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
+import { escolherRelacionadas, escolherOpcoes, URL_VIAGENS, URL_ROTEIROS, type CartaoViagem, type OpcaoDestino } from "@/lib/relacionadas";
 import PerguntasFrequentes, { montarPerguntas } from "@/components/viagem/PerguntasFrequentes";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, isUnlimitedSpots, salesClosed, temVaga, poucasVagas, marcadoBateVolta } from "@/lib/format";
@@ -224,7 +225,7 @@ function DestinationHighlights({ trip }: { trip: Trip }) {
 /* ═══════════════════════════════════════════
    6. Related Trips
 ═══════════════════════════════════════════ */
-function RelatedCard({ trip }: { trip: Trip }) {
+function RelatedCard({ trip }: { trip: CartaoViagem }) {
   const depDate = new Date(trip.departure_date);
   return (
     <Link href={`/viagens/${trip.slug ?? trip.id}`}
@@ -264,35 +265,21 @@ function RelatedCard({ trip }: { trip: Trip }) {
   );
 }
 
-function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: number; currentTemplateId: number | null; category: string }) {
-  const [trips, setTrips] = useState<Trip[]>([]);
+function RelatedTrips({ currentId, currentTemplateId, category, inicial }: { currentId: number; currentTemplateId: number | null; category: string; inicial?: CartaoViagem[] }) {
+  // `inicial` vem pronto do servidor (links no HTML que o Google lê). Sem ele,
+  // a busca do servidor falhou e a página monta aqui, como sempre fez.
+  const [trips, setTrips] = useState<CartaoViagem[]>(inicial ?? []);
 
   useEffect(() => {
-    fetch(`${API}/trips/?limit=50`)
+    if (inicial) { setTrips(inicial); return; }
+    fetch(`${API}${URL_VIAGENS}`)
       .then(r => r.json())
       .then((data: Trip[]) => {
         if (!Array.isArray(data)) return;
-        // Exclude current trip's template, keep only one trip per template (earliest date), prioritize same category
-        const seen = new Set<number | null>();
-        const related = data
-          .filter(t => t.id !== currentId && t.is_active !== false && t.template_id !== currentTemplateId)
-          .sort((a, b) => {
-            // Same category first, then by departure date
-            const catA = a.category === category ? 1 : 0;
-            const catB = b.category === category ? 1 : 0;
-            if (catB !== catA) return catB - catA;
-            return new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime();
-          })
-          .filter(t => {
-            if (seen.has(t.template_id)) return false;
-            seen.add(t.template_id);
-            return true;
-          })
-          .slice(0, 4);
-        setTrips(related);
+        setTrips(escolherRelacionadas(data, currentId, currentTemplateId, category));
       })
       .catch(() => {});
-  }, [currentId, currentTemplateId, category]);
+  }, [currentId, currentTemplateId, category, inicial]);
 
   if (!trips.length) return null;
 
@@ -307,17 +294,17 @@ function RelatedTrips({ currentId, currentTemplateId, category }: { currentId: n
 }
 
 /* Outras vertentes do mesmo destino (família principal + variações via parent_id) */
-type PubTemplate = { id: number; first_trip_id: number; slug?: string | null; title: string; image_url: string | null; parent_id?: number | null; price_from: number };
-function DestinationOptions({ templateId, parentId }: { templateId: number | null; parentId?: number | null }) {
-  const [items, setItems] = useState<PubTemplate[]>([]);
+function DestinationOptions({ templateId, parentId, inicial }: { templateId: number | null; parentId?: number | null; inicial?: OpcaoDestino[] }) {
+  const [items, setItems] = useState<OpcaoDestino[]>(inicial ?? []);
   // raiz da família: se este é variação, o principal; senão, ele mesmo.
   const root = parentId || templateId;
   useEffect(() => {
+    if (inicial) { setItems(inicial); return; }
     if (!root) return;
-    fetch(`${API}/templates/public`).then(r => r.ok ? r.json() : []).then((list: PubTemplate[]) => {
-      setItems((list || []).filter(t => t.id !== templateId && (t.id === root || t.parent_id === root)));
+    fetch(`${API}${URL_ROTEIROS}`).then(r => r.ok ? r.json() : []).then((list: OpcaoDestino[]) => {
+      setItems(escolherOpcoes(list || [], templateId, parentId));
     }).catch(() => {});
-  }, [root, templateId]);
+  }, [root, templateId, parentId, inicial]);
   if (!root || !items.length) return null;
   return (
     <div className="py-8">
@@ -591,7 +578,11 @@ function OpenDateCalendar({
 /* ═══════════════════════════════════════════
    12. Main Component
 ═══════════════════════════════════════════ */
-export default function TripDetailClient({ trip, semDatas = false }: { trip: Trip; semDatas?: boolean }) {
+export default function TripDetailClient({ trip, semDatas = false, relacionadas, opcoes }: {
+  trip: Trip; semDatas?: boolean;
+  /** Cartões já escolhidos no servidor; ausentes, a página busca sozinha. */
+  relacionadas?: CartaoViagem[]; opcoes?: OpcaoDestino[];
+}) {
   const router = useRouter();
   const { show: showLoading } = useLoading();
 
@@ -1279,8 +1270,8 @@ export default function TripDetailClient({ trip, semDatas = false }: { trip: Tri
               )}
 
               {/* Related Trips */}
-              <DestinationOptions templateId={trip.template_id} parentId={trip.parent_id} />
-              <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} />
+              <DestinationOptions templateId={trip.template_id} parentId={trip.parent_id} inicial={opcoes} />
+              <RelatedTrips currentId={trip.id} currentTemplateId={trip.template_id} category={trip.category} inicial={relacionadas} />
             </div>
 
             {/* ── Right sidebar (desktop only) ── */}

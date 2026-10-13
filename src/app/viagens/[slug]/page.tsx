@@ -6,6 +6,7 @@ import type { Trip } from "@/types/trip";
 import { fmtBRL } from "@/lib/format";
 import { imgOg } from "@/lib/imagem";
 import { tituloNoGoogle, descricaoNoGoogle } from "@/lib/seoViagem";
+import { escolherRelacionadas, escolherOpcoes, URL_VIAGENS, URL_ROTEIROS, type OpcaoDestino } from "@/lib/relacionadas";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -34,6 +35,20 @@ async function getBySlug(slug: string): Promise<BySlug | null> {
     });
     if (!r.ok) return null;
     return r.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Lista usada nos cartões do fim da página. Guardada por 5 minutos: o servidor
+ *  busca uma vez e serve a todas as páginas. Falhou, devolve null e a página
+ *  monta os cartões no navegador, como antes. */
+async function buscarLista<T>(caminho: string): Promise<T[] | null> {
+  try {
+    const r = await fetch(`${API}${caminho}`, { next: { revalidate: 300 } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) ? d : null;
   } catch {
     return null;
   }
@@ -165,8 +180,17 @@ export default async function TripDetailPage({
     permanentRedirect(`/viagens/${destino}`);
   }
 
-  const data = await getBySlug(slug);
+  // Em paralelo: os cartões do fim da página não atrasam a viagem.
+  const [data, viagens, roteiros] = await Promise.all([
+    getBySlug(slug),
+    buscarLista<Trip>(URL_VIAGENS),
+    buscarLista<OpcaoDestino>(URL_ROTEIROS),
+  ]);
   if (!data) notFound();
+  const cartoes = (t: Trip) => ({
+    relacionadas: viagens ? escolherRelacionadas(viagens, t.id, t.template_id, t.category) : undefined,
+    opcoes: roteiros ? escolherOpcoes(roteiros, t.template_id, t.parent_id) : undefined,
+  });
 
   // Sem data aberta: mesma página do roteiro (fotos, inclui, itinerário...), só
   // que o bloco de compra vira "consultar datas no WhatsApp". Os campos de
@@ -203,7 +227,7 @@ export default async function TripDetailPage({
     return (
       <Suspense>
         <Trilha titulo={r.title} slug={slug} />
-        <TripDetailClient trip={semData} semDatas />
+        <TripDetailClient trip={semData} semDatas {...cartoes(semData)} />
       </Suspense>
     );
   }
@@ -211,7 +235,7 @@ export default async function TripDetailPage({
   return (
     <Suspense>
       <Trilha titulo={data.roteiro.title} slug={slug} />
-      <TripDetailClient trip={data.trip} />
+      <TripDetailClient trip={data.trip} {...cartoes(data.trip)} />
     </Suspense>
   );
 }
