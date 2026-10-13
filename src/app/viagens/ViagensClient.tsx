@@ -134,6 +134,28 @@ export type ComboPublico = {
   preco_com_desconto_ate: number | null;
 };
 
+/**
+ * Volta a página ao ponto da lista onde o cliente estava. Insiste por até 2 s:
+ * no site real a lista remonta depois de buscar os dados, e o Next pode rolar
+ * para o topo nesse meio-tempo. Para na hora se o cliente tocar, rolar ou usar
+ * o teclado: aí quem manda é ele.
+ */
+function voltarAoPonto(y: number) {
+  let parar = false;
+  const soltar = () => { parar = true; };
+  const eventos = ["touchstart", "wheel", "keydown", "mousedown"] as const;
+  eventos.forEach((ev) => window.addEventListener(ev, soltar, { once: true, passive: true }));
+  const inicio = Date.now();
+  const tentar = () => {
+    if (parar) return;
+    const alvo = Math.min(y, document.documentElement.scrollHeight - window.innerHeight);
+    if (Math.abs(window.scrollY - alvo) > 40) window.scrollTo(0, alvo);
+    if (Date.now() - inicio < 2000) setTimeout(tentar, 100);
+    else eventos.forEach((ev) => window.removeEventListener(ev, soltar));
+  };
+  setTimeout(tentar, 50);
+}
+
 const CHAVE_FILTROS = "ajs_viagens_filtros";
 const VALIDADE_FILTROS = 2 * 60 * 60 * 1000; // 2 h: aba esquecida aberta não traz filtro velho
 
@@ -215,10 +237,7 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
         // tentativas: o Next pode rolar para o topo logo depois da primeira.
         // A segunda só age se a página ainda estiver lá em cima (o cliente não
         // começou a rolar por conta própria).
-        if (y > 0) {
-          setTimeout(() => requestAnimationFrame(() => window.scrollTo(0, y)), 80);
-          setTimeout(() => { if (window.scrollY < 50) window.scrollTo(0, y); }, 400);
-        }
+        if (y > 0) voltarAoPonto(y);
       }
     } catch { /* sem armazenamento (aba anônima, bloqueio): segue sem guardar */ }
     setRestaurado(true);
