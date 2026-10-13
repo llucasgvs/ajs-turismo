@@ -211,8 +211,14 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
         if (typeof salvo.selectedDate === "string" && salvo.selectedDate >= today) setSelectedDate(salvo.selectedDate);
         if (typeof salvo.selectedMonth === "string" && salvo.selectedMonth >= today.slice(0, 7)) setSelectedMonth(salvo.selectedMonth);
         const y = Number(salvo.scrollY) || 0;
-        // Depois que a lista filtrada desenhar, volta ao ponto onde estava.
-        if (y > 0) setTimeout(() => requestAnimationFrame(() => window.scrollTo(0, y)), 80);
+        // Depois que a lista filtrada desenhar, volta ao ponto onde estava. Duas
+        // tentativas: o Next pode rolar para o topo logo depois da primeira.
+        // A segunda só age se a página ainda estiver lá em cima (o cliente não
+        // começou a rolar por conta própria).
+        if (y > 0) {
+          setTimeout(() => requestAnimationFrame(() => window.scrollTo(0, y)), 80);
+          setTimeout(() => { if (window.scrollY < 50) window.scrollTo(0, y); }, 400);
+        }
       }
     } catch { /* sem armazenamento (aba anônima, bloqueio): segue sem guardar */ }
     setRestaurado(true);
@@ -228,12 +234,29 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
     } catch { /* idem */ }
   }, [restaurado, tipo, search, sort, selectedDate, selectedMonth]);
 
-  // Ponto da lista: anotado ao rolar e gravado ao sair da página.
+  // Ponto da lista: anotado ao rolar e gravado no TOQUE de um link. Gravar só
+  // ao sair não serve: o Next já rolou para o topo da página nova antes disso,
+  // e o ponto gravado virava sempre zero.
+  const saindo = useRef(false);
   useEffect(() => {
-    const onScroll = () => { rolagem.current = window.scrollY; };
+    saindo.current = false;
+    const onScroll = () => { if (!saindo.current) rolagem.current = window.scrollY; };
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      // Atalhos de tipo ficam na página; link em outra aba (WhatsApp) também.
+      if (!link || link.closest('nav[aria-label="Tipos de viagem"]') || link.target === "_blank") return;
+      rolagem.current = window.scrollY;
+      saindo.current = true;
+      try {
+        const salvo = JSON.parse(sessionStorage.getItem(CHAVE_FILTROS) || "null");
+        if (salvo) sessionStorage.setItem(CHAVE_FILTROS, JSON.stringify({ ...salvo, scrollY: rolagem.current, t: Date.now() }));
+      } catch { /* idem */ }
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("click", onClick, true);
     return () => {
       window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("click", onClick, true);
       try {
         const salvo = JSON.parse(sessionStorage.getItem(CHAVE_FILTROS) || "null");
         if (salvo) sessionStorage.setItem(CHAVE_FILTROS, JSON.stringify({ ...salvo, scrollY: rolagem.current, t: Date.now() }));
@@ -338,6 +361,17 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
     } catch { /* sem histórico, o filtro funciona do mesmo jeito */ }
   };
   const atalhos = useMemo(() => tiposDisponiveis(templates, combos.length), [templates, combos.length]);
+
+  // No celular a fileira desliza; o atalho marcado pode abrir fora da tela
+  // (Praia, Réveillon). Desliza a fileira até ele, sem mexer na rolagem da página.
+  const fileiraRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = fileiraRef.current;
+    const ativo = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !ativo || nav.scrollWidth <= nav.clientWidth) return;
+    const a = ativo.getBoundingClientRect(), n = nav.getBoundingClientRect();
+    if (a.left < n.left || a.right > n.right) nav.scrollLeft += a.left - n.left - 16;
+  }, [tipo, atalhos]);
   const topo = tipo ? cabecalho(tipo, templates) : null;
 
   const clearFilters = () => { setSearch(""); setSelectedDate(""); setSelectedMonth(""); if (tipo) escolherTipo(null); };
@@ -542,7 +576,7 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
         {/* Atalhos de tipo. São links de verdade (o Google segue cada um até a
             página filtrada), mas o toque troca a lista na hora, sem recarregar. */}
         {atalhos.length > 0 && (
-          <nav aria-label="Tipos de viagem" className="-mx-4 px-4 mb-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav ref={fileiraRef} aria-label="Tipos de viagem" className="-mx-4 px-4 mb-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* Celular: começa na esquerda e desliza (centralizado, o "Todas"
                 ficaria cortado). Telas maiores: centralizado, alinhado à busca. */}
             <div className="flex items-center gap-2 w-max md:w-full md:flex-wrap md:justify-center">
