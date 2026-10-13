@@ -263,7 +263,7 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
     const onClick = (e: MouseEvent) => {
       const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       // Atalhos de tipo ficam na página; link em outra aba (WhatsApp) também.
-      if (!link || link.closest('nav[aria-label="Tipos de viagem"]') || link.target === "_blank") return;
+      if (!link || link.closest('nav[aria-label="Tipos de viagem"], [role="listbox"]') || link.target === "_blank") return;
       rolagem.current = window.scrollY;
       saindo.current = true;
       try {
@@ -384,6 +384,44 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
   // No celular a fileira desliza; o atalho marcado pode abrir fora da tela
   // (Praia, Réveillon). Desliza a fileira até ele, sem mexer na rolagem da página.
   const fileiraRef = useRef<HTMLElement>(null);
+  const [fileiraLados, setFileiraLados] = useState({ esquerda: false, direita: false });
+  const medirFileira = () => {
+    const nav = fileiraRef.current;
+    if (!nav) return;
+    const resto = nav.scrollWidth - nav.clientWidth - nav.scrollLeft;
+    setFileiraLados({ esquerda: nav.scrollLeft > 8, direita: resto > 8 });
+  };
+  const deslizarFileira = (sentido: 1 | -1) => {
+    fileiraRef.current?.scrollBy({ left: sentido * 180, behavior: "smooth" });
+  };
+  useEffect(() => {
+    medirFileira();
+    window.addEventListener("resize", medirFileira);
+    return () => window.removeEventListener("resize", medirFileira);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atalhos]);
+  // "Empurrãozinho" uma vez por visita: a fileira anda um pouco e volta, para
+  // mostrar que desliza. Não acontece para quem desligou animações.
+  useEffect(() => {
+    const nav = fileiraRef.current;
+    if (!nav || nav.scrollWidth <= nav.clientWidth || nav.scrollLeft > 0) return;
+    try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (sessionStorage.getItem("ajs_atalhos_dica")) return;
+    } catch { return; }
+    let andou = false;
+    // Só se a fileira ainda estiver no começo (a página pode ter deslizado até
+    // o atalho marcado, quando o cliente chega por um link de Réveillon). A
+    // marca de "já mostrei" só é gravada quando acontece de fato.
+    const ida = setTimeout(() => {
+      if (nav.scrollLeft !== 0) return;
+      andou = true;
+      try { sessionStorage.setItem("ajs_atalhos_dica", "1"); } catch { /* segue */ }
+      nav.scrollBy({ left: 70, behavior: "smooth" });
+    }, 900);
+    const volta = setTimeout(() => { if (andou) nav.scrollBy({ left: -70, behavior: "smooth" }); }, 1600);
+    return () => { clearTimeout(ida); clearTimeout(volta); };
+  }, [atalhos]);
   useEffect(() => {
     const nav = fileiraRef.current;
     const ativo = nav?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -595,10 +633,11 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
         {/* Atalhos de tipo. São links de verdade (o Google segue cada um até a
             página filtrada), mas o toque troca a lista na hora, sem recarregar. */}
         {atalhos.length > 0 && (
-          <nav ref={fileiraRef} aria-label="Tipos de viagem" className="-mx-4 px-4 mb-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="relative -mx-4 mb-4">
+          <nav ref={fileiraRef} onScroll={medirFileira} aria-label="Tipos de viagem" className="px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* Celular: começa na esquerda e desliza (centralizado, o "Todas"
                 ficaria cortado). Telas maiores: centralizado, alinhado à busca. */}
-            <div className="flex items-center gap-2 w-max md:w-full md:flex-wrap md:justify-center">
+            <div className="flex items-center gap-2 w-max sm:w-full sm:flex-wrap sm:justify-center">
               {[{ id: null as TipoId | null, rotulo: "Todas" }, ...atalhos].map((a) => {
                 const ativo = tipo === a.id;
                 return (
@@ -616,6 +655,26 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
               })}
             </div>
           </nav>
+          {/* Sinais de que a fileira continua (só quando ela não cabe na tela):
+              degradê apagando a borda e uma seta que desliza ao ser tocada,
+              para quem não conhece o gesto de arrastar para o lado. */}
+          {fileiraLados.direita && (
+            <div className="sm:hidden absolute right-0 top-0 bottom-0 w-16 flex items-center justify-end pr-2 bg-gradient-to-l from-gray-50 via-gray-50/90 to-transparent pointer-events-none">
+              <button type="button" aria-label="Ver mais tipos de viagem" onClick={() => deslizarFileira(1)}
+                className="pointer-events-auto w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-navy-700">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+          {fileiraLados.esquerda && (
+            <div className="sm:hidden absolute left-0 top-0 bottom-0 w-16 flex items-center justify-start pl-2 bg-gradient-to-r from-gray-50 via-gray-50/90 to-transparent pointer-events-none">
+              <button type="button" aria-label="Voltar aos primeiros tipos" onClick={() => deslizarFileira(-1)}
+                className="pointer-events-auto w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-navy-700">
+                <ChevronLeft size={16} />
+              </button>
+            </div>
+          )}
+          </div>
         )}
 
         {/* Sort + filter bar */}
