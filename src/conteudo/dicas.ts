@@ -10,7 +10,17 @@
  * Um guia por destino, completo, em vez de vários artigos pequenos.
  */
 
-export type Foto = { url: string; alt: string };
+export type Foto = {
+  url: string;
+  alt: string;
+  /** Ponto da foto que fica à vista no recorte deitado (CSS object-position).
+   *  Útil em foto vertical, para não cortar o que importa. */
+  enquadramento?: string;
+  /** Foto em pé: aparece inteira, num quadro vertical, em vez de recortada. */
+  vertical?: boolean;
+  /** Texto curto embaixo da foto. */
+  legenda?: string;
+};
 
 export type Secao = {
   titulo: string;
@@ -170,6 +180,144 @@ export const DICAS: Dica[] = [
     ],
     roteiros: ["ilha-do-mel-pr"],
     chamadaNaViagem: "Primeira vez na Ilha do Mel? Veja nossas dicas: como chegar, o que levar e as melhores praias",
+    escritoEm: "2026-10-14",
+    atualizadoEm: "2026-10-14",
+  },
+  {
+    slug: "foz-do-iguacu",
+    destino: "Foz do Iguaçu",
+    tituloGoogle: "Foz do Iguaçu: o que fazer, Cataratas e como chegar",
+    descricaoGoogle:
+      "Guia de Foz do Iguaçu saindo de Curitiba: Cataratas do lado brasileiro e argentino, Itaipu, Marco das Três Fronteiras, o que levar e a melhor época.",
+    titulo: "Guia de Foz do Iguaçu",
+    subtitulo: "Cataratas dos dois lados, o que mais fazer na Tríplice Fronteira, o que levar e quando ir.",
+    resumo:
+      "Foz do Iguaçu fica no extremo oeste do Paraná, na Tríplice Fronteira entre Brasil, Argentina e Paraguai. É a cidade das Cataratas do Iguaçu, que podem ser vistas pelos dois lados da fronteira, e também da usina de Itaipu, do Marco das Três Fronteiras e das compras no Paraguai.",
+    capa: { url: `${FOTO}362f0b76-b941-458e-b528-20d330033064.jpeg`, alt: "Quedas das Cataratas do Iguaçu cercadas de mata, com a névoa subindo das águas" },
+    secoes: [
+      {
+        titulo: "Onde fica Foz do Iguaçu",
+        paragrafos: [
+          "A cidade fica no ponto em que o Rio Iguaçu encontra o Rio Paraná, bem na divisa com a Argentina e o Paraguai. Do lado argentino está Puerto Iguazú, e do lado paraguaio, Ciudad del Este. As três cidades são ligadas por pontes, e a travessia faz parte do passeio.",
+          "É essa mistura que torna a viagem tão completa: natureza, uma das maiores usinas hidrelétricas do mundo e três países em poucos quilômetros.",
+        ],
+      },
+      {
+        titulo: "Como chegar saindo de Curitiba",
+        paragrafos: [
+          "Por terra, são cerca de 640 km pela BR-277, cruzando o Paraná de leste a oeste. De ônibus, a viagem costuma ser feita durante a noite, para chegar cedo e já aproveitar o primeiro dia.",
+          "De avião, o voo é curto e chega ao aeroporto internacional da cidade, que fica no caminho das Cataratas.",
+          "Indo em excursão, você não precisa se preocupar com estrada, hotel nem deslocamento entre os passeios: o grupo vai junto, com quem conhece a região.",
+        ],
+      },
+      {
+        titulo: "Cataratas: lado brasileiro ou argentino?",
+        paragrafos: [
+          "As Cataratas do Iguaçu ficam entre dois parques nacionais, um em cada país, e os dois são Patrimônio Natural da Humanidade. São centenas de quedas, que mudam de volume conforme as chuvas. Cada lado mostra as quedas de um jeito, e o ideal é conhecer os dois.",
+        ],
+        lista: [
+          "Lado brasileiro: no Parque Nacional do Iguaçu, uma trilha à beira do rio mostra a vista panorâmica, aquela da foto de cartão-postal. O caminho termina numa passarela sobre o rio, de frente para a Garganta do Diabo. É um passeio de algumas horas.",
+          "Lado argentino: no Parque Nacional Iguazú, as passarelas passam por cima e por baixo das quedas, e um trem leva até a Garganta do Diabo vista do alto. Tem bem mais caminhada e pede o dia inteiro.",
+        ],
+        experiencia:
+          "Com o grupo da AJS, a visita às Cataratas é pelo lado brasileiro, com guia local e o ingresso do parque já incluso. Os passeios para a Argentina e o Paraguai aparecem na página de cada viagem, como opcional ou já incluídos, e dá para somar um combo com as atrações temáticas da cidade.",
+        foto: { url: `${FOTO}685e4076-c5e4-4442-b18c-c9b9be4549d8.jpeg`, alt: "Vista panorâmica das Cataratas do Iguaçu com arco-íris sobre o rio", enquadramento: "50% 45%" },
+      },
+      {
+        titulo: "O que mais fazer em Foz do Iguaçu",
+        paragrafos: [],
+        lista: [
+          "Itaipu Binacional: uma das maiores hidrelétricas do mundo, construída por Brasil e Paraguai. A visita mostra a barragem de perto e impressiona pelo tamanho.",
+          "Marco das Três Fronteiras: o mirante no encontro dos rios Iguaçu e Paraná, de onde se vê o Brasil, a Argentina e o Paraguai ao mesmo tempo. O fim de tarde lá é muito bonito.",
+          "Parque das Aves: ao lado da entrada das Cataratas, com aves da Mata Atlântica em viveiros por onde você caminha.",
+          "Atrações temáticas: Museu de Cera, Bar de Gelo, Vale dos Dinossauros, Maravilhas do Mundo e Show de Motos. Agradam a família inteira e são uma ótima opção para dias de chuva.",
+          "Puerto Iguazú, na Argentina: a feirinha é famosa pelos queijos, vinhos, alfajores, artesanato e produtos regionais.",
+          "Ciudad del Este, no Paraguai: conhecida pelas lojas e pela variedade de produtos para compras.",
+        ],
+        foto: {
+          url: `${FOTO}ecf02a15-3d7b-43e5-aa3a-f488c0506bc4.jpeg`,
+          alt: "Andreia Castilho, da AJS Turismo, no Marco das Três Fronteiras, entre os marcos do Brasil, da Argentina e do Paraguai",
+          vertical: true,
+          legenda: "Andreia Castilho, da AJS Turismo, no Marco das Três Fronteiras em uma das viagens com o grupo.",
+        },
+      },
+      {
+        titulo: "Documentos para atravessar a fronteira",
+        paragrafos: [
+          "Para ir à Argentina e ao Paraguai, você passa pela aduana e precisa apresentar documento original. As regras são mais rígidas do que nas viagens dentro do Brasil, principalmente para menores de idade.",
+          "A lista exata do que levar está na página de cada viagem, no item de documentos. Confira antes de sair de casa: sem o documento certo, não dá para atravessar.",
+        ],
+      },
+      {
+        titulo: "O que levar",
+        paragrafos: [],
+        lista: [
+          "Documento original com foto, conforme a lista da viagem",
+          "Capa de chuva ou roupa que possa molhar: perto da Garganta do Diabo, a névoa das quedas molha de verdade",
+          "Capinha ou saco à prova d'água para o celular",
+          "Tênis confortável para as trilhas e passarelas",
+          "Protetor solar, boné e óculos de sol",
+          "Repelente",
+          "Garrafa de água",
+          "Roupa leve no verão e agasalho no inverno, quando as noites são frias",
+        ],
+      },
+      {
+        titulo: "Melhor época para ir",
+        paragrafos: [
+          "Foz do Iguaçu vale a viagem o ano inteiro. O que muda é o clima e o volume das quedas.",
+        ],
+        lista: [
+          "Verão: calor forte e chuvas frequentes, que deixam as Cataratas mais cheias e impressionantes.",
+          "Inverno: dias mais secos e frescos, céu limpo e noites frias. Bom para caminhar sem calor.",
+          "Primavera e outono: temperatura agradável, um equilíbrio entre os dois.",
+          "Depois de períodos de muita chuva, a água fica mais volumosa e barrenta. Na seca, fica mais clara e as quedas aparecem mais separadas.",
+        ],
+      },
+      {
+        titulo: "Dicas para aproveitar melhor",
+        paragrafos: [],
+        lista: [
+          "Chegue cedo aos parques: tem menos fila, menos gente nas passarelas e menos calor.",
+          "Não alimente os quatis. Eles parecem mansos, mas podem morder e arranhar, e a comida faz mal a eles. Guarde lanches e sacolas fechados.",
+          "Reserve um dia para cada lado das Cataratas, se puder. O lado argentino pede mais tempo e mais caminhada.",
+          "Em feriados, a travessia das pontes para a Argentina e o Paraguai pode ter fila. Saia cedo.",
+        ],
+        foto: { url: `${FOTO}b537447f-38dd-4da3-9c25-66a7fd640dbf.jpeg`, alt: "Quati na grade do mirante com as Cataratas do Iguaçu ao fundo", enquadramento: "50% 78%" },
+      },
+    ],
+    perguntas: [
+      {
+        pergunta: "Vale mais a pena o lado brasileiro ou o argentino das Cataratas?",
+        resposta: "Os dois valem e se completam. O lado brasileiro mostra a vista panorâmica das quedas e é um passeio mais curto. O argentino leva você para perto das quedas, por cima e por baixo, e pede o dia inteiro.",
+      },
+      {
+        pergunta: "Precisa de passaporte para ir à Argentina e ao Paraguai?",
+        resposta: "Não necessariamente. Brasileiros podem atravessar com documento de identidade aceito no Mercosul ou com passaporte, mas as regras são mais rígidas do que dentro do Brasil, principalmente para menores. A lista exata está na página da viagem.",
+      },
+      {
+        pergunta: "A passarela da Garganta do Diabo molha?",
+        resposta: "Sim. A névoa das quedas molha bastante, ainda mais quando o rio está cheio. Vá com capa de chuva ou roupa que possa molhar e proteja o celular.",
+      },
+      {
+        pergunta: "Onde dá para ver os três países ao mesmo tempo?",
+        resposta: "No Marco das Três Fronteiras, no encontro dos rios Iguaçu e Paraná. De lá se vê o Brasil, a Argentina e o Paraguai.",
+      },
+      {
+        pergunta: "Foz do Iguaçu é boa para ir com crianças?",
+        resposta: "Sim. A trilha do lado brasileiro é tranquila, o Parque das Aves agrada muito as crianças e a viagem mistura natureza e passeios curtos. Para atravessar a fronteira, menores de idade têm regras próprias de documento.",
+      },
+      {
+        pergunta: "Quando as Cataratas estão mais cheias?",
+        resposta: "Depois de períodos de chuva, que são mais comuns no verão. Nessa época, as quedas ficam mais volumosas e a água fica barrenta.",
+      },
+    ],
+    roteiros: [
+      "foz-do-iguacu-opcionais-paraguai-e-argentina",
+      "foz-do-iguacu-opcionais-paraguai-e-argentina-2",
+      "reveillon-2027-em-foz-do-iguacu-pr",
+    ],
+    chamadaNaViagem: "Primeira vez em Foz do Iguaçu? Veja nossas dicas: Cataratas dos dois lados, o que fazer e o que levar",
     escritoEm: "2026-10-14",
     atualizadoEm: "2026-10-14",
   },

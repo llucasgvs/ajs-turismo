@@ -172,10 +172,14 @@ export default async function DicaPage({ params }: { params: Promise<{ slug: str
                 </div>
               )}
               {s.foto && (
-                <figure className="pt-2">
+                <figure className={`pt-2 ${s.foto.vertical ? "max-w-sm mx-auto" : ""}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={imgOtim(s.foto.url, 1200, 90)} alt={s.foto.alt} loading="lazy" decoding="async"
-                    className="w-full rounded-2xl shadow-sm object-cover aspect-[16/10]" />
+                    style={s.foto.enquadramento ? { objectPosition: s.foto.enquadramento } : undefined}
+                    className={`w-full rounded-2xl shadow-sm object-cover ${s.foto.vertical ? "aspect-[4/5]" : "aspect-[16/10]"}`} />
+                  {s.foto.legenda && (
+                    <figcaption className="text-center text-sm text-gray-500 mt-2.5">{s.foto.legenda}</figcaption>
+                  )}
                 </figure>
               )}
             </section>
