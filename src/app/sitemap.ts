@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { tiposDisponiveis, tipoIndexavel } from "@/lib/tiposDeViagem";
+import { DICAS } from "@/conteudo/dicas";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -10,6 +11,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/viagens`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE}/cadastro`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE}/login`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
+    // Guias de dicas: conteúdo fixo, a data vem do próprio guia.
+    { url: `${SITE}/dicas`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
+    ...DICAS.map((d) => ({
+      url: `${SITE}/dicas/${d.slug}`,
+      lastModified: new Date(d.atualizadoEm),
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
   ];
 
   try {

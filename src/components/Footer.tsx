@@ -51,6 +51,7 @@ export default function Footer() {
                 { label: "Como Funciona", href: "#como-funciona" },
                 { label: "Depoimentos", href: "#depoimentos" },
                 { label: "Contato", href: "#contato" },
+                { label: "Dicas de viagem", href: "/dicas" },
               ].map(({ label, href }) => (
                 <li key={label}>
                   <a

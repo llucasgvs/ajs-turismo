@@ -7,11 +7,12 @@ import {
   MapPin, Clock, Calendar, Users, Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   ArrowLeft, AlertTriangle,
   Shield, Headphones, Award, Camera, Sun, Mountain, Waves,
-  TreePine, Landmark, Earth, Utensils, Star, Bus, Plane,
+  TreePine, Landmark, Earth, Utensils, Star, Bus, Plane, BookOpen,
 } from "lucide-react";
 import type { Trip } from "@/types/trip";
 import { escolherRelacionadas, escolherOpcoes, URL_VIAGENS, URL_ROTEIROS, type CartaoViagem, type OpcaoDestino } from "@/lib/relacionadas";
 import PerguntasFrequentes, { montarPerguntas } from "@/components/viagem/PerguntasFrequentes";
+import { dicaDoRoteiro } from "@/conteudo/dicas";
 import Footer from "@/components/Footer";
 import { fmtBRL, fmtInstallment, isUnlimitedSpots, salesClosed, temVaga, poucasVagas, marcadoBateVolta } from "@/lib/format";
 import { useLoading } from "@/components/LoadingProvider";
@@ -585,6 +586,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
 }) {
   const router = useRouter();
   const { show: showLoading } = useLoading();
+  const dica = dicaDoRoteiro(trip.slug);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
@@ -1261,6 +1263,17 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
               )}
 
               <PerguntasFrequentes perguntas={montarPerguntas(trip, activeTrip, !semCompra)} />
+
+              {/* Link discreto para o guia do destino: texto simples, longe do
+                  preço e do botão de reservar. Também liga as duas páginas
+                  para o Google (uma informa, a outra vende). */}
+              {dica && (
+                <Link href={`/dicas/${dica.slug}`}
+                  className="group flex items-start gap-2 px-1 text-sm text-navy-600 hover:text-navy-800 transition-colors">
+                  <BookOpen size={16} className="text-gold-500 flex-shrink-0 mt-0.5" />
+                  <span>{dica.chamadaNaViagem} <span className="whitespace-nowrap group-hover:underline">→</span></span>
+                </Link>
+              )}
 
               {/* Trust Block - hidden on mobile */}
               {!semDatas && (

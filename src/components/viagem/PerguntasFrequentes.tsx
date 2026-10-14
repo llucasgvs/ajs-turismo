@@ -144,7 +144,7 @@ export default function PerguntasFrequentes({ perguntas }: { perguntas: Pergunta
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm" aria-labelledby="perguntas-frequentes">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(dados) }} />
-      <h2 id="perguntas-frequentes" className="font-display font-black text-lg text-navy-800 flex items-center gap-2 mb-2">
+      <h2 id="perguntas-frequentes" className="scroll-mt-24 font-display font-black text-lg text-navy-800 flex items-center gap-2 mb-2">
         <HelpCircle size={18} className="text-gold-500" /> Perguntas frequentes
       </h2>
       <div className="divide-y divide-gray-100">
