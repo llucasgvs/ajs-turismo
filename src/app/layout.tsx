@@ -160,12 +160,13 @@ const jsonLd = {
     "https://www.facebook.com/ajsturismo",
     "https://www.youtube.com/@ajsturismo",
   ],
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.9",
-    reviewCount: "500",
-    bestRating: "5",
-  },
+  // Liga o site à empresa registrada (o mesmo CNPJ do rodapé e do Cadastur).
+  // A AJS começou em 2016; o CNPJ atual é de 2017. Vale a história da empresa.
+  taxID: "28.702.277/0001-85",
+  foundingDate: "2016",
+  // Sem nota aqui de propósito: o Google proíbe avaliação que não dá para
+  // conferir e não mostra estrelas da empresa dada por ela mesma. As
+  // avaliações reais ficam no Perfil da Empresa no Google.
 };
 
 export default function RootLayout({
