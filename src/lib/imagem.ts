@@ -34,6 +34,14 @@ export function imgOtim(url?: string | null, largura = 828, qualidade = 85): str
   return `/_next/image?url=${encodeURIComponent(u)}&w=${w}&q=${q}`;
 }
 
+/** Várias larguras da mesma foto para o navegador escolher (srcSet): o
+ *  celular baixa a pequena e o computador a grande. */
+export function imgSrcSet(url: string | null | undefined, larguras: number[], qualidade = 85): string | undefined {
+  const base = imgOtim(url, larguras[0], qualidade);
+  if (!base.startsWith("/_next/image")) return undefined; // host fora do otimizador
+  return larguras.map((w) => `${imgOtim(url, w, qualidade)} ${LARGURAS.find((x) => x >= w) ?? w}w`).join(", ");
+}
+
 /**
  * A imagem de prévia (OpenGraph: WhatsApp, Facebook) pela MESMA porta das
  * fotos do site. Absoluta, porque o robô lê a URL fora do site.

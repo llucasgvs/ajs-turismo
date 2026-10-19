@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { imgOtim, imgSrcSet } from "@/lib/imagem";
 import { MapPin, Star, Users, ArrowRight, ChevronDown } from "lucide-react";
 
 const heroSlides = [
@@ -30,14 +31,31 @@ const stats = [
 
 export default function Hero() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
+  // As fotos 2 e 3 do carrossel só entram depois que a página terminou de
+  // carregar: antes, as três (até 857 KB cada) disputavam a rede com a primeira.
+  // Se a página demorar, libera do mesmo jeito em 2,5 s.
+  const [carregarResto, setCarregarResto] = useState(false);
+  // O carrossel só passa para uma foto que já chegou: em internet lenta, ele
+  // espera na atual em vez de mostrar o fundo vazio.
+  const prontas = useRef<boolean[]>(heroSlides.map((_, i) => i === 0));
+  const marcarPronta = (i: number) => { prontas.current[i] = true; };
 
   useEffect(() => {
-    setIsLoaded(true);
+    const liberar = () => setCarregarResto(true);
+    if (document.readyState === "complete") liberar();
+    else window.addEventListener("load", liberar, { once: true });
+    const reserva = setTimeout(liberar, 2500);
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+      setCurrentSlide((prev) => {
+        const proxima = (prev + 1) % heroSlides.length;
+        return prontas.current[proxima] ? proxima : prev;
+      });
     }, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(reserva);
+      window.removeEventListener("load", liberar);
+    };
   }, []);
 
   return (
@@ -50,14 +68,19 @@ export default function Hero() {
             i === currentSlide ? "opacity-100" : "opacity-0"
           }`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            decoding="async"
-            fetchPriority="high"
-            src={slide.image}
-            alt={slide.title}
-            className="w-full h-full object-cover"
-          />
+          {(i === 0 || carregarResto) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              decoding="async"
+              fetchPriority={i === 0 ? "high" : "low"}
+              src={imgOtim(slide.image, 1920, 80)}
+              srcSet={imgSrcSet(slide.image, [828, 1200, 1920], 80)}
+              sizes="100vw"
+              onLoad={() => marcarPronta(i)}
+              alt={slide.title}
+              className="w-full h-full object-cover"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-navy-900/80 via-navy-800/60 to-navy-900/90" />
         </div>
       ))}
@@ -72,9 +95,7 @@ export default function Hero() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
           <div
-            className={`inline-flex items-center gap-2 bg-gold-500/20 border border-gold-400/30 text-gold-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-full mb-6 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-700 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`inline-flex items-center gap-2 bg-gold-500/20 border border-gold-400/30 text-gold-300 text-xs md:text-sm font-semibold px-4 py-2 rounded-full mb-6`}
           >
             <Star size={12} fill="currentColor" />
             Agência de viagens com mais de 10 anos de experiência
@@ -82,9 +103,7 @@ export default function Hero() {
 
           {/* Main headline */}
           <h1
-            className={`font-display font-black text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white leading-[1.05] mb-6 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-700 delay-100 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`font-display font-black text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white leading-[1.05] mb-6`}
           >
             Cada Viagem{" "}
             <span className="text-gold-400 relative">
@@ -98,9 +117,7 @@ export default function Hero() {
 
           {/* Sub headline */}
           <p
-            className={`text-white/80 text-base md:text-xl mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-700 delay-200 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`text-white/80 text-base md:text-xl mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed`}
           >
             Pacotes de viagens incríveis com o melhor custo-benefício do Brasil.
             Destinos nacionais e internacionais, atendimento personalizado e muito mais.
@@ -108,9 +125,7 @@ export default function Hero() {
 
           {/* CTAs */}
           <div
-            className={`flex flex-col sm:flex-row gap-3 justify-center mb-12 md:mb-16 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-700 delay-300 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`flex flex-col sm:flex-row gap-3 justify-center mb-12 md:mb-16`}
           >
             <Link
               href="/viagens"
@@ -134,9 +149,7 @@ export default function Hero() {
 
           {/* Stats */}
           <div
-            className={`flex flex-row justify-center gap-4 md:gap-8 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-700 delay-[400ms] ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`flex flex-row justify-center gap-4 md:gap-8`}
           >
             {stats.map(({ icon: Icon, value, label }) => (
               <div key={label} className="text-center">
@@ -156,7 +169,7 @@ export default function Hero() {
         {heroSlides.map((_, i) => (
           <button
             key={i}
-            onClick={() => setCurrentSlide(i)}
+            onClick={() => { setCarregarResto(true); setCurrentSlide(i); }}
             className={`h-1.5 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
               i === currentSlide ? "w-8 bg-gold-400" : "w-2 bg-white/40"
             }`}

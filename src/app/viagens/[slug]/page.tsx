@@ -54,6 +54,30 @@ async function buscarLista<T>(caminho: string): Promise<T[] | null> {
   }
 }
 
+/** As datas do roteiro, só com o que muda de uma data para outra (o resto é
+ *  igual ao da viagem). Vêm prontas no HTML para o seletor de datas já
+ *  aparecer no lugar: antes ele surgia ~1,5 s depois e empurrava a página
+ *  inteira para baixo no celular. O navegador busca de novo logo em seguida,
+ *  sem cache, para as vagas ficarem em tempo real. */
+const CAMPOS_DA_DATA = [
+  "id", "departure_date", "return_date", "duration_nights", "price_per_person", "original_price",
+  "max_installments", "price_tiers", "total_spots", "available_spots", "min_group_size", "optionals",
+  "status", "is_active", "is_featured", "created_at",
+] as const;
+type DataDoRoteiro = Pick<Trip, (typeof CAMPOS_DA_DATA)[number]>;
+
+async function buscarDatas(templateId: number): Promise<DataDoRoteiro[] | undefined> {
+  try {
+    const r = await fetch(`${API}/trips/?template_id=${templateId}&limit=500&future_only=true`, { next: { revalidate: 60 } });
+    if (!r.ok) return undefined;
+    const lista = await r.json();
+    if (!Array.isArray(lista)) return undefined;
+    return lista.map((t: Trip) => Object.fromEntries(CAMPOS_DA_DATA.map((c) => [c, t[c]])) as DataDoRoteiro);
+  } catch {
+    return undefined; // sem as datas prontas, a página busca no navegador, como antes
+  }
+}
+
 /** URL antiga /viagens/{id}: descobre o slug do roteiro daquela data. */
 async function slugDoIdAntigo(id: string): Promise<string | null> {
   try {
@@ -187,6 +211,7 @@ export default async function TripDetailPage({
     buscarLista<OpcaoDestino>(URL_ROTEIROS),
   ]);
   if (!data) notFound();
+  const datas = data.has_dates && data.trip ? await buscarDatas(data.template_id) : undefined;
   const cartoes = (t: Trip) => ({
     relacionadas: viagens ? escolherRelacionadas(viagens, t.id, t.template_id, t.category) : undefined,
     opcoes: roteiros ? escolherOpcoes(roteiros, t.template_id, t.parent_id) : undefined,
@@ -235,7 +260,7 @@ export default async function TripDetailPage({
   return (
     <Suspense>
       <Trilha titulo={data.roteiro.title} slug={slug} />
-      <TripDetailClient trip={data.trip} {...cartoes(data.trip)} />
+      <TripDetailClient trip={data.trip} datasIniciais={datas} {...cartoes(data.trip)} />
     </Suspense>
   );
 }

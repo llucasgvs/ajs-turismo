@@ -178,8 +178,6 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} ${montserrat.variable}`}>
       <head>
         <link rel="preconnect" href="https://images.unsplash.com" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

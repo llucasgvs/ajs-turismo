@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PerguntasFrequentes from "@/components/viagem/PerguntasFrequentes";
 import { DICAS, dicaPorSlug, ancora } from "@/conteudo/dicas";
-import { imgOtim, imgOg } from "@/lib/imagem";
+import { imgOtim, imgOg, imgSrcSet } from "@/lib/imagem";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.ajsturismo.com.br";
@@ -92,7 +92,8 @@ export default async function DicaPage({ params }: { params: Promise<{ slug: str
       <section className="relative pt-20 overflow-hidden">
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imgOtim(d.capa.url, 1920, 85)} alt="" fetchPriority="high" className="w-full h-full object-cover opacity-40" />
+          <img src={imgOtim(d.capa.url, 1920, 80)} srcSet={imgSrcSet(d.capa.url, [828, 1200, 1920], 80)} sizes="100vw"
+            alt="" fetchPriority="high" decoding="async" className="w-full h-full object-cover opacity-40" />
           <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-900/70 to-navy-900" />
         </div>
         <div className="relative container-custom py-12 md:py-20 text-center flex flex-col items-center">

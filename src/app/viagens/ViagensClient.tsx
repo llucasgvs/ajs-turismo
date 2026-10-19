@@ -9,7 +9,10 @@ import { Clock,
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
-import { imgOtim } from "@/lib/imagem";
+import { imgOtim, imgSrcSet } from "@/lib/imagem";
+
+/** Foto de fundo do topo (fica a 20% de opacidade, atrás do título). */
+const FUNDO_TOPO = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=85&fit=crop";
 import { prazoDoCombo } from "@/lib/combos";
 import { ehDoTipo, tiposDisponiveis, cabecalho, tipoValido, type TipoId } from "@/lib/tiposDeViagem";
 
@@ -456,8 +459,10 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
       <section className="relative pt-20 overflow-hidden pb-20">
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img loading="lazy" decoding="async"
-            src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80&fit=crop"
+          <img decoding="async" fetchPriority="high"
+            src={imgOtim(FUNDO_TOPO, 1920, 75)}
+            srcSet={imgSrcSet(FUNDO_TOPO, [828, 1200, 1920], 75)}
+            sizes="100vw"
             alt="destinos"
             className="w-full h-full object-cover opacity-20"
           />

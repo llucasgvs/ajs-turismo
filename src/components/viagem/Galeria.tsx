@@ -85,7 +85,8 @@ export function PhotoGrid({ images, onOpen, nome = "" }: { images: string[]; onO
       {/* Mobile: single large image */}
       <div className="sm:hidden relative h-72 rounded-2xl overflow-hidden cursor-pointer" onClick={() => onOpen(0)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy" decoding="async" src={imgOtim(images[0], 828, 90)} alt={nome ? `${nome}, foto 1` : ""} className="w-full h-full object-cover" />
+        {/* É a maior foto da tela no celular: carrega primeiro, sem esperar. */}
+        <img fetchPriority="high" decoding="async" src={imgOtim(images[0], 828, 90)} alt={nome ? `${nome}, foto 1` : ""} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         {images.length > 1 && (
           <button

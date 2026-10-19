@@ -579,8 +579,25 @@ function OpenDateCalendar({
 /* ═══════════════════════════════════════════
    12. Main Component
 ═══════════════════════════════════════════ */
-export default function TripDetailClient({ trip, semDatas = false, relacionadas, opcoes }: {
+/** Data mais próxima que ainda vende (com vaga e dentro do prazo); se nenhuma
+ *  vende, a primeira. Mesma regra na montagem e na atualização das vagas. */
+function aindaVende(t: Trip): boolean {
+  return temVaga(t.available_spots) && t.status !== "sold_out" && !salesClosed(t.departure_date);
+}
+
+function maisProxima(ordenadas: Trip[]): Trip | undefined {
+  return ordenadas.find(aindaVende) || ordenadas[0];
+}
+
+function ordenarDatas(lista: Trip[]): Trip[] {
+  return [...lista].sort((a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime());
+}
+
+export default function TripDetailClient({ trip, semDatas = false, relacionadas, opcoes, datasIniciais }: {
   trip: Trip; semDatas?: boolean;
+  /** Datas já buscadas no servidor, só com os campos que mudam por data. Com
+   *  elas o seletor de datas nasce no lugar, sem empurrar a página. */
+  datasIniciais?: Partial<Trip>[];
   /** Cartões já escolhidos no servidor; ausentes, a página busca sozinha. */
   relacionadas?: CartaoViagem[]; opcoes?: OpcaoDestino[];
 }) {
@@ -591,8 +608,12 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
   const [navUser, setNavUser] = useState<StoredUser | null>(null);
-  const [siblingTrips, setSiblingTrips] = useState<Trip[]>([]);
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [siblingTrips, setSiblingTrips] = useState<Trip[]>(() =>
+    !semDatas && datasIniciais?.length ? ordenarDatas(datasIniciais.map((d) => ({ ...trip, ...d }) as Trip)) : []);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(() => maisProxima(siblingTrips) ?? null);
+  // A data veio da escolha do cliente (clique) ou da seleção automática? Só a
+  // do cliente é mantida quando as vagas são atualizadas.
+  const escolhaDoCliente = useRef(false);
   const [dateError, setDateError] = useState(false);
   const [selectedOptionals, setSelectedOptionals] = useState<{ name: string; price: number }[]>([]);
   const [sidebarPeople, setSidebarPeople] = useState(1);
@@ -718,13 +739,16 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
       .then(r => r.json())
       .then((data: Trip[]) => {
         if (!Array.isArray(data) || data.length === 0) return;
-        const sorted = [...data].sort(
-          (a, b) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime()
-        );
+        const sorted = ordenarDatas(data);
         setSiblingTrips(sorted);
-        // Auto-seleciona a data mais próxima disponível (com vaga e dentro do prazo de vendas)
-        const nearest = sorted.find(t => temVaga(t.available_spots) && t.status !== "sold_out" && !salesClosed(t.departure_date)) || sorted[0];
-        if (nearest) setSelectedTrip(nearest);
+        // Com as vagas do momento: mantém a data que o CLIENTE escolheu, se
+        // ela ainda vende. A seleção automática (feita com dados de até 60 s
+        // atrás) é refeita, para nunca ficar parada numa data que esgotou.
+        setSelectedTrip((atual) => {
+          const mesma = atual ? sorted.find((t) => t.id === atual.id) : undefined;
+          if (escolhaDoCliente.current && mesma && aindaVende(mesma)) return mesma;
+          return maisProxima(sorted) ?? atual;
+        });
       })
       .catch(() => {});
   }, [trip.id, trip.template_id]);
@@ -746,6 +770,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   }, [trip.template_id, trip.id, trip.title, trip.price_per_person, trip.category]);
 
   const handleSelectDate = useCallback((t: Trip) => {
+    escolhaDoCliente.current = true;
     setSelectedTrip(t);
     setDateError(false);
   }, []);

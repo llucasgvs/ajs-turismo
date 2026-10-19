@@ -1,5 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap');
-
+/* As fontes vêm do next/font (layout.tsx), hospedadas pelo próprio site.
+   Não importar do Google aqui: era carga dupla e travava o desenho da página. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
