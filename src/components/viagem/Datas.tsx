@@ -31,6 +31,27 @@ export type DataSelecionavel = {
   status?: string | null;
 };
 
+/* Preço do cartão e o "de" riscado.
+ *
+ * Viagem avulsa: o preço DE VENDA da data (já com promoção) e o "de"
+ * cadastrado. Combo: a TABELA menos o desconto do pacote, e a tabela riscada,
+ * porque é sobre ela que o combo desconta (decisão do dono, 09/09/2026).
+ *
+ * Antes os dois casos usavam a tabela, e a regra do combo vazou para a viagem
+ * avulsa: em promoção, o cartão mostrava o preço cheio em destaque (R$ 240 em
+ * vez de R$ 228) enquanto a barra de baixo e a cobrança usavam o promocional. */
+export function precoDoCartao(t: DataSelecionavel, descontoPct: number): number {
+  return descontoPct > 0
+    ? precoDeTabela(t.price_per_person, t.original_price) * (1 - descontoPct / 100)
+    : t.price_per_person;
+}
+
+export function riscadoDoCartao(t: DataSelecionavel, descontoPct: number): number | null {
+  if (descontoPct > 0) return precoDeTabela(t.price_per_person, t.original_price);
+  const de = Number(t.original_price ?? 0);
+  return de > t.price_per_person ? de : null;
+}
+
 /* A data escolhida, como a lateral da página de viagem sempre mostrou.
  *
  * Estava escrita à mão dentro de TripDetailClient. Saiu para cá quando o combo
@@ -175,16 +196,9 @@ export function DateSelector<T extends DataSelecionavel>({
               {/* Price row */}
               <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                  {/* Com desconto de combo, o riscado é o preço da própria
-                      viagem: é dele que o cliente é poupado ao levar o pacote.
-                      Sem combo, segue sendo o "de" cadastrado na data. */}
-                  {/* Com combo, o riscado é a TABELA: é dela que o pacote
-                      desconta. Sem combo, segue sendo o "de" cadastrado. */}
-                  {(descontoPct > 0 ? precoDeTabela(t.price_per_person, t.original_price) : t.original_price) && (
+                  {riscadoDoCartao(t, descontoPct) && (
                     <p className="text-[10px] text-gray-400 line-through leading-none">
-                      R$ {fmtBRL(descontoPct > 0
-                        ? precoDeTabela(t.price_per_person, t.original_price)
-                        : (t.original_price as number))}
+                      R$ {fmtBRL(riscadoDoCartao(t, descontoPct) as number)}
                     </p>
                   )}
                   {isSold ? (
@@ -193,7 +207,7 @@ export function DateSelector<T extends DataSelecionavel>({
                     <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
                   ) : (
                     <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                      R$ {fmtBRL(precoDeTabela(t.price_per_person, t.original_price) * (1 - descontoPct / 100))}
+                      R$ {fmtBRL(precoDoCartao(t, descontoPct))}
                       <span className="text-xs font-normal text-gray-400"> /pessoa</span>
                     </span>
                   )}
@@ -351,15 +365,15 @@ export function CompactDateSelector<T extends DataSelecionavel>({
                       ) : (
                         <>
                           <span className="min-w-0">
-                            {/* Com desconto de combo, o riscado é a TABELA:
-                                é dela que o pacote desconta. */}
-                            {descontoPct > 0 && (
+                            {/* Mesma regra do cartão grande: na avulsa, o "de"
+                                da promoção; no combo, a tabela. */}
+                            {riscadoDoCartao(t, descontoPct) && (
                               <span className="block text-[10px] text-gray-400 line-through leading-none">
-                                R$ {fmtBRL(precoDeTabela(t.price_per_person, t.original_price))}
+                                R$ {fmtBRL(riscadoDoCartao(t, descontoPct) as number)}
                               </span>
                             )}
                             <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                              R$ {fmtBRL(precoDeTabela(t.price_per_person, t.original_price) * (1 - descontoPct / 100))}
+                              R$ {fmtBRL(precoDoCartao(t, descontoPct))}
                             </span>
                           </span>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap overflow-hidden text-ellipsis ${
