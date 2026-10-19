@@ -251,7 +251,7 @@ function RelatedCard({ trip }: { trip: CartaoViagem }) {
         )}
       </div>
       <div className="p-3 flex flex-col flex-1">
-        <h4 className="font-display font-black text-xs text-navy-800 line-clamp-2 mb-2 leading-snug">{trip.title}</h4>
+        <h3 className="font-display font-black text-xs text-navy-800 line-clamp-2 mb-2 leading-snug">{trip.title}</h3>
         <div className="mt-auto flex items-end justify-between">
           <div>
             <p className="text-[10px] text-gray-400">a partir de</p>
@@ -510,12 +510,12 @@ function OpenDateCalendar({
 
       {/* Month navigation */}
       <div className="px-5 pb-2 flex items-center justify-between">
-        <button type="button" onClick={prevMonth} disabled={!canPrev}
+        <button type="button" onClick={prevMonth} disabled={!canPrev} aria-label="Mês anterior"
           className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 disabled:opacity-30 transition-colors">
           <ChevronLeft size={16} />
         </button>
         <span className="text-sm font-bold text-navy-800 capitalize">{monthLabel}</span>
-        <button type="button" onClick={nextMonth} disabled={!canNext}
+        <button type="button" onClick={nextMonth} disabled={!canNext} aria-label="Próximo mês"
           className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 disabled:opacity-30 transition-colors">
           <ChevronRight size={16} />
         </button>
@@ -1209,7 +1209,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                       <div className="space-y-5">
                         {trip.itinerary.map((item, idx) => (
                           <div key={idx}>
-                            <h4 className="font-bold text-navy-800 mb-2">{item.title}</h4>
+                            <h3 className="font-bold text-navy-800 mb-2">{item.title}</h3>
                             {item.items && item.items.length > 0 && (
                               <ul className="space-y-1.5 pl-1">
                                 {item.items.map((bullet: string, bi: number) => (
@@ -1472,10 +1472,10 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                                     {!ocupaPoltrona(label) && " · não ocupa poltrona"}
                                   </p>
                                 </div>
-                                <button type="button" onClick={() => changeSidebarTier(label, -1)}
+                                <button type="button" onClick={() => changeSidebarTier(label, -1)} aria-label={`Tirar um: ${label}`}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">−</button>
                                 <span className="w-6 text-center font-bold text-navy-800">{sidebarTiers[label] || 0}</span>
-                                <button type="button" onClick={() => changeSidebarTier(label, 1)}
+                                <button type="button" onClick={() => changeSidebarTier(label, 1)} aria-label={`Pôr mais um: ${label}`}
                                   className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold flex-shrink-0">+</button>
                               </div>
                             ))}
@@ -1485,11 +1485,11 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                         <>
                           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Pessoas</p>
                           <div className="flex items-center gap-3">
-                            <button type="button"
+                            <button type="button" aria-label="Uma pessoa a menos"
                               onClick={() => { setSelecaoExplicita(true); setSidebarPeople(p => Math.max(1, p - 1)); }}
                               className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">−</button>
                             <span className="flex-1 text-center font-bold text-navy-800 text-base">{sidebarPeople} pessoa{sidebarPeople > 1 ? "s" : ""}</span>
-                            <button type="button"
+                            <button type="button" aria-label="Uma pessoa a mais"
                               onClick={() => { setSelecaoExplicita(true); setSidebarPeople(p => Math.min(activeTrip.available_spots || 50, p + 1)); }}
                               className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-base transition-colors">+</button>
                           </div>

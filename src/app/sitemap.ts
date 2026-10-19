@@ -9,8 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: SITE, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 },
     { url: `${SITE}/viagens`, lastModified: new Date(), changeFrequency: "daily", priority: 0.9 },
-    { url: `${SITE}/cadastro`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
-    { url: `${SITE}/login`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
+    // Login e cadastro ficam de fora: não servem como resultado de busca.
     // Guias de dicas: conteúdo fixo, a data vem do próprio guia.
     { url: `${SITE}/dicas`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
     ...DICAS.map((d) => ({

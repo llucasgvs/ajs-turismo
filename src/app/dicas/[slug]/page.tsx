@@ -92,7 +92,7 @@ export default async function DicaPage({ params }: { params: Promise<{ slug: str
       <section className="relative pt-20 overflow-hidden">
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imgOtim(d.capa.url, 1920, 80)} srcSet={imgSrcSet(d.capa.url, [828, 1200, 1920], 80)} sizes="100vw"
+          <img src={imgOtim(d.capa.url, 1920, 60)} srcSet={imgSrcSet(d.capa.url, [828, 1200, 1920], 60)} sizes="100vw"
             alt="" fetchPriority="high" decoding="async" className="w-full h-full object-cover opacity-40" />
           <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-900/70 to-navy-900" />
         </div>

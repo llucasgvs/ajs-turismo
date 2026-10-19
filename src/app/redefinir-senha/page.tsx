@@ -81,7 +81,7 @@ export default function RedefinirSenhaPage() {
             <blockquote className="text-white/90 text-2xl font-display font-bold leading-snug mb-4">
               &ldquo;A vida é curta demais para ficar no mesmo lugar.&rdquo;
             </blockquote>
-            <p className="text-white/50 text-sm">- Anônimo</p>
+            <p className="text-white/70 text-sm">- Anônimo</p>
           </div>
         </div>
       </div>
@@ -150,7 +150,8 @@ export default function RedefinirSenhaPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-navy-600"
+                      aria-label={showPassword ? "Esconder a senha" : "Mostrar a senha"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-navy-600"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>

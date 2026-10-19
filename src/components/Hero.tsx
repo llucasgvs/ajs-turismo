@@ -165,15 +165,22 @@ export default function Hero() {
       </div>
 
       {/* Slide indicators */}
-      <div className="absolute bottom-6 md:bottom-20 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-        {heroSlides.map((_, i) => (
+      <div className="absolute bottom-6 md:bottom-20 left-1/2 -translate-x-1/2 flex z-10">
+        {/* A bolinha continua do mesmo tamanho; o botão em volta dela é que
+            cresce, para dar para tocar com o dedo: o Google pede 24 px entre um
+            alvo e outro, por isso o espaço entre as bolinhas ficou um pouco maior. */}
+        {heroSlides.map((slide, i) => (
           <button
             key={i}
+            aria-label={`Ver foto ${i + 1}: ${slide.title}`}
+            aria-current={i === currentSlide}
             onClick={() => { setCarregarResto(true); setCurrentSlide(i); }}
-            className={`h-1.5 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
+            className="px-2 py-3"
+          >
+            <span className={`block h-1.5 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
               i === currentSlide ? "w-8 bg-gold-400" : "w-2 bg-white/40"
-            }`}
-          />
+            }`} />
+          </button>
         ))}
       </div>
 
@@ -181,7 +188,7 @@ export default function Hero() {
       <div className="hidden md:block absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => document.querySelector("#destinos")?.scrollIntoView({ behavior: "smooth" })}
-          className="flex flex-col items-center gap-1 text-white/50 hover:text-gold-400 transition-colors animate-bounce-slow"
+          className="flex flex-col items-center gap-1 text-white/70 hover:text-gold-400 transition-colors animate-bounce-slow"
         >
           <span className="text-xs">Explore</span>
           <ChevronDown size={20} />

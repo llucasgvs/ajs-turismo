@@ -135,7 +135,7 @@ export default function Testimonials() {
               </div>
               <div className="text-left">
                 <p className="text-white font-bold">{t.name}</p>
-                <p className="text-white/50 text-xs sm:text-sm break-words">{t.location} · {t.trip} · {t.date}</p>
+                <p className="text-white/70 text-xs sm:text-sm break-words">{t.location} · {t.trip} · {t.date}</p>
               </div>
             </div>
           </div>
@@ -144,25 +144,31 @@ export default function Testimonials() {
           <div className="flex items-center justify-center gap-4 mt-8">
             <button
               onClick={prev}
+              aria-label="Depoimento anterior"
               className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
             >
               <ChevronLeft size={20} />
             </button>
 
-            <div className="flex gap-2">
+            <div className="flex">
               {testimonials.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrent(i)}
-                  className={`h-2 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
+                  aria-label={`Ver depoimento ${i + 1}`}
+                  aria-current={i === current}
+                  className="px-2 py-3"
+                >
+                  <span className={`block h-2 rounded-full transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
                     i === current ? "w-8 bg-gold-400" : "w-2 bg-white/30"
-                  }`}
-                />
+                  }`} />
+                </button>
               ))}
             </div>
 
             <button
               onClick={next}
+              aria-label="Próximo depoimento"
               className="w-11 h-11 rounded-full bg-white/10 hover:bg-gold-500 text-white flex items-center justify-center transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 hover:scale-110"
             >
               <ChevronRight size={20} />

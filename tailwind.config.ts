@@ -8,6 +8,13 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Só a cor de TEXTO dos cinzas fica um tom mais escura (bordas e fundos
+      // seguem iguais). O cinza 400 de antes (#9ca3af) tinha contraste 2,5 no
+      // branco: difícil de ler no celular e reprovado na acessibilidade do
+      // Google, que pede 4,5. Aprovado pelo dono em 19/10/2026, com antes e depois.
+      textColor: {
+        gray: { 400: "#6b7280", 500: "#4b5563" },
+      },
       colors: {
         navy: {
           50: "#EEF2FA",

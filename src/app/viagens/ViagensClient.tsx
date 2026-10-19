@@ -460,8 +460,8 @@ export default function ViagensClient({ initialTemplates, combos = [], tipoInici
         <div className="absolute inset-0 bg-navy-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img decoding="async" fetchPriority="high"
-            src={imgOtim(FUNDO_TOPO, 1920, 75)}
-            srcSet={imgSrcSet(FUNDO_TOPO, [828, 1200, 1920], 75)}
+            src={imgOtim(FUNDO_TOPO, 1920, 50)}
+            srcSet={imgSrcSet(FUNDO_TOPO, [828, 1200, 1920], 50)}
             sizes="100vw"
             alt="destinos"
             className="w-full h-full object-cover opacity-20"
@@ -862,7 +862,7 @@ function ComboCard({ c }: { c: ComboPublico }) {
           )}
         </div>
         <div className="absolute bottom-2.5 left-2.5 right-2.5">
-          <h3 className="font-display font-black text-base text-white leading-tight drop-shadow">{c.nome}</h3>
+          <h2 className="font-display font-black text-base text-white leading-tight drop-shadow">{c.nome}</h2>
           <div className="flex items-center gap-1 text-white/80 text-xs mt-0.5">
             <MapPin size={10} className="flex-shrink-0" /> {c.roteiros.length} viagens, você escolhe as datas
           </div>
@@ -975,7 +975,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
         </div>
 
         <div className="absolute bottom-2.5 left-2.5 right-2.5">
-          <h3 className="font-display font-black text-base text-white leading-tight drop-shadow">{tmpl.title}</h3>
+          <h2 className="font-display font-black text-base text-white leading-tight drop-shadow">{tmpl.title}</h2>
           <div className="flex items-center gap-1 text-white/80 text-xs mt-0.5">
             <MapPin size={10} className="flex-shrink-0" /> {tmpl.destination}
           </div>

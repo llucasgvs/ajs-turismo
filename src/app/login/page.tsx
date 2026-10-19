@@ -67,7 +67,7 @@ export default function LoginPage() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
             <div className="relative w-12 h-12">
-              <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
+              <Image src="/icon_ajs.png" alt="" fill className="object-contain" />
             </div>
             <div>
               <span className="font-display font-black text-white text-2xl">AJS</span>
@@ -80,7 +80,7 @@ export default function LoginPage() {
             <blockquote className="text-white/90 text-2xl font-display font-bold leading-snug mb-4">
               &ldquo;Viajar é a única coisa que você compra que te torna mais rico.&rdquo;
             </blockquote>
-            <p className="text-white/50 text-sm">- Anônimo</p>
+            <p className="text-white/70 text-sm">- Anônimo</p>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function LoginPage() {
         {/* Mobile logo */}
         <Link href="/" className="flex items-center gap-3 mb-10 lg:hidden">
           <div className="relative w-10 h-10">
-            <Image src="/icon_ajs.png" alt="AJS Turismo" fill className="object-contain" />
+            <Image src="/icon_ajs.png" alt="" fill className="object-contain" />
           </div>
           <div>
             <span className="font-display font-black text-navy-700 text-xl">AJS</span>
@@ -153,7 +153,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-navy-600"
+                  aria-label={showPassword ? "Esconder a senha" : "Mostrar a senha"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-navy-600"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>

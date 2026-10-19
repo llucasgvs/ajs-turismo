@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade - AJS Turismo",
+  // Endereço próprio: sem isto, herdava o da página inicial.
+  alternates: { canonical: "/privacidade" },
+  title: { absolute: "Política de Privacidade - AJS Turismo" },
   description: "Saiba como a AJS Turismo coleta, usa e protege seus dados pessoais.",
 };
 

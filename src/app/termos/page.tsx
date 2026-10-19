@@ -3,7 +3,10 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso - AJS Turismo",
+  // Endereço próprio: sem isto, herdava o da página inicial.
+  alternates: { canonical: "/termos" },
+  // absolute: o layout raiz já acrescenta " - AJS Turismo" e saía repetido.
+  title: { absolute: "Termos de Uso - AJS Turismo" },
   description: "Termos e condições de uso do site e dos serviços da AJS Turismo.",
 };
 

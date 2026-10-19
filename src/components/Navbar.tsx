@@ -211,7 +211,7 @@ export default function Navbar() {
                   href={WA_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 text-white/40 text-xs pt-1"
+                  className="flex items-center justify-center gap-2 text-white/65 text-xs pt-1"
                 >
                   <MessageCircle size={12} />
                   <span>(41) 99834-8766</span>
