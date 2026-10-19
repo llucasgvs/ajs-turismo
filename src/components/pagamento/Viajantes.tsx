@@ -28,14 +28,17 @@ export type FaixaDoSeletor = {
   occupies_seat: boolean;
 };
 
-export function Counter({ value, onMinus, onPlus }: {
+export function Counter({ value, onMinus, onPlus, rotulo }: {
   value: number; onMinus: () => void; onPlus: () => void;
+  /** Quem está sendo contado (ex.: "Adulto"), para o leitor de tela. */
+  rotulo?: string;
 }) {
+  const de = rotulo ? `: ${rotulo}` : "";
   return (
     <div className="flex items-center gap-3">
-      <button type="button" onClick={onMinus} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Minus size={15} /></button>
+      <button type="button" onClick={onMinus} aria-label={`Um a menos${de}`} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Minus size={15} /></button>
       <span className="w-5 text-center font-semibold text-navy-800">{value}</span>
-      <button type="button" onClick={onPlus} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Plus size={15} /></button>
+      <button type="button" onClick={onPlus} aria-label={`Um a mais${de}`} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-navy-500 hover:text-navy-700 transition-colors"><Plus size={15} /></button>
     </div>
   );
 }
@@ -115,6 +118,7 @@ export function SeletorDeViajantes({
                 value={contagem[f.label] || 0}
                 onMinus={() => onFaixa(f.label, -1)}
                 onPlus={() => onFaixa(f.label, 1)}
+                rotulo={f.label}
               />
             </div>
           ))}
@@ -128,6 +132,7 @@ export function SeletorDeViajantes({
             value={pessoas}
             onMinus={() => onPessoas(-1)}
             onPlus={() => onPessoas(1)}
+            rotulo="pessoa"
           />
         </div>
       )}
