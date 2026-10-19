@@ -1375,38 +1375,42 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                       <button
                         type="button"
                         onClick={() => showDatePicker ? setShowDatePicker(false) : openDatePicker()}
-                        className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                        className="w-full px-5 py-3.5 block hover:bg-gray-50 transition-colors text-left"
                       >
-                        <div>
-                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Data</p>
-                          {selectedTrip ? (
-                            <p className="text-sm font-bold text-navy-800">
-                              {/* No bate-e-volta, "· bate e volta" em vez de repetir
-                                  a data. Repetida ficava pior que em outros blocos,
-                                  porque aqui os dois lados usam formatos diferentes
-                                  ("23 de ago. de 2026 → 23 de ago."), o que parecia
-                                  defeito. É a mesma forma já usada no painel do
-                                  cliente, e diz o mesmo dia com todas as letras. */}
-                              <DataEscolhida
-                                saida={selectedTrip.departure_date}
-                                retorno={selectedTrip.return_date}
-                              />
-                            </p>
-                          ) : (
-                            <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
+                        {/* O "Trocar" era um texto azul solto e muito cliente não
+                            achava. Virou um botão pequeno e escuro na linha do
+                            rótulo: fica visível sem competir com o "Reservar" (o
+                            único em destaque) e a data ganha a linha inteira. */}
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Data</p>
+                          {siblingTrips.length > 1 && !trip.is_open_date && (
+                            <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-md bg-navy-700 hover:bg-navy-800 text-white text-[11px] font-semibold px-2 py-0.5 shadow-sm transition-colors">
+                              {showDatePicker
+                                ? <><ChevronUp size={12}/> Fechar</>
+                                : <><Calendar size={12}/> Trocar data</>}
+                            </span>
+                          )}
+                          {trip.is_open_date && (
+                            <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-md bg-navy-700 hover:bg-navy-800 text-white text-[11px] font-semibold px-2 py-0.5 shadow-sm transition-colors">
+                              <Calendar size={12}/> Trocar data
+                            </span>
                           )}
                         </div>
-                        {siblingTrips.length > 1 && !trip.is_open_date && (
-                          <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
-                            {showDatePicker
-                              ? <><ChevronUp size={14}/> Fechar</>
-                              : <><ChevronDown size={14}/> Trocar</>}
-                          </span>
-                        )}
-                        {trip.is_open_date && (
-                          <span className="text-xs text-navy-500 font-semibold flex items-center gap-1 flex-shrink-0">
-                            <Calendar size={12}/> Alterar
-                          </span>
+                        {selectedTrip ? (
+                          <p className="text-sm font-bold text-navy-800">
+                            {/* No bate-e-volta, "· bate e volta" em vez de repetir
+                                a data. Repetida ficava pior que em outros blocos,
+                                porque aqui os dois lados usam formatos diferentes
+                                ("23 de ago. de 2026 → 23 de ago."), o que parecia
+                                defeito. É a mesma forma já usada no painel do
+                                cliente, e diz o mesmo dia com todas as letras. */}
+                            <DataEscolhida
+                              saida={selectedTrip.departure_date}
+                              retorno={selectedTrip.return_date}
+                            />
+                          </p>
+                        ) : (
+                          <p className="text-sm font-bold text-gray-400">Selecione uma data</p>
                         )}
                       </button>
 

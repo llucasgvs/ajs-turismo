@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Package, Check, Loader2, AlertCircle,
-  ArrowRight, ChevronDown, X, Clock, } from "lucide-react";
+  ArrowRight, ChevronDown, X, Clock, Calendar, } from "lucide-react";
 import Footer from "@/components/Footer";
 import { GalleryModal, PhotoGrid, ShareButton } from "@/components/viagem/Galeria";
 import { COMPACT_THRESHOLD, CompactDateSelector, DataEscolhida, DateSelector } from "@/components/viagem/Datas";
@@ -619,12 +619,12 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
                           {/* "Trocar" sobe para a linha do rótulo e a data usa a
                               largura toda. Lado a lado, "18 de set. de 2026 →
                               20 de set." quebrava em duas linhas no celular. */}
-                          <span className="flex items-center justify-between gap-3">
+                          <span className="flex items-center justify-between gap-3 mb-1">
                             <span className="block text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Data</span>
                             {roteiro.datas.length > 1 && (
-                              <span className="text-xs text-navy-600 font-semibold flex items-center gap-1 flex-shrink-0">
-                                {aberto ? <><ChevronDown size={14} className="rotate-180" /> Fechar</>
-                                        : <><ChevronDown size={14} /> Trocar</>}
+                              <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-md bg-navy-700 hover:bg-navy-800 text-white text-[11px] font-semibold px-2 py-0.5 shadow-sm transition-colors">
+                                {aberto ? <><ChevronDown size={12} className="rotate-180" /> Fechar</>
+                                        : <><Calendar size={12} /> Trocar data</>}
                               </span>
                             )}
                           </span>
