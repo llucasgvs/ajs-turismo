@@ -22,14 +22,15 @@ type RevPoint = { month: string; label: string; revenue: number; count: number }
 /** Recordes e viagem mais vendida, para o tooltip do gráfico (rota
  *  /bookings/admin/revenue-highlights). */
 type Recorde = { valor: number; data?: string; mes?: string } | null;
-type MaisVendida = { titulo: string; vendas: number; total: number; empate: boolean };
+/** A viagem que mais trouxe RECEITA no dia/mês, e quanto ela pesa no total. */
+type ViagemDestaque = { titulo: string; receita: number; vendas: number; parcela: number; reservas: number };
 type Destaques = {
   inicio: string | null;
   dia: { maior_receita: Recorde; mais_vendas: Recorde };
   mes: { maior_receita: Recorde; mais_vendas: Recorde };
   meses_com_venda: number;
-  mais_vendida_dia: Record<string, MaisVendida>;
-  mais_vendida_mes: Record<string, MaisVendida>;
+  viagem_dia?: Record<string, ViagemDestaque>;
+  viagem_mes?: Record<string, ViagemDestaque>;
 };
 type TmplRank = { id: number | null; title: string; destination: string; revenue: number; travelers: number; sales: number };
 type CustRank = { name: string; trips: number; spend: number };
@@ -543,16 +544,18 @@ export default function AdminDashboard() {
     }
     return null;
   };
+  // Por RECEITA, e não por quantidade: o gráfico é de receita. Em 19/10/2026 a
+  // Oktoberfest teve 2 vendas (R$ 680) num dia de R$ 13 mil feito por dois
+  // Réveillons, e "mais vendida: Oktoberfest" contava a história errada. Se a
+  // viagem do topo pesa menos de 30% do dia, nenhuma "fez" o dia e a linha sai.
   const vendidaDo = (p: RevPoint): string | null => {
-    const m = chartMode === "day" ? destaques?.mais_vendida_dia[p.month] : chartMode === "month" ? destaques?.mais_vendida_mes[p.month] : undefined;
-    if (!m) return null;
-    if (m.total === 1) return `Venda: ${m.titulo}`;
-    if (m.empate) return null;   // empate no topo não tem "mais vendida"
-    // Sem "de N": aqui cada viagem de um combo conta como uma venda dela, e o
-    // total da linha de cima conta o combo uma vez só. "30 de 94" embaixo de
-    // "77 vendas" pareceria conta errada.
-    return `Mais vendida: ${m.titulo} (${plw(m.vendas, "venda", "vendas")})`;
+    const v = chartMode === "day" ? destaques?.viagem_dia?.[p.month] : chartMode === "month" ? destaques?.viagem_mes?.[p.month] : undefined;
+    if (!v) return null;
+    if (v.reservas === 1) return `Venda: ${v.titulo}`;
+    if (v.parcela < 0.3) return null;
+    return `Maior receita: ${v.titulo} (${fmtR(v.receita)})`;
   };
+
 
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
   // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
