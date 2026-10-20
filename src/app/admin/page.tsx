@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Clock, MapPin, ChevronRight, AlertTriangle, CheckCircle, Calendar,
   Loader2, BookOpen, CreditCard, Camera, TrendingUp, TrendingDown, Trophy, Crown, Target,
-  DollarSign, XCircle, ArrowUpRight, Lock,
+  DollarSign, XCircle, ArrowUpRight, Lock, ArrowLeftRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
@@ -50,6 +50,12 @@ const fmtR = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDig
 
 const fmtRk = (n: number) => n >= 1000 ? `R$ ${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".", ",")}k` : `R$ ${Math.round(n)}`;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+/** Variação com sinal e uma casa: +13,8% / -4%. Recebe a fração (0,138). */
+const fmtVar = (v: number) => `${v > 0 ? "+" : ""}${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+/** Diferença em reais com sinal: +R$ 5.800,00 / -R$ 120,00. */
+const fmtDif = (d: number) => `${d >= 0 ? "+" : "-"}${fmtR(Math.abs(d))}`;
+/** Variação de `a` contra `b`; sem base (zero) não há percentual. */
+const variacao = (a: number, b: number | null | undefined) => (b && b > 0 ? (a - b) / b : null);
 const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
 /** plural: plw(2,"venda","vendas") → "2 vendas" */
 const plw = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
@@ -122,6 +128,11 @@ const _modos: Record<string, ValoresDoModo> = {};
 
 const chaveModo = (liquido: boolean, soSite: boolean) => `${liquido}|${soSite}`;
 
+/** Dias do mês ANTERIOR, para a comparação do gráfico. Separado de `_modos`
+ *  porque só é buscado quando a comparação é ligada: quem nunca liga o botão
+ *  não paga essa requisição a cada abertura do painel. */
+const _prevDia: Record<string, { dados: RevPoint[]; ts: number }> = {};
+
 /** Query string das rotas de valor a partir da chave do modo. */
 const paramsDoModo = (chave: string) => {
   const [liq, site] = chave.split("|");
@@ -145,6 +156,11 @@ export default function AdminDashboard() {
   // Falha ao carregar: o painel avisa em vez de mostrar zeros que parecem reais.
   const [erroCarga, setErroCarga] = useState(false);
   const [chartMode, setChartMode] = useState<"day" | "month" | "year">("day");
+  // Comparar com o mês anterior no gráfico de receita (só no computador): no
+  // "Mês atual", cada dia ganha o contorno do mesmo dia do mês passado; nos
+  // "6 meses", cada mês ganha a variação contra o anterior.
+  const [comparar, setComparar] = useState(false);
+  const [prevDia, setPrevDia] = useState<RevPoint[] | null>(null);
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [margin, setMargin] = useState(20); // margem presumida (%), só exibição
@@ -168,6 +184,7 @@ export default function AdminDashboard() {
     setLiquido(localStorage.getItem("ajs_admin_liquido") === "1");
     setSoSite(localStorage.getItem("ajs_admin_so_site") === "1");
     setVerTotal(localStorage.getItem("ajs_admin_total") === "1");
+    setComparar(localStorage.getItem("ajs_admin_comparar") === "1");
     setPrefsLidas(true);
   }, []);
   const onLiquido = (v: boolean) => { setLiquido(v); try { localStorage.setItem("ajs_admin_liquido", v ? "1" : "0"); } catch { /* ignore */ } };
@@ -190,6 +207,31 @@ export default function AdminDashboard() {
     return () => mq.removeEventListener("change", aplicar);
   }, []);
   const onVerTotal = (v: boolean) => { setVerTotal(v); try { localStorage.setItem("ajs_admin_total", v ? "1" : "0"); } catch { /* ignore */ } };
+  const onComparar = (v: boolean) => { setComparar(v); try { localStorage.setItem("ajs_admin_comparar", v ? "1" : "0"); } catch { /* ignore */ } };
+  // No "Anual" não há comparação (o ano corrente está pela metade), e no
+  // celular o botão nem aparece.
+  const compararAtivo = comparar && telaGrande && chartMode !== "year";
+  // Busca os dias do mês anterior só quando a comparação do "Mês atual" está
+  // ligada, no MESMO modo da tela (bruto/líquido, tudo/só site): comparar
+  // líquido de agora com bruto do mês passado seria número errado com rótulo
+  // certo.
+  useEffect(() => {
+    if (!prefsLidas || !compararAtivo || chartMode !== "day") return;
+    const modo = chaveModo(liquido, soSite);
+    const guardado = _prevDia[modo];
+    if (guardado && Date.now() - guardado.ts < TTL) { setPrevDia(guardado.dados); return; }
+    let cancelado = false;
+    setPrevDia(null);
+    apiFetch(`/bookings/admin/revenue-series?granularity=day&offset=1&${paramsDoModo(modo)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelado || !Array.isArray(d)) return;
+        _prevDia[modo] = { dados: d, ts: Date.now() };
+        setPrevDia(d);
+      })
+      .catch(() => { /* sem o mês anterior, o gráfico fica como sempre */ });
+    return () => { cancelado = true; };
+  }, [prefsLidas, compararAtivo, chartMode, liquido, soSite]);
   // Guarda a CHAVE do modo (os dois eixos). O `load` roda com dependências
   // vazias, então sem esta referência ele congelaria o modo da primeira
   // montagem e a atualização silenciosa traria número de um modo sob o rótulo
@@ -418,7 +460,26 @@ export default function AdminDashboard() {
   const noPhotos = templates.filter(t => t.is_active && t.photos_count < 5).length;
 
   const series = chartMode === "day" ? sDay.slice(0, new Date().getDate()) : chartMode === "year" ? sYear : sMonth;
-  const maxRev = Math.max(1, ...series.map(s => s.revenue));
+  // Comparação: no "Mês atual", o mesmo dia do mês anterior (alinhado pelo
+  // número do dia); nos "6 meses", o mês anterior. O mês corrente compara do
+  // dia 1 até hoje com o MESMO período do mês passado (o mesmo critério do card
+  // de receita), nunca com o mês passado inteiro.
+  const prevSerie = compararAtivo && chartMode === "day" && prevDia ? prevDia : null;
+  const prevDoDia = (i: number) => prevSerie?.[i]?.revenue ?? 0;
+  const maxRev = Math.max(1, ...series.map(s => s.revenue), ...(prevSerie ? series.map((_, i) => prevDoDia(i)) : []));
+  const somaAtual = series.reduce((s, p) => s + p.revenue, 0);
+  const somaAnterior = prevSerie ? series.reduce((s, _, i) => s + prevDoDia(i), 0) : 0;
+  // Com dois dias de mês, uma venda vira +300%: o percentual só aparece a
+  // partir do terceiro dia, como no card de receita.
+  const varResumo = series.length >= 3 ? variacao(somaAtual, somaAnterior) : null;
+  const hojeMes = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const ehMesCorrente = (p: RevPoint) => p.month === hojeMes;
+  const baseDoMes = (i: number): number | null => {
+    if (i === 0) return null;
+    const p = series[i];
+    return ehMesCorrente(p) ? (stats?.prev_month_revenue ?? null) : series[i - 1].revenue;
+  };
+  const nomeMesAnterior = mesAnterior ? mesAnterior.toLowerCase() : "mês anterior";
 
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
   // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
@@ -611,9 +672,37 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 overflow-hidden">
           <CardHead title={soSite ? "Receita confirmada · só site" : "Receita confirmada"} icon={<TrendingUp size={14} className="text-emerald-500" />}
-            action={<div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["year", "month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "year" ? "Anual" : m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>} />
+            action={<div className="flex items-center gap-2">
+              {chartMode !== "year" && (
+                <button type="button" onClick={() => onComparar(!comparar)} aria-pressed={comparar}
+                  title="Comparar com o mês anterior"
+                  className={`hidden lg:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${comparar ? "bg-navy-700 text-white" : "bg-gray-100 text-gray-500 hover:text-navy-600"}`}>
+                  <ArrowLeftRight size={12} /> {chartMode === "day" ? `vs. ${nomeMesAnterior}` : "vs. mês anterior"}
+                </button>
+              )}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 text-xs font-semibold">{(["year", "month", "day"] as const).map(m => <button key={m} onClick={() => setChartMode(m)} className={`px-2.5 py-1 rounded-md transition-colors ${chartMode === m ? "bg-white text-navy-800 shadow-sm" : "text-gray-400 hover:text-navy-600"}`}>{m === "year" ? "Anual" : m === "month" ? "6 meses" : "Mês atual"}</button>)}</div>
+            </div>} />
           {loading ? <div className="py-6"><SkelGrafico n={12} altura="h-44" /></div> : (
             <div className="px-5 py-5">
+              {/* Resumo da comparação: o acumulado do mês até hoje contra o
+                  mesmo período do mês anterior. Venda de viagem é irregular,
+                  então é ele que diz se o mês está melhor; os dias mostram o
+                  ritmo. */}
+              {prevSerie && (
+                <div className="mb-1 flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-3.5 py-2.5 text-xs text-gray-500">
+                  {/* Cada pedaço inteiro numa linha: quebrar no meio de um
+                      valor ("-R$" numa linha e o número na outra) confunde. */}
+                  <p className="min-w-0">
+                    <span className="whitespace-nowrap">Até o dia {series.length}: <b className="text-navy-800 tabular-nums">{fmtR(somaAtual)}</b></span>
+                    {" · "}<span className="whitespace-nowrap">{nomeMesAnterior} no mesmo período: <span className="tabular-nums">{fmtR(somaAnterior)}</span></span>
+                    {varResumo !== null && <>{" · "}<b className={`whitespace-nowrap tabular-nums ${somaAtual >= somaAnterior ? "text-emerald-700" : "text-red-700"}`}>{fmtVar(varResumo)} ({fmtDif(somaAtual - somaAnterior)})</b></>}
+                  </p>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-navy-300" />{MES_FULL[new Date().getMonth()]}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border border-dashed border-gray-400" />{mesAnterior || "Mês anterior"}</span>
+                  </div>
+                </div>
+              )}
               <div className="relative pt-12" onMouseLeave={() => setHoverIdx(null)}>
                 {/* tooltip que SEGUE a barra ativa */}
                 {hoverIdx !== null && series[hoverIdx] && (() => {
@@ -629,6 +718,28 @@ export default function AdminDashboard() {
                         </p>
                         <p className="text-[12px] font-black text-gold-300 leading-tight mt-0.5">{fmtR(p.revenue)}</p>
                         <p className="text-[10px] text-navy-200 leading-tight">{plw(p.count, "venda", "vendas")}</p>
+                        {prevSerie && (() => {
+                          const b = prevDoDia(hoverIdx);
+                          const v = variacao(p.revenue, b);
+                          const dia = prevSerie[hoverIdx]?.month;
+                          return <>
+                            <p className="text-[10px] text-navy-200 leading-tight mt-1">{dia ? dayMonth(dia) : nomeMesAnterior}: {fmtR(b)}</p>
+                            {v !== null
+                              ? <p className={`text-[11px] font-bold leading-tight ${p.revenue >= b ? "text-emerald-300" : "text-red-300"}`}>{fmtVar(v)} ({fmtDif(p.revenue - b)})</p>
+                              : p.revenue > 0 && <p className="text-[10px] text-emerald-300 leading-tight">{cap(nomeMesAnterior)} não teve venda neste dia</p>}
+                          </>;
+                        })()}
+                        {compararAtivo && chartMode === "month" && (() => {
+                          const b = baseDoMes(hoverIdx);
+                          const v = variacao(p.revenue, b);
+                          if (b === null || v === null) return null;
+                          const anterior = MES_FULL[parseInt(series[hoverIdx - 1].month.split("-")[1]) - 1];
+                          const parcial = ehMesCorrente(p) ? ` até o dia ${stats?.month_elapsed_days ?? ""}` : "";
+                          return <>
+                            <p className="text-[10px] text-navy-200 leading-tight mt-1">{anterior}{parcial}: {fmtR(b)}</p>
+                            <p className={`text-[11px] font-bold leading-tight ${v >= 0 ? "text-emerald-300" : "text-red-300"}`}>{fmtVar(v)} ({fmtDif(p.revenue - b)})</p>
+                          </>;
+                        })()}
                       </div>
                     </div>
                   );
@@ -642,10 +753,24 @@ export default function AdminDashboard() {
                     const active = hoverIdx === i;
                     return <div key={p.month} className="flex-1 flex flex-col h-full min-w-0 cursor-default" onMouseEnter={() => setHoverIdx(i)}>
                       <div className="relative flex-1">
-                        {p.revenue > 0 && (
+                        {/* Mesmo dia do mês anterior: só o contorno, atrás da
+                            barra, para comparar o tamanho de relance. */}
+                        {prevSerie && prevDoDia(i) > 0 && (
+                          <div className="absolute bottom-0 inset-x-0 rounded-t-md border border-dashed border-b-0 border-gray-400" style={{ height: `${Math.round((prevDoDia(i) / maxRev) * 88)}%` }} />
+                        )}
+                        {/* No dia a dia com comparação, os valores escritos
+                            saem de cima das barras: com o contorno ao lado
+                            viravam um amontoado de números. Ficam no tooltip. */}
+                        {p.revenue > 0 && !prevSerie && (
                           <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums ${last ? "text-gold-600" : "text-navy-500"}`} style={{ bottom: `calc(${barH}% + 3px)` }}>{fmtRk(p.revenue)}</span>
                         )}
-                        <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode !== "day" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={{ height: `${barH}%` }} />
+                        {compararAtivo && chartMode === "month" && (() => {
+                          const v = variacao(p.revenue, baseDoMes(i));
+                          return v !== null && (
+                            <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ${v >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`} style={{ bottom: `calc(${barH}% + 17px)` }}>{fmtVar(v)}</span>
+                          );
+                        })()}
+                        <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode !== "day" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={prevSerie ? { height: `${barH}%`, left: "18%", right: "18%" } : { height: `${barH}%` }} />
                       </div>
                       <span className={`mt-1 ${chartMode === "day" ? "text-[8px]" : "text-[10px]"} font-semibold capitalize truncate w-full text-center ${last ? "text-gold-600" : "text-gray-400"}`}>{p.label}</span>
                     </div>;
