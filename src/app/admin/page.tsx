@@ -19,6 +19,18 @@ type Stats = { total_revenue: number; total_confirmed: number; total_travelers: 
 type CountStats = { confirmed_revenue: number; pending_value: number; month_count: number; month_value: number };
 type Counts = { interesse: number; pending: number; confirmed: number; completed: number; cancelled: number; refunded: number; all: number; stats: CountStats };
 type RevPoint = { month: string; label: string; revenue: number; count: number };
+/** Recordes e viagem mais vendida, para o tooltip do gráfico (rota
+ *  /bookings/admin/revenue-highlights). */
+type Recorde = { valor: number; data?: string; mes?: string } | null;
+type MaisVendida = { titulo: string; vendas: number; total: number; empate: boolean };
+type Destaques = {
+  inicio: string | null;
+  dia: { maior_receita: Recorde; mais_vendas: Recorde };
+  mes: { maior_receita: Recorde; mais_vendas: Recorde };
+  meses_com_venda: number;
+  mais_vendida_dia: Record<string, MaisVendida>;
+  mais_vendida_mes: Record<string, MaisVendida>;
+};
 type TmplRank = { id: number | null; title: string; destination: string; revenue: number; travelers: number; sales: number };
 type CustRank = { name: string; trips: number; spend: number };
 type Analytics = { total_revenue: number; total_confirmed: number; ticket_medio: number; conversao: number; top_revenue: TmplRank[]; top_sales: TmplRank[]; top_customers: CustRank[]; never_sold: { id: number; title: string }[]; by_category: { category: string; revenue: number }[] };
@@ -132,6 +144,10 @@ const chaveModo = (liquido: boolean, soSite: boolean) => `${liquido}|${soSite}`;
  *  porque só é buscado quando a comparação é ligada: quem nunca liga o botão
  *  não paga essa requisição a cada abertura do painel. */
 const _prevDia: Record<string, { dados: RevPoint[]; ts: number }> = {};
+/** Destaques por modo. Buscados uma vez, logo depois de o painel assentar:
+ *  passar o mouse no gráfico nunca dispara requisição. */
+const _destaques: Record<string, { dados: Destaques; ts: number }> = {};
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 /** Query string das rotas de valor a partir da chave do modo. */
 const paramsDoModo = (chave: string) => {
@@ -161,6 +177,7 @@ export default function AdminDashboard() {
   // "6 meses", cada mês ganha a variação contra o anterior.
   const [comparar, setComparar] = useState(false);
   const [prevDia, setPrevDia] = useState<RevPoint[] | null>(null);
+  const [destaques, setDestaques] = useState<Destaques | null>(null);
   const [rankTab, setRankTab] = useState<"rev" | "sales" | "cust">("rev");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [margin, setMargin] = useState(20); // margem presumida (%), só exibição
@@ -232,6 +249,28 @@ export default function AdminDashboard() {
       .catch(() => { /* sem o mês anterior, o gráfico fica como sempre */ });
     return () => { cancelado = true; };
   }, [prefsLidas, compararAtivo, chartMode, liquido, soSite]);
+
+  // Destaques do tooltip (recordes, mais vendida), no MESMO modo da tela. Só
+  // depois da carga principal, para não disputar banda com ela.
+  useEffect(() => {
+    if (!prefsLidas) return;
+    const modo = chaveModo(liquido, soSite);
+    const guardado = _destaques[modo];
+    if (guardado && Date.now() - guardado.ts < TTL) { setDestaques(guardado.dados); return; }
+    let cancelado = false;
+    setDestaques(null);
+    const t = setTimeout(() => {
+      apiFetch(`/bookings/admin/revenue-highlights?${paramsDoModo(modo)}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (cancelado || !d || typeof d !== "object" || !d.dia) return;
+          _destaques[modo] = { dados: d, ts: Date.now() };
+          setDestaques(d);
+        })
+        .catch(() => { /* sem destaques, o tooltip fica como sempre */ });
+    }, 1200);
+    return () => { cancelado = true; clearTimeout(t); };
+  }, [prefsLidas, liquido, soSite]);
   // Guarda a CHAVE do modo (os dois eixos). O `load` roda com dependências
   // vazias, então sem esta referência ele congelaria o modo da primeira
   // montagem e a atualização silenciosa traria número de um modo sob o rótulo
@@ -481,6 +520,40 @@ export default function AdminDashboard() {
   };
   const nomeMesAnterior = mesAnterior ? mesAnterior.toLowerCase() : "mês anterior";
 
+  // Destaques do tooltip. O histórico começa na primeira venda registrada
+  // (agosto de 2026), então o recorde é "desde o início", nunca "do ano": os
+  // dois seriam o mesmo número com nomes diferentes. Só um recorde por vez, o
+  // mais forte, para o tooltip não virar lista.
+  const inicioRotulo = destaques?.inicio ? `${MES_CURTO[parseInt(destaques.inicio.slice(5, 7)) - 1]}/${destaques.inicio.slice(0, 4)}` : "";
+  const diasDeHistorico = destaques?.inicio ? Math.floor((Date.now() - new Date(destaques.inicio + "T12:00:00").getTime()) / 86_400_000) : 0;
+  const diasComVendaNoMes = chartMode === "day" ? series.filter(x => x.revenue > 0).length : 0;
+  const maiorDoMes = chartMode === "day" ? Math.max(0, ...series.map(x => x.revenue)) : 0;
+  const recordeDo = (p: RevPoint): string | null => {
+    if (!destaques) return null;
+    if (chartMode === "day") {
+      // Com menos de um mês de histórico, todo dia bom seria "recorde".
+      if (diasDeHistorico >= 30 && destaques.dia.maior_receita?.data === p.month) return `Melhor dia desde o início (${inicioRotulo})`;
+      if (diasDeHistorico >= 30 && destaques.dia.mais_vendas?.data === p.month) return `Dia com mais vendas desde o início (${p.count} vendas)`;
+      if (diasComVendaNoMes >= 3 && p.revenue > 0 && p.revenue === maiorDoMes) return "Melhor dia do mês";
+      return null;
+    }
+    if (chartMode === "month" && destaques.meses_com_venda >= 2) {
+      if (destaques.mes.maior_receita?.mes === p.month) return `Melhor mês desde o início (${inicioRotulo})`;
+      if (destaques.mes.mais_vendas?.mes === p.month) return `Mês com mais vendas desde o início (${p.count} vendas)`;
+    }
+    return null;
+  };
+  const vendidaDo = (p: RevPoint): string | null => {
+    const m = chartMode === "day" ? destaques?.mais_vendida_dia[p.month] : chartMode === "month" ? destaques?.mais_vendida_mes[p.month] : undefined;
+    if (!m) return null;
+    if (m.total === 1) return `Venda: ${m.titulo}`;
+    if (m.empate) return null;   // empate no topo não tem "mais vendida"
+    // Sem "de N": aqui cada viagem de um combo conta como uma venda dela, e o
+    // total da linha de cima conta o combo uma vez só. "30 de 94" embaixo de
+    // "77 vendas" pareceria conta errada.
+    return `Mais vendida: ${m.titulo} (${plw(m.vendas, "venda", "vendas")})`;
+  };
+
   const profit = curRev * (margin / 100); // lucro presumido (estimativa, só exibição)
   // markup correspondente à margem (markup = margem / custo). Ex.: 25% margem = 33,3% markup.
   const markup = margin < 100 ? (margin / (100 - margin)) * 100 : null;
@@ -718,6 +791,15 @@ export default function AdminDashboard() {
                         </p>
                         <p className="text-[12px] font-black text-gold-300 leading-tight mt-0.5">{fmtR(p.revenue)}</p>
                         <p className="text-[10px] text-navy-200 leading-tight">{plw(p.count, "venda", "vendas")}</p>
+                        {(() => {
+                          const rec = recordeDo(p);
+                          const ven = vendidaDo(p);
+                          if (!rec && !ven) return null;
+                          return <div className="mt-1.5 pt-1.5 border-t border-white/10 space-y-0.5">
+                            {rec && <p className="flex items-center gap-1 text-[10px] font-bold text-gold-300 leading-tight"><Trophy size={10} className="flex-shrink-0" /> {rec}</p>}
+                            {ven && <p className="text-[10px] text-navy-100 leading-tight max-w-[260px] truncate">{ven}</p>}
+                          </div>;
+                        })()}
                         {prevSerie && (() => {
                           const b = prevDoDia(hoverIdx);
                           const v = variacao(p.revenue, b);
