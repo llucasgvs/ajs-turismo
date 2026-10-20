@@ -548,12 +548,14 @@ export default function AdminDashboard() {
   // Oktoberfest teve 2 vendas (R$ 680) num dia de R$ 13 mil feito por dois
   // Réveillons, e "mais vendida: Oktoberfest" contava a história errada. Se a
   // viagem do topo pesa menos de 30% do dia, nenhuma "fez" o dia e a linha sai.
-  const vendidaDo = (p: RevPoint): string | null => {
+  // Rótulo e título separados: o título quebra linha (nome de viagem longo
+  // não pode ser cortado) e o rótulo com o valor fica numa linha só.
+  const vendidaDo = (p: RevPoint): { rotulo: string; titulo: string } | null => {
     const v = chartMode === "day" ? destaques?.viagem_dia?.[p.month] : chartMode === "month" ? destaques?.viagem_mes?.[p.month] : undefined;
     if (!v) return null;
-    if (v.reservas === 1) return `Venda: ${v.titulo}`;
+    if (v.reservas === 1) return { rotulo: "Venda", titulo: v.titulo };
     if (v.parcela < 0.3) return null;
-    return `Maior receita: ${v.titulo} (${fmtR(v.receita)})`;
+    return { rotulo: `Maior receita: ${fmtR(v.receita)}`, titulo: v.titulo };
   };
 
 
@@ -784,7 +786,9 @@ export default function AdminDashboard() {
                 {hoverIdx !== null && series[hoverIdx] && (() => {
                   const n = series.length;
                   const leftPct = ((hoverIdx + 0.5) / n) * 100;
-                  const tx = hoverIdx <= 1 ? "0%" : hoverIdx >= n - 2 ? "-100%" : "-50%";
+                  // Pela posição, e não pelo índice: com o nome da viagem o tooltip ficou
+                  // mais largo e, no 3º dia, já saía pela esquerda da tela.
+                  const tx = leftPct < 30 ? "0%" : leftPct > 70 ? "-100%" : "-50%";
                   const p = series[hoverIdx];
                   return (
                     <div className="absolute top-0 z-20 pointer-events-none transition-[left] duration-100" style={{ left: `${leftPct}%`, transform: `translateX(${tx})` }}>
@@ -800,7 +804,10 @@ export default function AdminDashboard() {
                           if (!rec && !ven) return null;
                           return <div className="mt-1.5 pt-1.5 border-t border-white/10 space-y-0.5">
                             {rec && <p className="flex items-center gap-1 text-[10px] font-bold text-gold-300 leading-tight"><Trophy size={10} className="flex-shrink-0" /> {rec}</p>}
-                            {ven && <p className="text-[10px] text-navy-100 leading-tight max-w-[260px] truncate">{ven}</p>}
+                            {ven && <div className="text-[10px] leading-tight">
+                              <p className="text-navy-200">{ven.rotulo}</p>
+                              <p className="text-navy-100 font-semibold whitespace-normal break-words w-max max-w-[240px]">{ven.titulo}</p>
+                            </div>}
                           </div>;
                         })()}
                         {prevSerie && (() => {
@@ -854,6 +861,15 @@ export default function AdminDashboard() {
                           return v !== null && (
                             <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ${v >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`} style={{ bottom: `calc(${barH}% + 17px)` }}>{fmtVar(v)}</span>
                           );
+                        })()}
+                        {/* Troféu em cima do dia (ou mês) com recorde: o
+                            motivo aparece no tooltip. Fica acima do que já
+                            estiver em cima da barra (valor, contorno ou selo). */}
+                        {recordeDo(p) && (() => {
+                          const base = prevSerie ? Math.max(barH, Math.round((prevDoDia(i) / maxRev) * 88)) : barH;
+                          const comSelo = compararAtivo && chartMode === "month" && variacao(p.revenue, baseDoMes(i)) !== null;
+                          const acima = comSelo ? 37 : prevSerie ? 3 : 17;
+                          return <Trophy size={11} aria-label="Recorde" className="absolute left-1/2 -translate-x-1/2 text-gold-500" style={{ bottom: `calc(${base}% + ${acima}px)` }} />;
                         })()}
                         <div className={`absolute bottom-0 inset-x-0 mx-auto ${chartMode !== "day" ? "max-w-[40px]" : ""} rounded-t-md transition-colors ${last ? (active ? "bg-gold-500" : "bg-gold-400") : active ? "bg-navy-500" : "bg-navy-200"}`} style={prevSerie ? { height: `${barH}%`, left: "18%", right: "18%" } : { height: `${barH}%` }} />
                       </div>
