@@ -505,7 +505,20 @@ export default function AdminDashboard() {
   // dia 1 até hoje com o MESMO período do mês passado (o mesmo critério do card
   // de receita), nunca com o mês passado inteiro.
   const prevSerie = compararAtivo && chartMode === "day" && prevDia ? prevDia : null;
-  const prevDoDia = (i: number) => prevSerie?.[i]?.revenue ?? 0;
+  // Hoje ainda não acabou: o mesmo dia do mês passado entra só até a MESMA hora
+  // de agora, como no card de receita. Somar o dia inteiro deixava o gráfico
+  // dizendo +36,9% e o card +40% (21/10/2026: R$ 864 de vendas da tarde de
+  // 21/09 entravam só de um lado). O backend já devolve esse corte pronto em
+  // `prev_month_revenue`; o de hoje é ele menos os dias anteriores.
+  const ultimoDia = series.length - 1;
+  const prevDoDia = (i: number) => {
+    if (!prevSerie) return 0;
+    if (i === ultimoDia && stats) {
+      const antes = prevSerie.slice(0, i).reduce((s, p) => s + p.revenue, 0);
+      return Math.max(0, prevRev - antes);
+    }
+    return prevSerie[i]?.revenue ?? 0;
+  };
   const maxRev = Math.max(1, ...series.map(s => s.revenue), ...(prevSerie ? series.map((_, i) => prevDoDia(i)) : []));
   const somaAtual = series.reduce((s, p) => s + p.revenue, 0);
   const somaAnterior = prevSerie ? series.reduce((s, _, i) => s + prevDoDia(i), 0) : 0;
@@ -815,7 +828,7 @@ export default function AdminDashboard() {
                           const v = variacao(p.revenue, b);
                           const dia = prevSerie[hoverIdx]?.month;
                           return <>
-                            <p className="text-[10px] text-navy-200 leading-tight mt-1">{dia ? dayMonth(dia) : nomeMesAnterior}: {fmtR(b)}</p>
+                            <p className="text-[10px] text-navy-200 leading-tight mt-1">{dia ? dayMonth(dia) : nomeMesAnterior}{hoverIdx === ultimoDia ? " até esta hora" : ""}: {fmtR(b)}</p>
                             {v !== null
                               ? <p className={`text-[11px] font-bold leading-tight ${p.revenue >= b ? "text-emerald-300" : "text-red-300"}`}>{fmtVar(v)} ({fmtDif(p.revenue - b)})</p>
                               : p.revenue > 0 && <p className="text-[10px] text-emerald-300 leading-tight">{cap(nomeMesAnterior)} não teve venda neste dia</p>}
