@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown, Package } from "lucide-react";
+import { Check, X, Plus, Search, User, Phone, CreditCard, Cake, Users, FileText, MapPin, DollarSign, MessageSquare, Clock, Copy, CheckCheck, Filter, Globe, Store, Loader2, ChevronDown, Pencil, AlertTriangle, Undo2, Ticket, Calendar, ArrowUpDown, Package, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { nomeCurtoDaViagem, fmtDia, fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
@@ -1546,6 +1546,13 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const [notes, setNotes] = useState(booking.notes || "");
   const [phone, setPhone] = useState(booking.traveler_phone || "");
   const [people, setPeople] = useState(booking.num_travelers);
+  // Quantas pessoas em cada faixa. O preço é o GRAVADO na reserva: tirar
+  // alguém não pode mudar o valor de quem continua.
+  const [faixas, setFaixas] = useState(
+    (booking.tier_breakdown ?? []).map((t) => ({ label: t.label, price: Number(t.price) || 0, qty: Number(t.qty) || 0 })),
+  );
+  const mudarFaixa = (i: number, d: number) =>
+    setFaixas((prev) => prev.map((f, idx) => (idx === i ? { ...f, qty: Math.max(0, f.qty + d) } : f)));
   const [companions, setCompanions] = useState<Companion[]>(
     parsedCompanions.length > 0
       ? parsedCompanions
@@ -1578,6 +1585,11 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const updateCompanion = (i: number, field: keyof Companion, value: string) => {
     setCompanions((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
   };
+  // Tira ESTE acompanhante (o "−" de pessoas tira sempre o último).
+  const removerAcompanhante = (i: number) => {
+    setCompanions((prev) => prev.filter((_, idx) => idx !== i));
+    setPeople((p) => Math.max(1, p - 1));
+  };
 
   const priceNum = parseFloat(price) || 0;
   const discNum = parseFloat(discount) || 0;
@@ -1588,12 +1600,15 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   // divergência em silêncio.
   const temFaixas = !!booking.tier_breakdown?.length;
   const baseTotal = temFaixas
-    ? booking.tier_breakdown!.reduce((s, t) => s + (Number(t.price) || 0) * (Number(t.qty) || 0), 0)
+    ? faixas.reduce((s, f) => s + f.price * f.qty, 0)
     : priceNum * people;
   // Adulto = faixa que paga o valor cheio. Mesma definição do servidor.
   const adultosEdit = temFaixas
-    ? booking.tier_breakdown!.reduce((s, t) => s + ((Number(t.price) || 0) >= priceNum ? Number(t.qty) || 0 : 0), 0)
+    ? faixas.reduce((s, f) => s + (f.price >= priceNum ? f.qty : 0), 0)
     : people;
+  const somaFaixas = faixas.reduce((s, f) => s + f.qty, 0);
+  const faixasErradas = temFaixas && somaFaixas !== people;
+  const faixasMudaram = temFaixas && faixas.some((f, i) => f.qty !== (Number(booking.tier_breakdown![i]?.qty) || 0));
   const opcionaisTotal = opcionais.reduce(
     (s, o) => s + (parseFloat(o.price) || 0) * (o.name === QUARTO_SINGLE ? adultosEdit : people),
     0,
@@ -1609,7 +1624,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const foraNum = parseFloat(porFora) || 0;
   const liquidoNum = parseFloat(liquido) || 0;
   const changed = priceNum !== booking.price_per_person || discNum !== (booking.discount_amount || 0)
-    || people !== booking.num_travelers || opcionaisAgora !== opcionaisOriginais
+    || people !== booking.num_travelers || faixasMudaram || opcionaisAgora !== opcionaisOriginais
     || foraNum !== (booking.pago_por_fora || 0)
     || liquidoNum !== (booking.net_amount || 0);
 
@@ -1640,6 +1655,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
           notes: notes || null,
           traveler_phone: phone || undefined,
           num_travelers: people,
+          tier_breakdown: temFaixas ? faixas.map((f) => ({ label: f.label, qty: f.qty })) : undefined,
           companions: companions.map((c) => ({ full_name: c.full_name, cpf: c.cpf, birth_date: c.birth_date || undefined })),
         }),
       });
@@ -1767,6 +1783,31 @@ function EditBookingModal({ booking, onClose, onSaved }: {
             </div>
           </div>
 
+          {/* Faixas de idade: com faixas, o total sai daqui, então tirar alguém
+              da reserva pede tirar da faixa certa também. */}
+          {temFaixas && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Faixas de idade</label>
+              <div className="space-y-1.5">
+                {faixas.map((f, i) => (
+                  <div key={f.label} className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2">
+                    <span className="flex-1 min-w-0 text-sm text-navy-800 truncate">{f.label} <span className="text-gray-400 text-xs">R$ {fmtBRL(f.price)}</span></span>
+                    <button type="button" onClick={() => mudarFaixa(i, -1)} aria-label={`Tirar uma pessoa de ${f.label}`}
+                      className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                    <span className="w-5 text-center font-bold text-sm text-navy-800 tabular-nums">{f.qty}</span>
+                    <button type="button" onClick={() => mudarFaixa(i, 1)} aria-label={`Pôr uma pessoa em ${f.label}`}
+                      className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                  </div>
+                ))}
+              </div>
+              {faixasErradas && (
+                <p className="text-xs text-red-600 mt-1.5">
+                  As faixas somam {somaFaixas} e a reserva tem {people} {people === 1 ? "pessoa" : "pessoas"}. Ajuste para salvar.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Telefone */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Telefone do titular</label>
@@ -1786,7 +1827,14 @@ function EditBookingModal({ booking, onClose, onSaved }: {
               </label>
               {companions.map((c, i) => (
                 <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-400">Acompanhante {i + 1}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-gray-400">Acompanhante {i + 1}</p>
+                    <button type="button" onClick={() => removerAcompanhante(i)}
+                      aria-label={`Tirar ${c.full_name || `o acompanhante ${i + 1}`} da reserva`}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-red-600 transition-colors">
+                      <Trash2 size={12} /> Tirar
+                    </button>
+                  </div>
                   <div className="relative">
                     <User size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input type="text" placeholder="Nome completo" value={c.full_name}
@@ -1871,7 +1919,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
             <div className="flex items-center justify-between text-gray-500">
               <span>
                 {temFaixas
-                  ? booking.tier_breakdown!.filter((t) => t.qty > 0).map((t) => `${t.qty} × ${t.label}`).join(", ")
+                  ? faixas.filter((f) => f.qty > 0).map((f) => `${f.qty} × ${f.label}`).join(", ")
                   : `${people} × R$ ${fmtBRL(priceNum)}`}
               </span>
               <span>R$ {fmtBRL(baseTotal)}</span>
@@ -1900,7 +1948,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
           <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-500 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
             Cancelar
           </button>
-          <button onClick={handleSave} disabled={loading}
+          <button onClick={handleSave} disabled={loading || faixasErradas}
             className="flex-1 bg-navy-800 hover:bg-navy-700 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
             {loading ? <><Loader2 size={15} className="animate-spin" /> Salvando...</> : <><Check size={15} /> Salvar alterações</>}
           </button>
@@ -2987,7 +3035,11 @@ export default function AdminReservasPage() {
 
       {showExternal && (
         <ExternalSaleModal
-          trips={trips.filter((t) => t.is_active !== false && t.available_spots > 0 && t.status !== "cancelled" && t.status !== "completed")}
+          // `completed` junta duas coisas: viagem que já saiu e data que só fechou
+          // para o SITE (3 dias antes). Venda externa vale até a saída, porque é
+          // combinada na mão; o servidor só exige viagem ativa e vaga.
+          trips={trips.filter((t) => t.is_active !== false && t.available_spots > 0 && t.status !== "cancelled"
+            && (t.status !== "completed" || (!!t.departure_date && new Date(t.departure_date).getTime() > Date.now())))}
           onClose={() => setShowExternal(false)}
           onSaved={() => { invalidateAdminCache(); fetchBookings(); fetchCounts(); }}
         />
