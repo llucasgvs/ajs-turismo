@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { nomeCurtoDaViagem, fmtDia, fmtBRL, spotsLabel, formatCPF, formatPhone } from "@/lib/format";
 import { invalidateAdminCache, adminDirtyTs } from "@/lib/adminCache";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
-import { valorNaData } from "@/lib/tiers";
+import { valorNaData, tierLabel, tierOccupiesSeat } from "@/lib/tiers";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
 
@@ -2213,15 +2213,20 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   const [autoFilled, setAutoFilled] = useState(false);
   const cpfTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Acompanhantes acompanham o total de pessoas: sobra corta do fim, falta
+  // ganha linha em branco.
+  const ajustarAcompanhantes = (pessoas: number) =>
+    setCompanions((prev) => {
+      const need = pessoas - 1;
+      if (need > prev.length) return [...prev, ...Array.from({ length: need - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" }))];
+      return prev.slice(0, need);
+    });
+
   const changePeople = (n: number) => {
     const max = selectedTrip?.available_spots ?? 99;
     const clamped = Math.max(1, Math.min(n, max));
     setPeople(clamped);
-    setCompanions((prev) => {
-      const need = clamped - 1;
-      if (need > prev.length) return [...prev, ...Array.from({ length: need - prev.length }, () => ({ full_name: "", cpf: "", birth_date: "" }))];
-      return prev.slice(0, need);
-    });
+    ajustarAcompanhantes(clamped);
   };
 
   const updateCompanion = (i: number, field: keyof Companion, value: string) => {
@@ -2274,7 +2279,41 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
 
   const selectedTrip = trips.find((t) => String(t.id) === tripId);
   const effectivePrice = priceOverride ? parseFloat(priceOverride) || 0 : (selectedTrip?.price_per_person || 0);
-  const total = effectivePrice * people;
+
+  // Faixas de idade da DATA escolhida. Sem elas a criança saía pelo preço de
+  // adulto (AJS-EQMXNL3, out/2026). Mesma conta do servidor: adulto é a faixa
+  // que a data não cadastra e paga o preço da data (ou o combinado na mão);
+  // as outras pagam o preço delas, e colo não ocupa poltrona.
+  const ADULTO = "Adulto";
+  const faixasDaData = (selectedTrip?.price_tiers ?? []).map((t) => ({
+    label: tierLabel(t),
+    price: Number(t.price) || 0,
+    ocupa: tierOccupiesSeat(t as { occupies_seat?: boolean }),
+  }));
+  const temFaixas = faixasDaData.length > 0;
+  const [qtdFaixa, setQtdFaixa] = useState<Record<string, number>>({});
+  // Trocar de data recomeça a distribuição: todo mundo como adulto.
+  useEffect(() => { setQtdFaixa({ [ADULTO]: people }); }, [tripId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const linhasFaixa = [
+    { label: ADULTO, price: effectivePrice, ocupa: true },
+    ...faixasDaData,
+  ].map((f) => ({ ...f, qty: qtdFaixa[f.label] ?? 0 }));
+  const poltronasFaixa = linhasFaixa.reduce((s, f) => s + (f.ocupa ? f.qty : 0), 0);
+  const mudarFaixa = (label: string, d: number) => {
+    const atual = qtdFaixa[label] ?? 0;
+    const nova = Math.max(0, atual + d);
+    const proximo = { ...qtdFaixa, [label]: nova };
+    const pessoas = Object.values(proximo).reduce((s, q) => s + q, 0);
+    if (pessoas < 1) return;
+    const ocupaEsta = linhasFaixa.find((f) => f.label === label)?.ocupa ?? true;
+    if (d > 0 && ocupaEsta && poltronasFaixa + 1 > (selectedTrip?.available_spots ?? 99)) return;
+    setQtdFaixa(proximo);
+    setPeople(pessoas);
+    ajustarAcompanhantes(pessoas);
+  };
+  const total = temFaixas
+    ? linhasFaixa.reduce((s, f) => s + f.price * f.qty, 0)
+    : effectivePrice * people;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2302,6 +2341,9 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           traveler_phone: phone,
           traveler_birth_date: birth || undefined,
           num_travelers: people,
+          tier_breakdown: temFaixas
+            ? linhasFaixa.filter((f) => f.qty > 0).map((f) => ({ label: f.label, qty: f.qty }))
+            : undefined,
           companions: companions.filter((c) => c.full_name.trim()).map((c) => ({
             full_name: c.full_name,
             cpf: c.cpf,
@@ -2442,9 +2484,31 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
             <p className="text-[10px] text-gray-400">Data de nascimento é opcional</p>
           </div>
 
-          {/* 4. Quantidade + Pagamento */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* 4a. Faixas de idade: só aparece quando a data tem faixa. Aí elas
+              substituem o contador de pessoas, porque o total sai delas. */}
+          {temFaixas && (
             <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pessoas por faixa de idade</label>
+              <div className="space-y-1.5">
+                {linhasFaixa.map((f) => (
+                  <div key={f.label} className="flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2 bg-white">
+                    <span className="flex-1 min-w-0 text-sm text-navy-800 truncate">
+                      {f.label} <span className="text-gray-400 text-xs">R$ {fmtBRL(f.price)}{!f.ocupa ? " · sem poltrona" : ""}</span>
+                    </span>
+                    <button type="button" onClick={() => mudarFaixa(f.label, -1)} aria-label={`Tirar uma pessoa de ${f.label}`}
+                      className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">−</button>
+                    <span className="w-5 text-center font-bold text-sm text-navy-800 tabular-nums">{f.qty}</span>
+                    <button type="button" onClick={() => mudarFaixa(f.label, 1)} aria-label={`Pôr uma pessoa em ${f.label}`}
+                      className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 4. Quantidade + Pagamento */}
+          <div className={temFaixas ? "" : "grid grid-cols-2 gap-3"}>
+            {!temFaixas && <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pessoas</label>
               <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white">
                 <button type="button" onClick={() => changePeople(people - 1)}
@@ -2453,7 +2517,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
                 <button type="button" onClick={() => changePeople(people + 1)}
                   className="w-7 h-7 border border-gray-200 rounded-lg flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 transition-colors">+</button>
               </div>
-            </div>
+            </div>}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Pagamento</label>
               <div className="relative">
@@ -2507,7 +2571,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           <div>
             <button type="button" onClick={() => setShowPriceOverride((v) => !v)}
               className="text-xs text-navy-500 hover:text-navy-700 underline underline-offset-2 transition-colors">
-              {showPriceOverride ? "Usar preço padrão da viagem" : "Alterar preço por pessoa?"}
+              {showPriceOverride ? "Usar preço padrão da viagem" : temFaixas ? "Alterar preço do adulto?" : "Alterar preço por pessoa?"}
             </button>
             {showPriceOverride && (
               <div className="relative mt-2">
@@ -2556,7 +2620,11 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           {/* Resumo + Submit */}
           {selectedTrip && (
             <div className="bg-navy-50 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
-              <span className="text-gray-500">{people} pessoa{people !== 1 ? "s" : ""} × R$ {fmtBRL(effectivePrice)}</span>
+              <span className="text-gray-500">
+                {temFaixas
+                  ? linhasFaixa.filter((f) => f.qty > 0).map((f) => `${f.qty} × ${f.label}`).join(", ")
+                  : `${people} pessoa${people !== 1 ? "s" : ""} × R$ ${fmtBRL(effectivePrice)}`}
+              </span>
               <span className="font-black text-navy-800 text-base">R$ {fmtBRL(total)}</span>
             </div>
           )}
