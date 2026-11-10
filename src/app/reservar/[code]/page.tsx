@@ -388,6 +388,10 @@ function BookingCheckout({ code }: { code: string }) {
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<Method>("pix");
   const [installments, setInstallments] = useState(1);
+  // A tela está esperando o servidor confirmar uma mudança (opcional, pessoas,
+  // data). Enquanto isso o pagamento fica travado: só se paga o total que o
+  // servidor já calculou e que está na tela. Ver `enfileirar`.
+  const [sincronizando, setSincronizando] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
   const loadStatus = useCallback(async (): Promise<string | null> => {
@@ -505,9 +509,9 @@ function BookingCheckout({ code }: { code: string }) {
             {/* No mobile: resumo no topo. No desktop: à direita. */}
             <div className="space-y-4 order-2 md:order-1 min-w-0">
               <StepTravelers booking={booking} done={step > 1} active={step === 1} onEdit={() => setStep(1)} onDone={() => setStep(2)} code={code} />
-              <StepPayment booking={booking} active={step === 2} code={code} method={method} setMethod={setMethod} installments={installments} setInstallments={setInstallments} onConfirmed={() => setConfirmed(true)} pollStatus={loadStatus} />
+              <StepPayment booking={booking} active={step === 2} code={code} method={method} setMethod={setMethod} installments={installments} setInstallments={setInstallments} onConfirmed={() => setConfirmed(true)} pollStatus={loadStatus} sincronizando={sincronizando} />
             </div>
-            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={true} method={method} installments={installments} onTravelersChange={() => setStep(1)} onComboSalvo={aoSalvarCombo} />
+            <ReservationCard booking={booking} trip={trip} code={code} onUpdate={setBooking} editable={true} method={method} installments={installments} onTravelersChange={() => setStep(1)} onComboSalvo={aoSalvarCombo} onSincronizando={setSincronizando} />
           </div>
         </div>
       </main>
@@ -518,9 +522,10 @@ function BookingCheckout({ code }: { code: string }) {
 }
 
 /* ── Card da reserva (direita): foto + edição + preço ────────────────── */
-function ReservationCard({ booking, trip, code, onUpdate, editable, method, installments, onTravelersChange, onComboSalvo }: {
+function ReservationCard({ booking, trip, code, onUpdate, editable, method, installments, onTravelersChange, onComboSalvo, onSincronizando }: {
   booking: Booking; trip: Trip | null; code: string; onUpdate: (b: Booking) => void; editable: boolean;
   method: Method; installments: number; onTravelersChange?: () => void;
+  onSincronizando?: (v: boolean) => void;
   /** Combo: o servidor devolve o grupo depois de refazer o carrinho. */
   onComboSalvo?: (grupo: string) => void;
 }) {
@@ -604,7 +609,46 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   }, [trip, hasTiers, booking.tier_breakdown, booking.num_travelers]);
 
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onSincronizando?.(busy); }, [busy, onSincronizando]);
   const seq = useRef(0);
+  // Fila dos PATCH de itens: um de cada vez, na ordem dos cliques.
+  //
+  // Caso real (09/11/2026), AJS-Y68ZDWD: a cliente trocou de transfer e dois
+  // PATCH saíram com 0,2 s de diferença. No servidor eles se cruzaram e a
+  // reserva ficou com o transfer marcado e o total sem ele. O servidor agora
+  // trava a reserva, mas a tela também não dispara mais em paralelo.
+  //
+  // Cada PATCH leva a seleção INTEIRA, não a diferença. Então, se chegou um
+  // clique mais novo enquanto este esperava a vez, este nem sai: o mais novo
+  // já leva tudo.
+  const fila = useRef<Promise<unknown>>(Promise.resolve());
+  const enfileirar = useCallback((my: number, body: object) => {
+    const envia = async () => {
+      if (my !== seq.current) return;
+      let ok = false;
+      try {
+        const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (r.ok) { ok = true; if (my === seq.current) onUpdate(await r.json()); }
+      } catch { /* trata abaixo */ }
+      if (ok || my !== seq.current) return;
+      // Não gravou (rede caiu, vaga acabou...). A tela já mostrava a mudança,
+      // então ela volta para o que está gravado no servidor: tela e cobrança
+      // nunca podem ficar diferentes.
+      try {
+        const r = await apiFetch(`/payments/${code}/status`);
+        if (r.ok && my === seq.current) {
+          const d: Booking = await r.json();
+          onUpdate(d);
+          setOpts(new Set((d.selected_optionals || []).map(o => o.name)));
+          setPeople(d.num_travelers);
+          if (d.tier_breakdown?.length) setTierCounts(Object.fromEntries(d.tier_breakdown.map(t => [t.label, t.qty])));
+        }
+      } catch { /* sem rede: o pagamento também não sai */ }
+    };
+    const vez = fila.current.then(envia, envia);
+    fila.current = vez;
+    return vez;
+  }, [code, onUpdate]);
 
   const push = useCallback(async (num: number, tiers: Record<string, number>, optNames: Set<string>) => {
     if (!trip) return;
@@ -665,11 +709,9 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     // de forma autoritativa quando a reserva for criada.
     if (!code) { if (my === seq.current) setBusy(false); return; }
 
-    try {
-      const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown }) });
-      if (r.ok && my === seq.current) onUpdate(await r.json());
-    } catch { /* mantém */ } finally { if (my === seq.current) setBusy(false); }
-  }, [code, hasTiers, trip, onUpdate, booking]);
+    await enfileirar(my, { num_travelers: total, selected_optionals, tier_breakdown });
+    if (my === seq.current) setBusy(false);
+  }, [code, hasTiers, trip, onUpdate, booking, enfileirar]);
 
   const changePeople = (d: number) => { const v = Math.max(1, Math.min(trip?.available_spots || 50, people + d)); setPeople(v); push(v, tierCounts, opts); onTravelersChange?.(); };
   const changeTier = (label: string, d: number) => setTierCounts(prev => {
@@ -731,11 +773,10 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
     }
     // Pré-login (sem code): só a atualização otimista acima.
     if (!code) return;
+    const my = ++seq.current;
     setBusy(true);
-    try {
-      const r = await apiFetch(`/payments/${code}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ num_travelers: total, selected_optionals, tier_breakdown, trip_id: tid }) });
-      if (r.ok) onUpdate(await r.json());
-    } catch { /* mantém */ } finally { setBusy(false); }
+    await enfileirar(my, { num_travelers: total, selected_optionals, tier_breakdown, trip_id: tid });
+    if (my === seq.current) setBusy(false);
   };
 
   const combo = ehCombo(booking);
@@ -1233,10 +1274,10 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 }
 
 /* ── Passo 2: Pagamento ──────────────────────────────────────────────── */
-function StepPayment({ booking, active, code, method, setMethod, installments, setInstallments, onConfirmed, pollStatus }: {
+function StepPayment({ booking, active, code, method, setMethod, installments, setInstallments, onConfirmed, pollStatus, sincronizando }: {
   booking: Booking; active: boolean; code: string;
   method: Method; setMethod: (m: Method) => void; installments: number; setInstallments: (n: number) => void;
-  onConfirmed: () => void; pollStatus: () => Promise<string | null>;
+  onConfirmed: () => void; pollStatus: () => Promise<string | null>; sincronizando: boolean;
 }) {
   return (
     <section id="step-2" className={`bg-white rounded-2xl shadow-sm scroll-mt-20 ${!active ? "opacity-50 pointer-events-none" : ""}`}>
@@ -1266,8 +1307,8 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
             )}
           </div>
           <div key={method} className="mt-5 animate-pop">
-            {method === "pix" && <PixPanel code={code} amount={booking.final_amount} onConfirmed={onConfirmed} pollStatus={pollStatus} />}
-            {method === "card" && <CardPanel code={code} amount={booking.final_amount} options={booking.installment_options || []} installments={installments} setInstallments={setInstallments} onConfirmed={onConfirmed} />}
+            {method === "pix" && <PixPanel code={code} amount={booking.final_amount} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
+            {method === "card" && <CardPanel code={code} amount={booking.final_amount} options={booking.installment_options || []} installments={installments} setInstallments={setInstallments} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
             {method === "whatsapp" && <WhatsappPanel code={code} booking={booking} />}
           </div>
 
@@ -1304,7 +1345,7 @@ function MethodRadio({ icon, label, hint, selected, onClick }: { icon: React.Rea
   );
 }
 
-function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amount: number; onConfirmed: () => void; pollStatus: () => Promise<string | null> }) {
+function PixPanel({ code, amount, onConfirmed, pollStatus, sincronizando }: { code: string; amount: number; onConfirmed: () => void; pollStatus: () => Promise<string | null>; sincronizando: boolean }) {
   const [qr, setQr] = useState<{ image: string; payload: string; expiresAt: number | null } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1325,10 +1366,12 @@ function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amo
   }, [amount]);
 
   const generate = async () => {
+    if (sincronizando) return;
     setLoading(true); setError(""); setInfo("");
     try {
-      const r = await apiFetch(`/payments/${code}/pix`, { method: "POST" });
-      if (!r.ok) { const e = await r.json(); setError(typeof e.detail === "string" ? e.detail : "Erro ao gerar o PIX."); return; }
+      // O servidor só cobra se este for exatamente o total calculado.
+      const r = await apiFetch(`/payments/${code}/pix`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valor_na_tela: amount }) });
+      if (!r.ok) { const e = await r.json(); setError(typeof e.detail === "string" ? e.detail : "Erro ao gerar o PIX."); if (r.status === 409) await pollStatus(); return; }
       const d = await r.json();
       // Janela de pagamento (urgência clara). O código real do Asaas dura mais,
       // então se passar disso é só gerar outro - a confirmação continua valendo.
@@ -1363,7 +1406,7 @@ function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amo
       <p className="text-gray-500 text-sm mb-4">Pague em segundos. Sua vaga é confirmada na hora.</p>
       {error && <div className="mb-3 text-left"><ErrorMsg>{error}</ErrorMsg></div>}
       {info && <div className="mb-3 text-left"><InfoMsg>{info}</InfoMsg></div>}
-      <button onClick={generate} disabled={loading} className="bg-navy-700 hover:bg-navy-600 text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-60">{loading ? "Gerando..." : "Gerar QR Code PIX"}</button>
+      <button onClick={generate} disabled={loading || sincronizando} className="bg-navy-700 hover:bg-navy-600 text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-60">{loading ? "Gerando..." : sincronizando ? "Atualizando o total..." : "Gerar QR Code PIX"}</button>
     </div>
   );
 
@@ -1394,7 +1437,7 @@ function PixPanel({ code, amount, onConfirmed, pollStatus }: { code: string; amo
   );
 }
 
-function CardPanel({ code, amount, options, installments, setInstallments, onConfirmed }: { code: string; amount: number; options: { n: number; installment: number; total: number; interest_free: boolean }[]; installments: number; setInstallments: (n: number) => void; onConfirmed: () => void }) {
+function CardPanel({ code, amount, options, installments, setInstallments, onConfirmed, pollStatus, sincronizando }: { code: string; amount: number; options: { n: number; installment: number; total: number; interest_free: boolean }[]; installments: number; setInstallments: (n: number) => void; onConfirmed: () => void; pollStatus: () => Promise<string | null>; sincronizando: boolean }) {
   const user = typeof window !== "undefined" ? getUser() : null;
   // Pré-preenche o cartão de teste APENAS em ambiente local (sandbox). Nunca em produção.
   const DEV = API.includes("localhost");
@@ -1415,7 +1458,7 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
     } catch { /* offline - não bloqueia */ }
   };
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(""); setInfo("");
+    e.preventDefault(); if (sincronizando) return; setError(""); setInfo("");
     const num = onlyDigits(number); const [mm, yy] = expiry.split("/");
     if (num.length < 13) return setError("Número do cartão inválido.");
     if (!mm || !yy) return setError("Validade inválida (MM/AA).");
@@ -1424,9 +1467,15 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
     if (!addr) return setError("Informe o número do endereço.");
     setLoading(true);
     try {
-      const r = await apiFetch(`/payments/${code}/card`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ holder_name: holder, number: num, expiry_month: mm, expiry_year: yy, ccv, cpf: onlyDigits(user?.cpf || ""), postal_code: onlyDigits(cep), address_number: addr, phone: onlyDigits(user?.phone || ""), installments }) });
+      const r = await apiFetch(`/payments/${code}/card`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ holder_name: holder, number: num, expiry_month: mm, expiry_year: yy, ccv, cpf: onlyDigits(user?.cpf || ""), postal_code: onlyDigits(cep), address_number: addr, phone: onlyDigits(user?.phone || ""), installments, valor_na_tela: amount }) });
       const d = await r.json();
-      if (!r.ok) { setError(typeof d.detail === "string" ? d.detail : "Pagamento não autorizado. Confira os dados do cartão."); return; }
+      if (!r.ok) {
+        setError(typeof d.detail === "string" ? d.detail : "Pagamento não autorizado. Confira os dados do cartão.");
+        // 409: o servidor recusou um total que não batia com os itens e acabou
+        // de corrigi-lo. Recarrega para o resumo e as parcelas mostrarem o novo.
+        if (r.status === 409) await pollStatus();
+        return;
+      }
       // Reaproveita o endereço de cobrança na próxima compra (sem re-login).
       try { if (user) localStorage.setItem("ajs_user", JSON.stringify({ ...user, postal_code: onlyDigits(cep), address_number: addr })); } catch { /* ignore */ }
       if (d.status === "confirmed") onConfirmed();
@@ -1499,7 +1548,7 @@ function CardPanel({ code, amount, options, installments, setInstallments, onCon
         );
       })()}
 
-      <button type="submit" disabled={loading} className="w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm">{loading ? <><Loader2 size={17} className="animate-spin" /> Processando…</> : <><Lock size={15} /> Pagar agora</>}</button>
+      <button type="submit" disabled={loading || sincronizando} className="w-full bg-navy-700 hover:bg-navy-600 text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm">{loading ? <><Loader2 size={17} className="animate-spin" /> Processando…</> : sincronizando ? <><Loader2 size={17} className="animate-spin" /> Atualizando o total…</> : <><Lock size={15} /> Pagar agora</>}</button>
     </form>
   );
 }
