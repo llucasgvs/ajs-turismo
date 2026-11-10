@@ -16,7 +16,7 @@ import { ADULTO, SeletorDeViajantes, contagemApos, type FaixaDoSeletor } from "@
 import { type FaixaDoCombo, paraSelecao, rotuloFaixa, prazoDoCombo, textoDoPrazo } from "@/lib/combos";
 import { Opcionais } from "@/components/viagem/Opcionais";
 import { imgOtim } from "@/lib/imagem";
-import { visitanteGA } from "@/lib/analytics";
+import { dadosDaVisita } from "@/lib/analytics";
 
 type Opcional = { name: string; price: number; description?: string | null };
 
@@ -422,7 +422,7 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
           num_travelers: e.num_travelers,
           // Só faixa e quantidade: o preço é da prévia, quem cobra é o servidor.
           tier_breakdown: e.tier_breakdown.map(({ label, qty }) => ({ label, qty })),
-          ...visitanteGA(),
+          ...dadosDaVisita(),
         }),
       });
       const d = await res.json();

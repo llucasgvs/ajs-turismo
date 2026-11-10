@@ -10,6 +10,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { adminDirtyTs } from "@/lib/adminCache";
 import { Skel, SkelLinhas, SkelGrafico } from "@/components/admin/Skeleton";
+import { OrigemDasVendas } from "@/components/admin/OrigemDasVendas";
 import { spDay } from "@/lib/format";
 
 const RES = "/admin/reservas";
@@ -948,6 +949,9 @@ export default function AdminDashboard() {
           </div>
         )}
       </Card>
+
+      {/* De onde vieram as vendas: busca os próprios dados. */}
+      <OrigemDasVendas />
 
       {/* ════ ATO 3 - AÇÕES ════ */}
       <Eyebrow kicker="Ações" title="O que pede atenção agora" />

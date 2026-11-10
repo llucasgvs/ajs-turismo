@@ -16,7 +16,8 @@ import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { totalOpcionais, quartoObrigatorio, multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
-import { trackPurchaseOnce, trackBeginCheckout, visitanteGA } from "@/lib/analytics";
+import { trackPurchaseOnce, trackBeginCheckout, dadosDaVisita } from "@/lib/analytics";
+import { origemDaVisita } from "@/lib/origem";
 import { BrandedLoader } from "@/components/BrandedLoader";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 
@@ -1695,7 +1696,7 @@ function PreCheckout() {
             // Só faixa e quantidade: o preço que veio na URL é da prévia.
             tier_breakdown: ((sel.tier_breakdown || []) as { label: string; qty: number }[])
               .map(({ label, qty }) => ({ label, qty })),
-            ...visitanteGA(),
+            ...dadosDaVisita(),
           }),
         });
         const d = await res.json();
@@ -1709,8 +1710,10 @@ function PreCheckout() {
     try {
       const res = await apiFetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // Só no checkout pago: o pedido de cotação não vira compra no GA.
-        body: JSON.stringify(trip?.quote_only ? payload : { ...payload, ...visitanteGA() }),
+        // O visitante do GA só no checkout pago (o pedido de cotação não vira
+        // compra no GA). A origem vai nos dois: cotação também é cliente vindo
+        // de algum lugar.
+        body: JSON.stringify(trip?.quote_only ? { ...payload, ...origemDaVisita() } : { ...payload, ...dadosDaVisita() }),
       });
       if (!res.ok) { const e = await res.json(); setError(typeof e.detail === "string" ? e.detail : "Não foi possível iniciar a reserva."); setCreating(false); return; }
       const d = await res.json();

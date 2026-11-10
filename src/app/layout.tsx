@@ -4,6 +4,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { LoadingProvider } from "@/components/LoadingProvider";
+import { AnotaOrigem } from "@/components/AnotaOrigem";
 
 // Google Analytics 4. O ID é público (aparece no código da página), então fica
 // aqui mesmo. Serve de base para medir as campanhas do Google Ads.
@@ -185,6 +186,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <LoadingProvider>{children}</LoadingProvider>
+        {/* De onde o visitante veio (anúncio, Instagram...), para o painel
+            saber a origem de cada venda. Ver src/lib/origem.ts. */}
+        <AnotaOrigem />
         {/* Visitas por página (Vercel Analytics). Não usa cookie, então não
             exige aviso de cookies. */}
         <Analytics />

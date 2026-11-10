@@ -31,7 +31,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { QUARTO_SINGLE, quartoObrigatorio } from "@/lib/opcionais";
 import { type FaixaDoCombo, paraSelecao } from "@/lib/combos";
-import { visitanteGA } from "@/lib/analytics";
+import { dadosDaVisita } from "@/lib/analytics";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -183,7 +183,7 @@ export function ComboEditavel({
       };
       const res = await apiFetch("/combos/checkout", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...corpo, ...visitanteGA() }),
+        body: JSON.stringify({ ...corpo, ...dadosDaVisita() }),
       });
       const d = await res.json();
       if (!res.ok) {

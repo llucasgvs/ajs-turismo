@@ -7,6 +7,8 @@
  * é usado para decidir nada no checkout.
  */
 
+import { origemDaVisita } from "@/lib/origem";
+
 type Gtag = (...args: unknown[]) => void;
 
 function getGtag(): Gtag | null {
@@ -184,4 +186,12 @@ export function visitanteGA(): { ga_client_id?: string; ga_session_id?: string }
   } catch {
     return {};
   }
+}
+
+/**
+ * Tudo o que vai junto ao abrir uma reserva para medir de onde ela veio: o
+ * visitante do GA e a origem anotada na entrada do site (ver origem.ts).
+ */
+export function dadosDaVisita(): Record<string, unknown> {
+  return { ...visitanteGA(), ...origemDaVisita() };
 }

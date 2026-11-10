@@ -10,6 +10,7 @@ import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { valorNaData, tierLabel, tierOccupiesSeat } from "@/lib/tiers";
 import { Skel } from "@/components/admin/Skeleton";
 import { useFecharComEsc } from "@/hooks/useFecharComEsc";
+import { COMO_CONHECEU_OPCOES, COMO_CONHECEU_LABEL, nomeDoCanal } from "@/lib/canais";
 
 const PAGE_SIZE = 25;
 
@@ -80,6 +81,13 @@ type Booking = {
   optionals_amount: number;
   installments: number;
   is_external: boolean;
+  /** De onde a pessoa veio (ver app/core/origem.py no backend). `canal` é a
+   *  última visita antes da reserva; `canal_primeiro`, a primeira de todas. */
+  canal?: string | null;
+  canal_primeiro?: string | null;
+  canal_campanha?: string | null;
+  /** Venda de balcão: "Como conheceu a AJS?", opcional. */
+  como_conheceu?: string | null;
   tier_breakdown?: { label: string; price: number; qty: number }[];
   selected_optionals?: { name: string; price: number }[];
   trip_title: string | null;
@@ -187,6 +195,38 @@ function ViagensDoCombo({ b }: { b: Booking }) {
         </p>
       )}
     </div>
+  );
+}
+
+// ── De onde veio a venda (nomes em src/lib/canais.ts) ─────────────────────────
+function OrigemDaReserva({ b }: { b: Booking }) {
+  let linhas: { rotulo: string; valor: string; vazio?: boolean }[];
+  if (b.is_external) {
+    linhas = [{
+      rotulo: "Como conheceu a AJS",
+      valor: b.como_conheceu ? (COMO_CONHECEU_LABEL[b.como_conheceu] || b.como_conheceu) : "Não informado",
+      vazio: !b.como_conheceu,
+    }];
+  } else if (b.canal) {
+    linhas = [{ rotulo: "Chegou por", valor: nomeDoCanal(b.canal, b.canal_campanha) }];
+    if (b.canal_primeiro && b.canal_primeiro !== b.canal) {
+      linhas.push({ rotulo: "Primeiro contato", valor: nomeDoCanal(b.canal_primeiro, b.canal_campanha) });
+    }
+  } else {
+    linhas = [{ rotulo: "Chegou por", valor: "Não identificado", vazio: true }];
+  }
+  return (
+    <section>
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Globe size={11} /> De onde veio</p>
+      <div className="bg-gray-50 rounded-xl p-3 space-y-1 text-sm">
+        {linhas.map((l) => (
+          <div key={l.rotulo} className="flex justify-between gap-3">
+            <span className="text-gray-500 shrink-0">{l.rotulo}</span>
+            <span className={`text-right ${l.vazio ? "text-gray-400" : "font-semibold text-navy-800"}`}>{l.valor}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1213,6 +1253,8 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
             </div>
           </section>
 
+          <OrigemDaReserva b={booking} />
+
           {/* Acompanhantes */}
           {companions.length > 0 && (
             <section>
@@ -1544,6 +1586,7 @@ function EditBookingModal({ booking, onClose, onSaved }: {
   const [liquido, setLiquido] = useState(String(booking.net_amount || ""));
   const [paymentMethod, setPaymentMethod] = useState(booking.payment_method || "whatsapp");
   const [notes, setNotes] = useState(booking.notes || "");
+  const [comoConheceu, setComoConheceu] = useState(booking.como_conheceu || "");
   const [phone, setPhone] = useState(booking.traveler_phone || "");
   const [people, setPeople] = useState(booking.num_travelers);
   // Quantas pessoas em cada faixa. O preço é o GRAVADO na reserva: tirar
@@ -1653,6 +1696,8 @@ function EditBookingModal({ booking, onClose, onSaved }: {
             .map((o) => ({ name: o.name.trim(), price: parseFloat(o.price) || 0 })),
           payment_method: paymentMethod,
           notes: notes || null,
+          // Só na venda de balcão, e só se mudou: vazio limpa.
+          como_conheceu: booking.is_external && comoConheceu !== (booking.como_conheceu || "") ? comoConheceu : undefined,
           traveler_phone: phone || undefined,
           num_travelers: people,
           tier_breakdown: temFaixas ? faixas.map((f) => ({ label: f.label, qty: f.qty })) : undefined,
@@ -1857,6 +1902,22 @@ function EditBookingModal({ booking, onClose, onSaved }: {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {booking.is_external && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                Como conheceu a AJS? <span className="normal-case font-normal text-gray-400">(opcional)</span>
+              </label>
+              <div className="relative">
+                <select value={comoConheceu} onChange={(e) => setComoConheceu(e.target.value)}
+                  className={`w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer ${comoConheceu ? "" : "text-gray-400"}`}>
+                  <option value="">Não perguntei</option>
+                  {COMO_CONHECEU_OPCOES.map(([v, l]) => <option key={v} value={v} className="text-gray-900">{l}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           )}
 
@@ -2203,6 +2264,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("whatsapp");
   const [notes, setNotes] = useState("");
+  const [comoConheceu, setComoConheceu] = useState("");
   const [priceOverride, setPriceOverride] = useState("");
   const [showPriceOverride, setShowPriceOverride] = useState(false);
   const [liquido, setLiquido] = useState("");
@@ -2355,6 +2417,7 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
           // jeito de dizer "entrou cheio", e aí o backend não grava nada.
           net_amount: showLiquido && liquido ? parseFloat(liquido) : undefined,
           notes: notes || undefined,
+          como_conheceu: comoConheceu || undefined,
         }),
       });
       if (!res.ok) {
@@ -2609,6 +2672,21 @@ function ExternalSaleModal({ trips, onClose, onSaved }: {
               )}
             </div>
           )}
+
+          {/* 5c. Como conheceu (opcional) */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+              Como conheceu a AJS? <span className="normal-case font-normal text-gray-400">(opcional)</span>
+            </label>
+            <div className="relative">
+              <select value={comoConheceu} onChange={(e) => setComoConheceu(e.target.value)}
+                className={`w-full pl-3 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-400 appearance-none bg-white cursor-pointer ${comoConheceu ? "" : "text-gray-400"}`}>
+                <option value="">Não perguntei</option>
+                {COMO_CONHECEU_OPCOES.map(([v, l]) => <option key={v} value={v} className="text-gray-900">{l}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
 
           {/* 6. Obs */}
           <div className="relative">
