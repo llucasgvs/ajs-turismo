@@ -22,6 +22,7 @@ export function paraSelecao(d: {
   price_per_person: number;
   original_price?: number | null;
   available_spots: number;
+  encerra_horas?: number | null;
 }): DataSelecionavel {
   return {
     id: d.trip_id,
@@ -30,6 +31,7 @@ export function paraSelecao(d: {
     price_per_person: d.price_per_person,
     original_price: d.original_price ?? null,
     available_spots: d.available_spots,
+    encerra_horas: d.encerra_horas ?? null,
   };
 }
 

@@ -3182,7 +3182,7 @@ export default function AdminReservasPage() {
       {showExternal && (
         <ExternalSaleModal
           // `completed` junta duas coisas: viagem que já saiu e data que só fechou
-          // para o SITE (3 dias antes). Venda externa vale até a saída, porque é
+          // para o SITE (no prazo do roteiro, 72 h no padrão). Venda externa vale até a saída, porque é
           // combinada na mão; o servidor só exige viagem ativa e vaga.
           trips={trips.filter((t) => t.is_active !== false && t.available_spots > 0 && t.status !== "cancelled"
             && (t.status !== "completed" || (!!t.departure_date && new Date(t.departure_date).getTime() > Date.now())))}

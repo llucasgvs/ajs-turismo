@@ -9,7 +9,7 @@ import {
   Plane, CheckCircle2, ArrowRight, Download, Ticket, FileText, Sparkles, Bus, Wallet, Clock, Share2, Loader2, Package,
 } from "lucide-react";
 import { getUser, logout, apiFetch } from "@/lib/api";
-import { spDay, fmtBRL, salesClosed } from "@/lib/format";
+import { spDay, fmtBRL, salesClosed, prazoDeVendaEmTexto } from "@/lib/format";
 import { multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
 import { BrandedLoader } from "@/components/BrandedLoader";
 
@@ -27,6 +27,8 @@ interface Booking {
   trip_return_date?: string; trip_departure_at?: string; trip_return_at?: string; trip_image_url?: string;
   trip_required_documents?: string | null; trip_departure_locations?: unknown[]; trip_includes?: string[];
   trip_quote_only?: boolean;
+  /** Prazo de venda do roteiro, em horas antes da saída (vem do servidor). */
+  trip_encerra_horas?: number;
   /* Combo. O cliente continua vendo UMA viagem por card, porque é o voucher de
      cada ônibus que ele usa na porta. Estes campos só dão o contexto: que as
      três viagens são uma compra só, e que o valor de cada uma já é a fatia
@@ -400,9 +402,9 @@ function TripCard({ b, variant }: { b: Booking; variant: Variant }) {
           </div>
         </div>
         {variant === "pending" && (
-          salesClosed(b.trip_departure_date) ? (
+          salesClosed(b.trip_departure_date, b.trip_encerra_horas) ? (
             <div className="mt-3">
-              <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-600 mb-2.5">As vendas para esta data já encerraram (fechamos alguns dias antes da saída). Fale com a nossa equipe para verificar.</div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-600 mb-2.5">As vendas para esta data já encerraram (pelo site, fechamos {prazoDeVendaEmTexto(b.trip_encerra_horas)} antes da saída). Fale com a nossa equipe para verificar.</div>
               <a href={waMsg(b)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:brightness-95 text-white font-bold text-sm py-2.5 rounded-xl transition-all"><MessageCircle size={14} /> Falar no WhatsApp</a>
             </div>
           ) : (

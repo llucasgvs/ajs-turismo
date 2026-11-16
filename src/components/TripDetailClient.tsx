@@ -582,7 +582,7 @@ function OpenDateCalendar({
 /** Data mais próxima que ainda vende (com vaga e dentro do prazo); se nenhuma
  *  vende, a primeira. Mesma regra na montagem e na atualização das vagas. */
 function aindaVende(t: Trip): boolean {
-  return temVaga(t.available_spots) && t.status !== "sold_out" && !salesClosed(t.departure_date);
+  return temVaga(t.available_spots) && t.status !== "sold_out" && !salesClosed(t.departure_date, t.encerra_horas);
 }
 
 function maisProxima(ordenadas: Trip[]): Trip | undefined {
@@ -719,7 +719,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   // a viagem acabou, quando na verdade só aquele dia encheu.
   const outrasDatasComVaga = siblingTrips.filter(
     (t) => t.id !== activeTrip.id && temVaga(t.available_spots)
-           && t.status !== "sold_out" && !salesClosed(t.departure_date)
+           && t.status !== "sold_out" && !salesClosed(t.departure_date, t.encerra_horas)
   ).length;
   const discount = activeTrip.original_price
     ? Math.round((1 - activeTrip.price_per_person / activeTrip.original_price) * 100)
@@ -778,7 +778,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   // Vai para o checkout (estilo Airbnb). Login/cadastro acontece lá dentro (modal),
   // então não checamos login aqui nem criamos a reserva - a seleção vai na URL.
   const handleOpenBooking = useCallback(() => {
-    if (!selectedTrip || salesClosed(selectedTrip.departure_date)) {
+    if (!selectedTrip || salesClosed(selectedTrip.departure_date, selectedTrip.encerra_horas)) {
       setDateError(true);
       document.getElementById("date-selector")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;

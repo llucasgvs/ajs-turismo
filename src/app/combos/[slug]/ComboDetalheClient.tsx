@@ -31,6 +31,8 @@ type DataDoRoteiro = {
   price_tiers: { name?: string; age_range?: string; price?: number;
                  original_price?: number | null; occupies_seat?: boolean }[];
   tem_hospedagem: boolean;
+  /** Horas antes da saída em que o site para de vender (prazo do roteiro). */
+  encerra_horas?: number;
 };
 
 type RoteiroDoCombo = {
@@ -393,9 +395,10 @@ export default function ComboDetalheClient({ combo }: { combo: Combo }) {
     setErro("");
     if (faltaData) { setErro("Escolha a data de cada viagem."); return; }
     /* A lista de datas é de quando a página carregou. Numa aba aberta desde
-       ontem, a saída de daqui a 3 dias já encerrou vendas e o servidor vai
-       recusar. Confere aqui, dizendo QUAL viagem, e recarrega as datas. */
-    const encerrada = pernas.find((p) => p.data && salesClosed(p.data.departure_date));
+       ontem, a saída já pode ter entrado no prazo e o servidor vai recusar.
+       Confere aqui, com o prazo do roteiro de cada perna (a Ilha do Mel fecha
+       24 h antes, o resto 72 h), dizendo QUAL viagem, e recarrega as datas. */
+    const encerrada = pernas.find((p) => p.data && salesClosed(p.data.departure_date, p.data.encerra_horas));
     if (encerrada) {
       setErro(`${nomeCurtoDaViagem(encerrada.roteiro.title)}: as vendas para a data escolhida já encerraram. Escolha outra data.`);
       router.refresh();

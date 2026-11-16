@@ -32,6 +32,9 @@ export interface Trip {
   tem_hospedagem?: boolean;
   whatsapp_only?: boolean;
   quote_only?: boolean;
+  /** Horas antes da saída em que o site para de vender esta data. Vem do
+   *  servidor (prazo do roteiro): 72 no padrão, 24 na Ilha do Mel. */
+  encerra_horas?: number;
   slug?: string | null;
   parent_id?: number | null;
   is_open_date: boolean;

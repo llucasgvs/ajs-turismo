@@ -15,7 +15,7 @@ import {
 import Footer from "@/components/Footer";
 import { apiFetch, getUser, getToken } from "@/lib/api";
 import { totalOpcionais, quartoObrigatorio, multiplicadorOpcional, QUARTO_SINGLE } from "@/lib/opcionais";
-import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga } from "@/lib/format";
+import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga, prazoDeVendaEmTexto } from "@/lib/format";
 import { trackPurchaseOnce, trackBeginCheckout, dadosDaVisita } from "@/lib/analytics";
 import { origemDaVisita } from "@/lib/origem";
 import { BrandedLoader } from "@/components/BrandedLoader";
@@ -47,6 +47,8 @@ interface Booking {
   trip_whatsapp_only?: boolean;
   trip_allow_pix?: boolean;
   trip_quote_only?: boolean;
+  /** Prazo de venda do roteiro, em horas antes da saída (vem do servidor). */
+  trip_encerra_horas?: number;
   installments_max?: number;
   installment_options?: { n: number; installment: number; total: number; interest_free: boolean }[];
   /* ── Combo ──
@@ -496,8 +498,8 @@ function BookingCheckout({ code }: { code: string }) {
   if (["cancelled", "refunded", "completed"].includes(booking.status))
     return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status={booking.status} /></div><Footer /></div>;
   // Prazo de vendas encerrado (saída próxima): não deixa tentar pagar e cair em erro.
-  if (salesClosed(booking.trip_departure_date))
-    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status="closed" /></div><Footer /></div>;
+  if (salesClosed(booking.trip_departure_date, booking.trip_encerra_horas))
+    return <div className="min-h-screen bg-gray-50 flex flex-col"><CheckoutHeader /><div className="flex-1"><BlockedScreen status="closed" encerraHoras={booking.trip_encerra_horas} /></div><Footer /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
@@ -1838,12 +1840,12 @@ function PreCheckout() {
   );
 }
 
-function BlockedScreen({ status }: { status: string }) {
+function BlockedScreen({ status, encerraHoras }: { status: string; encerraHoras?: number }) {
   const map: Record<string, { title: string; msg: string }> = {
     cancelled: { title: "Reserva cancelada", msg: "Esta reserva foi cancelada e não pode mais ser paga." },
     refunded: { title: "Reserva reembolsada", msg: "Esta reserva foi reembolsada." },
     completed: { title: "Viagem já realizada", msg: "Esta reserva já foi concluída." },
-    closed: { title: "Vendas encerradas", msg: "As vendas para esta data já encerraram (fechamos alguns dias antes da saída). Fale com a nossa equipe para verificar disponibilidade." },
+    closed: { title: "Vendas encerradas", msg: `As vendas para esta data já encerraram (pelo site, fechamos ${prazoDeVendaEmTexto(encerraHoras)} antes da saída). Fale com a nossa equipe para verificar disponibilidade.` },
   };
   const m = map[status] || { title: "Reserva indisponível", msg: "Esta reserva não está disponível para pagamento." };
   const wa = "https://wa.me/5541998348766?text=" + encodeURIComponent("Olá! Quero verificar disponibilidade para uma viagem com a saída próxima.");

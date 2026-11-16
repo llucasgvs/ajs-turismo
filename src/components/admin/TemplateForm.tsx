@@ -66,6 +66,8 @@ interface TemplateFormData {
   is_active: boolean;
   whatsapp_only: boolean;
   allow_pix: boolean;
+  /** Horas antes da saída em que o site para de vender. Vazio = padrão (72). */
+  encerra_horas: string;
   quote_only: boolean;
   parent_id: number | null;
   // Saídas diárias
@@ -117,7 +119,7 @@ const EMPTY: TemplateFormData = {
   short_description: "", seo_titulo: "", seo_descricao: "", description: "", required_documents: "", image_url: "",
   includes: ["Coordenador de grupo", "Transporte Ida e Volta", "Hospedagem"], excludes: [], optionals: [], itinerary: [], departure_locations: [], gallery: [],
   tem_hospedagem: false, quarto_single: "",
-  is_featured: false, is_active: true, whatsapp_only: false, allow_pix: false, quote_only: false, parent_id: null,
+  is_featured: false, is_active: true, whatsapp_only: false, allow_pix: false, encerra_horas: "", quote_only: false, parent_id: null,
   is_open_date: false, open_date_price: "", open_date_max_installments: "12", open_date_spots_per_day: "0",
   open_date_min_advance: "1", open_date_max_advance: "180",
   open_date_departure_time: "06:00", open_date_return_time: "23:59",
@@ -154,6 +156,8 @@ export default function TemplateForm({
     // A API devolve null quando está no automático; o campo da tela quer texto.
     seo_titulo: String(initialData?.seo_titulo ?? ""),
     seo_descricao: String(initialData?.seo_descricao ?? ""),
+    // A API devolve null quando o roteiro segue o padrão; o campo quer texto.
+    encerra_horas: String((initialData as Record<string, unknown>)?.encerra_horas ?? ""),
     // normaliza open_date: number → string para os inputs
     open_date_price: String((initialData as Record<string, unknown>)?.open_date_price ?? ""),
     open_date_max_installments: String((initialData as Record<string, unknown>)?.open_date_max_installments ?? "12"),
@@ -266,6 +270,9 @@ export default function TemplateForm({
           ...form,
           // converte price de string para number antes de enviar
           tem_hospedagem: form.tem_hospedagem,
+          // Vazio = segue o padrão. O servidor valida (1 a 336 horas) e
+          // responde em português se vier algo estranho.
+          encerra_horas: form.encerra_horas.trim() || null,
           // O quarto single não é digitado na lista de opcionais: ele entra aqui,
           // a partir do campo próprio, já com a marca que o faz ser cobrado por
           // adulto. Assim o dono responde uma pergunta e não precisa saber da
@@ -772,6 +779,22 @@ export default function TemplateForm({
               {form.whatsapp_only && !form.quote_only && (
                 <Toggle label="Aceitar PIX à vista mesmo assim" description="Libera só o PIX no site (o cartão continua desligado). A taxa do PIX é R$ 1,89 fixos, contra percentual no cartão. Quem quiser parcelar continua sendo atendido pelo WhatsApp."
                   checked={form.allow_pix} onChange={(v) => set("allow_pix", v)} />
+              )}
+              {!form.quote_only && (
+                <div>
+                  <label className="block text-sm font-medium text-navy-700 mb-1">Fechar vendas no site</label>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Quantas horas antes da saída o site para de vender. Vazio é o padrão, 72 horas (3 dias).
+                    A venda pelo balcão continua até a saída.
+                  </p>
+                  <div className="relative w-40">
+                    <input type="number" min="1" max="336" step="1" inputMode="numeric" placeholder="72"
+                      value={form.encerra_horas}
+                      onChange={(e) => set("encerra_horas", e.target.value)}
+                      className="input-field w-full pr-16 py-2 text-sm" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">horas</span>
+                  </div>
+                </div>
               )}
               {!templateId ? (
                 <Toggle label="Sob cotação (sem data/preço)" description="Para roteiros que precisam de orçamento (ex.: cruzeiro). Some preço e datas; mostra 'Sob consulta'. Cliente faz cadastro e solicita a cotação pelo WhatsApp. Definido na criação e não muda depois."

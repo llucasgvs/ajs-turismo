@@ -1,6 +1,6 @@
 import { ChevronDown, HelpCircle } from "lucide-react";
 import type { Trip } from "@/types/trip";
-import { BOOKING_CUTOFF_DAYS } from "@/lib/format";
+import { prazoDeVendaEmTexto } from "@/lib/format";
 
 /**
  * Perguntas frequentes da página da viagem.
@@ -106,7 +106,7 @@ export function montarPerguntas(trip: Trip, data: Trip, comDatas: boolean): Perg
     });
     p.push({
       pergunta: "Até quando posso comprar?",
-      resposta: `Pelo site, até ${BOOKING_CUTOFF_DAYS} dias antes da saída. Depois disso, fale com a nossa equipe pelo WhatsApp.`,
+      resposta: `Pelo site, até ${prazoDeVendaEmTexto(data.encerra_horas ?? trip.encerra_horas)} antes da saída. Depois disso, fale com a nossa equipe pelo WhatsApp.`,
     });
   } else if (trip.whatsapp_only && !trip.quote_only) {
     p.push({

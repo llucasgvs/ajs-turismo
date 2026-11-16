@@ -63,6 +63,9 @@ const CAMPOS_DA_DATA = [
   "id", "departure_date", "return_date", "duration_nights", "price_per_person", "original_price",
   "max_installments", "price_tiers", "total_spots", "available_spots", "min_group_size", "optionals",
   "status", "is_active", "is_featured", "created_at",
+  // Prazo de venda da data (a Ilha do Mel fecha 24 h antes, o resto 72 h).
+  // Fora desta lista, o seletor recebia a data sem o prazo e caía no padrão.
+  "encerra_horas",
 ] as const;
 type DataDoRoteiro = Pick<Trip, (typeof CAMPOS_DA_DATA)[number]>;
 

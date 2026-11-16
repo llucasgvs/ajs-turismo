@@ -29,6 +29,8 @@ export type DataSelecionavel = {
   // o que o banco realmente tem.
   available_spots: number | null;
   status?: string | null;
+  /** Prazo de venda desta data, em horas antes da saída (vem do servidor). */
+  encerra_horas?: number | null;
 };
 
 /* Preço do cartão e o "de" riscado.
@@ -140,7 +142,7 @@ export function DateSelector<T extends DataSelecionavel>({
         <div className={`grid gap-3 ${sidebar ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
         {visible.map((t) => {
           const isSold = t.available_spots === 0 || t.status === "sold_out";
-          const isClosed = !isSold && salesClosed(t.departure_date);
+          const isClosed = !isSold && salesClosed(t.departure_date, t.encerra_horas);
           const blocked = isSold || isClosed;
           const isLow = !blocked && poucasVagas(t.available_spots);
           const isSelected = selected?.id === t.id;
@@ -321,7 +323,7 @@ export function CompactDateSelector<T extends DataSelecionavel>({
             <div className="space-y-1.5">
               {grouped[monthKey].map(t => {
                 const isSold = t.available_spots === 0 || t.status === "sold_out";
-                const isClosed = !isSold && salesClosed(t.departure_date);
+                const isClosed = !isSold && salesClosed(t.departure_date, t.encerra_horas);
                 const blocked = isSold || isClosed;
                 const isSelected = selected?.id === t.id;
                 const isLow = !blocked && poucasVagas(t.available_spots);
