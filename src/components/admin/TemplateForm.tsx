@@ -7,6 +7,7 @@ import { Plus, X, Loader2, Save, ChevronLeft, Upload, Star, MapPin, Check, Copy 
 import { apiFetch, getToken } from "@/lib/api";
 import { invalidateAdminCache } from "@/lib/adminCache";
 import { imgOtim } from "@/lib/imagem";
+import { erroDaApi } from "@/lib/format";
 import NoGoogle from "@/components/admin/NoGoogle";
 
 /** Espelha QUARTO_SINGLE em app/core/opcionais.py. O backend reconhece o
@@ -299,11 +300,9 @@ export default function TemplateForm({
       );
       const data = await res.json();
       if (!res.ok) {
-        if (Array.isArray(data.detail)) {
-          setError(data.detail.map((d: {msg?: string}) => d.msg ?? JSON.stringify(d)).join(", "));
-        } else {
-          setError(typeof data.detail === "string" ? data.detail : "Erro ao salvar.");
-        }
+        // erroDaApi tira o "Value error, " que o Pydantic põe antes das nossas
+        // mensagens (prazo de venda, textos do Google).
+        setError(erroDaApi(data));
         return;
       }
       invalidateAdminCache();
