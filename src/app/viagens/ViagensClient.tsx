@@ -7,6 +7,7 @@ import { Clock,
   X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp, Package,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { SeloBlack } from "@/components/BlackBar";
 import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim, imgSrcSet } from "@/lib/imagem";
@@ -972,6 +973,8 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
           {discount && discount > 0 && (
             <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">-{discount}%</span>
           )}
+          <SeloBlack pequeno templateId={tmpl.id} parcelas={tmpl.max_installments} preco={tmpl.price_from}
+            precoDe={tmpl.original_price_from} sobConsulta={tmpl.quote_only} />
         </div>
 
         <div className="absolute bottom-2.5 left-2.5 right-2.5">

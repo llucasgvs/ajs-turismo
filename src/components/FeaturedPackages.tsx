@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SeloBlack } from "@/components/BlackBar";
 import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
@@ -84,6 +85,8 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                         -{discount}% OFF
                       </div>
                     )}
+                    <SeloBlack templateId={pkg.id} parcelas={pkg.max_installments} preco={pkg.price_from}
+                      precoDe={pkg.original_price_from} sobConsulta={pkg.quote_only} />
                   </div>
 
                   <div className="absolute bottom-3 left-3 right-3">

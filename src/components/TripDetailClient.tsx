@@ -1,5 +1,6 @@
 "use client";
 
+import { PixDaBlack } from "@/components/BlackBar";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -379,6 +380,7 @@ function StickyMobileCTA({
         <p className="text-[11px] text-emerald-600 font-medium">
           {trip.max_installments}x de R$ {fmtInstallment(trip.price_per_person, trip.max_installments)} s/juros
         </p>
+        <PixDaBlack compacto templateId={trip.template_id} preco={trip.price_per_person} precoDe={trip.original_price} />
       </div>
       {sold ? (
         <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
@@ -1361,6 +1363,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                         {activeTrip.max_installments}x de R$ {fmtInstallment(activeTrip.price_per_person, activeTrip.max_installments)} sem juros
                       </p>
                     )}
+                    <PixDaBlack templateId={activeTrip.template_id} preco={activeTrip.price_per_person} precoDe={activeTrip.original_price} />
                     {activeTrip.original_price && discount && discount > 0 && (
                       <div className="mt-2 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center border border-emerald-100">
                         Economia de {discount}%

@@ -7,6 +7,7 @@ import { Menu, X, MessageCircle, LayoutDashboard, User } from "lucide-react";
 import { getUser } from "@/lib/api";
 import type { StoredUser } from "@/lib/api";
 import { useLoading } from "@/components/LoadingProvider";
+import BlackBar from "@/components/BlackBar";
 
 const WA_URL = "https://wa.me/5541998348766?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20AJS%20Turismo%20e%20gostaria%20de%20saber%20mais%20sobre%20os%20pacotes%20de%20viagem.";
 
@@ -44,11 +45,15 @@ export default function Navbar() {
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ${
           scrolled
-            ? "bg-navy-900 shadow-lg py-2"
-            : "bg-gradient-to-b from-black/50 to-transparent py-4"
+            ? "bg-navy-900 shadow-lg"
+            : "bg-gradient-to-b from-black/50 to-transparent"
         }`}
       >
-        <div className="container-custom">
+        {/* Faixa de evento (Super Black). Fora do evento não ocupa nada. O
+            espaçamento do menu mora no container abaixo para a faixa ficar
+            colada no topo. */}
+        <BlackBar />
+        <div className={`container-custom transition-[padding] duration-200 ${scrolled ? "py-2" : "py-4"}`}>
           <div className="flex items-center justify-between">
             {/* Logo + número */}
             <div className="flex items-center gap-4 flex-shrink-0">
