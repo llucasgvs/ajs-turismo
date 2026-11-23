@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin, ArrowRight } from "lucide-react";
 import { fmtBRL } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
+import { SeloBlack } from "@/components/BlackBar";
 
 interface PublicTemplate {
   id: number;
@@ -17,6 +18,7 @@ interface PublicTemplate {
   price_from: number;
   /** Preço "de", quando a data tem promoção. Sem ele não há desconto a mostrar. */
   original_price_from?: number | null;
+  max_installments?: number;
 }
 
 export default function FeaturedDestinations({ templates: raw }: { templates: PublicTemplate[] }) {
@@ -65,11 +67,12 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                 />
                 <div className="absolute inset-0 bg-card-gradient" />
 
-                {tmpl.tag && (
-                  <div className="absolute top-3 left-3">
-                    <span className="badge">{tmpl.tag}</span>
-                  </div>
-                )}
+                {/* Tag e selo da Black um embaixo do outro: a direita é do desconto. */}
+                <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+                  {tmpl.tag && <span className="badge">{tmpl.tag}</span>}
+                  <SeloBlack pequeno templateId={tmpl.id} parcelas={tmpl.max_installments} preco={tmpl.price_from}
+                    precoDe={tmpl.original_price_from} sobConsulta={tmpl.quote_only} />
+                </div>
 
                 {/* Desconto: mesmo selo verde de `FeaturedPackages` e da lista de
                     viagens, para o cliente reconhecer a promoção em qualquer
