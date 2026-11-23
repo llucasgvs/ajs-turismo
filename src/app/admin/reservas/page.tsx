@@ -66,6 +66,8 @@ type Booking = {
   cancelled_at: string | null;
   updated_at: string | null;
   discount_amount: number;
+  /** Parte de `discount_amount` que veio do PIX da Super Black (11/2026). */
+  desconto_pix?: number;
   /** Dinheiro recebido por fora do Asaas, alem da cobranca (PIX no WhatsApp). */
   pago_por_fora?: number;
   /** Quanto ainda falta entrar. Zero quando a reserva esta quitada. */
@@ -1331,7 +1333,13 @@ function BookingDetailModal({ booking, trip, onClose, onConfirm, onEdit, onCance
               )}
               {booking.discount_amount > 0 && (
                 <div className="flex justify-between text-red-500">
-                  <span>Desconto</span>
+                  <span>
+                    {(booking.desconto_pix || 0) <= 0
+                      ? "Desconto"
+                      : Math.abs((booking.desconto_pix || 0) - booking.discount_amount) < 0.01
+                        ? "Desconto (PIX da Black)"
+                        : `Desconto (R$ ${fmtBRL(booking.desconto_pix || 0)} do PIX da Black)`}
+                  </span>
                   <span>− R$ {fmtBRL(booking.discount_amount)}</span>
                 </div>
               )}
