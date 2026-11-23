@@ -51,6 +51,10 @@ interface Booking {
   trip_encerra_horas?: number;
   installments_max?: number;
   installment_options?: { n: number; installment: number; total: number; interest_free: boolean }[];
+  /** Super Black: quanto o PIX desconta agora e o preço no PIX. `final_amount`
+      continua sendo o do cartão. Vazio/zero fora da promoção. */
+  desconto_pix?: number;
+  preco_pix?: number | null;
   /* ── Combo ──
      O código da venda de combo (CMB-...) entra nesta MESMA tela, e o servidor
      responde o pacote no formato de uma reserva: um valor, um número de
@@ -692,6 +696,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
       final_amount: base + optionals_amount,
       selected_optionals,
       tier_breakdown: tier_breakdown.map(t => ({ label: t.label, qty: t.qty, price: priceOf(t.label) })),
+      // O preço no PIX também é do servidor: some até o PATCH responder.
+      preco_pix: null,
       // ZERA as opções de parcelamento, em vez de manter as antigas.
       //
       // Quem calcula parcelamento é o servidor, e a resposta ainda não chegou.
@@ -772,6 +778,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         // manter o parcelamento antigo faria o Total do cartão mostrar o valor
         // da data anterior. Zerado, ele cai em `final_amount` até o PATCH voltar.
         installment_options: [],
+        preco_pix: null,
       });
     }
     // Pré-login (sem code): só a atualização otimista acima.
@@ -1067,10 +1074,17 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         {(() => {
           const opt = booking.installment_options?.find(o => o.n === installments);
           const isCard = method === "card";
-          const chargeTotal = isCard && opt ? opt.total : booking.final_amount;
+          const pixBlack = method === "pix" && valorNoPix(booking) < booking.final_amount;
+          const chargeTotal = isCard && opt ? opt.total : (method === "pix" ? valorNoPix(booking) : booking.final_amount);
           const hasInterest = isCard && opt && !opt.interest_free;
           return (
             <div className="border-t border-gray-100 pt-3">
+              {pixBlack && (
+                <div className="flex justify-between text-sm text-emerald-600 font-semibold mb-1">
+                  <span>Super Black: 10% no PIX</span>
+                  <span>− R$ {fmtBRL(booking.final_amount - valorNoPix(booking))}</span>
+                </div>
+              )}
               <div className="flex items-end justify-between">
                 <span className="text-sm text-gray-500">Total</span>
                 <span className="font-display font-black text-2xl text-navy-800">R$ {fmtBRL(chargeTotal)}</span>
@@ -1081,7 +1095,9 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                   <span className={hasInterest ? "text-gray-400" : "text-emerald-600 font-semibold"}> {hasInterest ? "com juros" : "sem juros"}</span>
                 </p>
               )}
-              {hasInterest && <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista ou no PIX: R$ {fmtBRL(booking.final_amount)}</p>}
+              {hasInterest && (valorNoPix(booking) < booking.final_amount
+                ? <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista: R$ {fmtBRL(booking.final_amount)} · no PIX: R$ {fmtBRL(valorNoPix(booking))}</p>
+                : <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista ou no PIX: R$ {fmtBRL(booking.final_amount)}</p>)}
             </div>
           );
         })()}
@@ -1277,6 +1293,11 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 }
 
 /* ── Passo 2: Pagamento ──────────────────────────────────────────────── */
+/** Valor do PIX: com o desconto da Black quando houver, senão o total. */
+function valorNoPix(b: Booking): number {
+  return b.preco_pix != null && (b.desconto_pix || 0) > 0 ? b.preco_pix : b.final_amount;
+}
+
 function StepPayment({ booking, active, code, method, setMethod, installments, setInstallments, onConfirmed, pollStatus, sincronizando }: {
   booking: Booking; active: boolean; code: string;
   method: Method; setMethod: (m: Method) => void; installments: number; setInstallments: (n: number) => void;
@@ -1292,7 +1313,7 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
                 PIX custa R$ 1,89 fixo, cartão custa percentual. Quem quer parcelar
                 continua indo ao WhatsApp. */}
             {(!booking.trip_whatsapp_only || booking.trip_allow_pix) && (
-              <MethodRadio icon={<QrCode size={18} />} label="PIX" hint="Aprovação na hora" selected={method === "pix"} onClick={() => setMethod("pix")} />
+              <MethodRadio icon={<QrCode size={18} />} label="PIX" hint={valorNoPix(booking) < booking.final_amount ? `R$ ${fmtBRL(valorNoPix(booking))} com 10% off (Super Black)` : "Aprovação na hora"} selected={method === "pix"} onClick={() => setMethod("pix")} />
             )}
             {!booking.trip_whatsapp_only && (
               <MethodRadio icon={<CreditCard size={18} />} label="Cartão de crédito" hint={(() => {
@@ -1310,7 +1331,7 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
             )}
           </div>
           <div key={method} className="mt-5 animate-pop">
-            {method === "pix" && <PixPanel code={code} amount={booking.final_amount} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
+            {method === "pix" && <PixPanel code={code} amount={valorNoPix(booking)} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
             {method === "card" && <CardPanel code={code} amount={booking.final_amount} options={booking.installment_options || []} installments={installments} setInstallments={setInstallments} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
             {method === "whatsapp" && <WhatsappPanel code={code} booking={booking} />}
           </div>
