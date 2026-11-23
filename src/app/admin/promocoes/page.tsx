@@ -751,6 +751,8 @@ type RoteiroBlack = {
   id: number; titulo: string; tag: string; aereo: boolean; datas: number;
   parcelas_hoje: [number, number]; parcelas_black: [number, number];
   cartao_no_site: boolean; pix_no_site: boolean;
+  /** Roteiro que o dono tirou da Black: sem PIX com desconto e sem parcela extra. */
+  fora_da_black?: boolean;
 };
 type VendaBlack = {
   codigo: string; viagem: string; pessoas: number; meio: string; parcelas: number;
@@ -780,7 +782,8 @@ function PainelBlack() {
   if (!d) return null;
   const sit = SITUACAO[d.situacao];
   const sobem = d.roteiros.filter((r) => r.parcelas_black[1] > r.parcelas_hoje[1]).length;
-  const semCartao = d.roteiros.filter((r) => !r.cartao_no_site);
+  const semCartao = d.roteiros.filter((r) => !r.cartao_no_site && !r.fora_da_black);
+  const fora = d.roteiros.filter((r) => r.fora_da_black);
   return (
     <section className="mb-6 rounded-2xl bg-navy-900 text-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -830,6 +833,11 @@ function PainelBlack() {
 
       {aba === "roteiros" && (
         <div className="mt-3 rounded-xl bg-white text-navy-800 overflow-x-auto">
+          {fora.length > 0 && (
+            <p className="text-xs text-red-700 bg-red-50 px-3 py-2">
+              Fora da Black (sem PIX com desconto e sem parcela extra): {fora.map((r) => nomeCurtoDaViagem(r.titulo)).join(", ")}.
+            </p>
+          )}
           {semCartao.length > 0 && (
             <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2">
               {semCartao.length === 1 ? "1 roteiro está" : `${semCartao.length} roteiros estão`} como &ldquo;só WhatsApp&rdquo;: o cartão não vende pelo site, então a Black do cartão não chega {semCartao.length === 1 ? "nele" : "neles"}.
@@ -846,7 +854,9 @@ function PainelBlack() {
                   <td className="px-3 py-2 font-semibold">{nomeCurtoDaViagem(r.titulo)}</td>
                   <td className="px-3 py-2 text-gray-500">{r.tag || "sem tag"}</td>
                   <td className="px-3 py-2">{faixa(r.parcelas_hoje)}</td>
-                  <td className={`px-3 py-2 font-bold ${r.parcelas_black[1] > r.parcelas_hoje[1] ? "text-emerald-600" : "text-gray-500"}`}>{faixa(r.parcelas_black)}</td>
+                  <td className={`px-3 py-2 font-bold ${r.fora_da_black ? "text-red-600" : r.parcelas_black[1] > r.parcelas_hoje[1] ? "text-emerald-600" : "text-gray-500"}`}>
+                    {r.fora_da_black ? "Fora da Black" : faixa(r.parcelas_black)}
+                  </td>
                   <td className="px-3 py-2 text-xs text-gray-500">
                     {r.cartao_no_site ? "PIX e cartão" : r.pix_no_site ? "Só PIX (cartão pelo WhatsApp)" : "Só WhatsApp"}
                   </td>
