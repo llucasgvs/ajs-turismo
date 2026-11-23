@@ -186,6 +186,8 @@ export default function PromocoesPage() {
         </button>
       </div>
 
+      <PainelBlack />
+
       {/* No celular o título vai em cima e o filtro rola de lado sem barra visível. */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-4 mt-2">
         <p className="text-[11px] font-black tracking-[0.15em] text-gold-600 uppercase">Suas promoções</p>
@@ -734,5 +736,155 @@ function Confirmar({ p, acao, onClose, onDone }: { p: Promocao; acao: "encerrar"
         </div>
       </div>
     </Moldura>
+  );
+}
+
+
+/* ── Super Black (evento especial) ─────────────────────────────────────────
+ * Não é uma promoção desta aba: desconto só no PIX e parcelas sem juros não
+ * cabem no preço da data, então as regras ficam no servidor
+ * (app/core/black.py). Aqui é só para ACOMPANHAR: o que vale, quando, em quais
+ * roteiros e o que já vendeu. Nada aqui muda a promoção. */
+
+type RegraBlack = { chave: string; titulo: string; detalhe: string; inicio: string; fim: string; situacao: Situacao };
+type RoteiroBlack = {
+  id: number; titulo: string; tag: string; aereo: boolean; datas: number;
+  parcelas_hoje: [number, number]; parcelas_black: [number, number];
+  cartao_no_site: boolean; pix_no_site: boolean;
+};
+type VendaBlack = {
+  codigo: string; viagem: string; pessoas: number; meio: string; parcelas: number;
+  desconto_pix: number; parcelado_pela_black: boolean; valor: number; pago_em: string;
+};
+type Black = {
+  nome: string; situacao: Situacao; inicio: string; fim: string;
+  regras: RegraBlack[]; roteiros: RoteiroBlack[]; vendas: VendaBlack[];
+  resumo: { vendas: number; receita: number; pix_com_desconto: number; desconto_pix_total: number; parcelado_pela_black: number };
+};
+
+function quandoBRT(iso: string, fim = false): string {
+  // O fim é exclusivo (0h do dia seguinte): mostra o último minuto que vale.
+  const ms = new Date(iso).getTime() - (fim ? 60_000 : 0);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .format(new Date(ms)).replace(",", " às");
+}
+
+const faixa = ([a, b]: [number, number]) => (a === b ? `${a}x` : `${a}x a ${b}x`);
+
+function PainelBlack() {
+  const [d, setD] = useState<Black | null>(null);
+  const [aba, setAba] = useState<"" | "roteiros" | "vendas">("");
+  useEffect(() => {
+    apiFetch("/promocoes/black").then((r) => (r.ok ? r.json() : null)).then(setD).catch(() => setD(null));
+  }, []);
+  if (!d) return null;
+  const sit = SITUACAO[d.situacao];
+  const sobem = d.roteiros.filter((r) => r.parcelas_black[1] > r.parcelas_hoje[1]).length;
+  const semCartao = d.roteiros.filter((r) => !r.cartao_no_site);
+  return (
+    <section className="mb-6 rounded-2xl bg-navy-900 text-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-display font-black text-lg">{d.nome}</p>
+        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${sit.cls}`}>{sit.txt}</span>
+        <span className="text-xs text-white/60">evento especial · {quandoBRT(d.inicio)} até {quandoBRT(d.fim, true)}</span>
+      </div>
+      <p className="text-xs text-white/60 mt-1">Regras fixas deste evento. Liga e desliga sozinha; aqui é só para acompanhar.</p>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+        {d.regras.map((r) => (
+          <div key={r.chave} className="rounded-xl bg-white/5 border border-white/10 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-bold text-sm">{r.titulo}</p>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SITUACAO[r.situacao].cls}`}>{SITUACAO[r.situacao].txt}</span>
+            </div>
+            <p className="text-xs text-white/60 mt-1">{quandoBRT(r.inicio)} até {quandoBRT(r.fim, true)}</p>
+            <p className="text-xs text-white/80 mt-1.5 leading-relaxed">{r.detalhe}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        {[
+          { k: "Vendas no site", v: String(d.resumo.vendas) },
+          { k: "Receita", v: `R$ ${fmtBRL(d.resumo.receita)}` },
+          { k: "PIX com 10%", v: `${d.resumo.pix_com_desconto} · R$ ${fmtBRL(d.resumo.desconto_pix_total)} de desconto` },
+          { k: "Parcelado pela Black", v: String(d.resumo.parcelado_pela_black) },
+        ].map((x) => (
+          <div key={x.k} className="rounded-xl bg-white/5 px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-white/50 font-bold">{x.k}</p>
+            <p className="font-bold text-sm mt-0.5">{x.v}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        <button onClick={() => setAba(aba === "roteiros" ? "" : "roteiros")}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg ${aba === "roteiros" ? "bg-white text-navy-900" : "bg-white/10 hover:bg-white/15"}`}>
+          Roteiros ({d.roteiros.length}, {sobem} sobem de parcela)
+        </button>
+        <button onClick={() => setAba(aba === "vendas" ? "" : "vendas")}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg ${aba === "vendas" ? "bg-white text-navy-900" : "bg-white/10 hover:bg-white/15"}`}>
+          Vendas da Black ({d.vendas.length})
+        </button>
+      </div>
+
+      {aba === "roteiros" && (
+        <div className="mt-3 rounded-xl bg-white text-navy-800 overflow-x-auto">
+          {semCartao.length > 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2">
+              {semCartao.length === 1 ? "1 roteiro está" : `${semCartao.length} roteiros estão`} como &ldquo;só WhatsApp&rdquo;: o cartão não vende pelo site, então a Black do cartão não chega {semCartao.length === 1 ? "nele" : "neles"}.
+            </p>
+          )}
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
+              <th className="px-3 py-2">Roteiro</th><th className="px-3 py-2">Tag</th>
+              <th className="px-3 py-2">Sem juros hoje</th><th className="px-3 py-2">Na Black</th><th className="px-3 py-2">No site</th>
+            </tr></thead>
+            <tbody>
+              {d.roteiros.map((r) => (
+                <tr key={r.id} className="border-t border-gray-100">
+                  <td className="px-3 py-2 font-semibold">{nomeCurtoDaViagem(r.titulo)}</td>
+                  <td className="px-3 py-2 text-gray-500">{r.tag || "sem tag"}</td>
+                  <td className="px-3 py-2">{faixa(r.parcelas_hoje)}</td>
+                  <td className={`px-3 py-2 font-bold ${r.parcelas_black[1] > r.parcelas_hoje[1] ? "text-emerald-600" : "text-gray-500"}`}>{faixa(r.parcelas_black)}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">
+                    {r.cartao_no_site ? "PIX e cartão" : r.pix_no_site ? "Só PIX (cartão pelo WhatsApp)" : "Só WhatsApp"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {aba === "vendas" && (
+        <div className="mt-3 rounded-xl bg-white text-navy-800 overflow-x-auto">
+          {d.vendas.length === 0 ? (
+            <p className="text-sm text-gray-500 px-3 py-4">Nenhuma venda paga durante a Black ainda.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
+                <th className="px-3 py-2">Reserva</th><th className="px-3 py-2">Viagem</th><th className="px-3 py-2">Pagamento</th>
+                <th className="px-3 py-2">Desconto PIX</th><th className="px-3 py-2 text-right">Valor</th>
+              </tr></thead>
+              <tbody>
+                {d.vendas.map((v) => (
+                  <tr key={v.codigo} className="border-t border-gray-100">
+                    <td className="px-3 py-2 font-mono text-xs">{v.codigo}</td>
+                    <td className="px-3 py-2">{nomeCurtoDaViagem(v.viagem)} <span className="text-gray-400 text-xs">({v.pessoas} pess.)</span></td>
+                    <td className="px-3 py-2 text-xs">
+                      {v.meio === "pix" ? "PIX" : v.meio === "credit_card" ? `Cartão ${v.parcelas}x` : v.meio}
+                      {v.parcelado_pela_black && <span className="ml-1 text-emerald-600 font-bold">(Black)</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs">{v.desconto_pix > 0 ? `R$ ${fmtBRL(v.desconto_pix)}` : ""}</td>
+                    <td className="px-3 py-2 text-right font-semibold">R$ {fmtBRL(v.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
