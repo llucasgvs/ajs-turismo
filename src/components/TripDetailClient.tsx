@@ -729,6 +729,10 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
     ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * pixPorPessoa(priceForLabel(label), deForLabel(label)), 0)
     : sidebarPeople * pixPorPessoa(activeTrip.price_per_person, activeTrip.original_price);
   const temPixBlack = sidebarPixTotal < sidebarBaseTotal - 0.004;
+  // Preço cheio (o "de" quando a data tem promoção): base do riscado e da economia no PIX.
+  const sidebarCheioTotal = activeHasTiers
+    ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * Math.max(priceForLabel(label), deForLabel(label) || 0), 0)
+    : sidebarPeople * Math.max(activeTrip.price_per_person, activeTrip.original_price || 0);
 
   // Sem data aberta não é "esgotado": não há vaga porque não há saída publicada.
   const sold = !semDatas && (activeTrip.available_spots === 0 || activeTrip.status === "sold_out");
@@ -1542,21 +1546,37 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                           <div key={label} className="flex items-center justify-between">
                             <span className="text-gray-500">{qty} × {label}</span>
                             <span className="font-semibold text-navy-700">
-                              {tierPriceLabel(qty * priceForLabel(label), fmtBRL)}
+                              {temPixBlack && pixPorPessoa(priceForLabel(label), deForLabel(label)) < priceForLabel(label) - 0.004 ? (
+                                <>
+                                  <s className="font-normal text-gray-400 mr-1 text-[0.85em]">R$ {fmtBRL(qty * Math.max(priceForLabel(label), deForLabel(label) || 0))}</s>
+                                  R$ {fmtBRL(qty * pixPorPessoa(priceForLabel(label), deForLabel(label)))}
+                                </>
+                              ) : tierPriceLabel(qty * priceForLabel(label), fmtBRL)}
                             </span>
                           </div>
                         ))}
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                          <span className="text-gray-600 font-semibold">Total ({sidebarTotalPeople})</span>
-                          <span className="font-black text-navy-700">R$ {fmtBRL(sidebarBaseTotal)}</span>
-                        </div>
-                        {temPixBlack && (
-                          <div className="flex items-center justify-between font-bold text-gold-700">
-                            <span>No PIX hoje (Black)</span>
-                            <span>R$ {fmtBRL(sidebarPixTotal)}</span>
+                        {temPixBlack ? (
+                          <>
+                            <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                              <span className="text-gray-600 font-semibold">Total no PIX ({sidebarTotalPeople})</span>
+                              <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPixTotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                              <span>Economia no PIX (Black)</span>
+                              <span>− R$ {fmtBRL(sidebarCheioTotal - sidebarPixTotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-400">
+                              <span>No cartão</span>
+                              <span>R$ {fmtBRL(sidebarBaseTotal)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                            <span className="text-gray-600 font-semibold">Total ({sidebarTotalPeople})</span>
+                            <span className="font-black text-navy-700">R$ {fmtBRL(sidebarBaseTotal)}</span>
                           </div>
                         )}
-                        {sidebarSavings > 0 && (
+                        {!temPixBlack && sidebarSavings > 0 && (
                           <div className="flex items-center justify-between text-emerald-600 font-semibold">
                             <span>Você economiza</span>
                             <span>− R$ {fmtBRL(sidebarSavings)}</span>
@@ -1565,17 +1585,31 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                       </div>
                     ) : sidebarPeople > 1 && (
                       <div className="mb-3 text-sm space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
-                          <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
-                        </div>
-                        {temPixBlack && (
-                          <div className="flex items-center justify-between font-bold text-gold-700">
-                            <span>No PIX hoje (Black)</span>
-                            <span>R$ {fmtBRL(sidebarPixTotal)}</span>
+                        {temPixBlack ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(pixPorPessoa(activeTrip.price_per_person, activeTrip.original_price))} no PIX</span>
+                              <span className="font-black text-navy-700">
+                                <s className="font-normal text-gray-400 mr-1 text-[0.85em]">R$ {fmtBRL(sidebarCheioTotal)}</s>
+                                R$ {fmtBRL(sidebarPixTotal)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                              <span>Economia no PIX (Black)</span>
+                              <span>− R$ {fmtBRL(sidebarCheioTotal - sidebarPixTotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-400">
+                              <span>No cartão</span>
+                              <span>R$ {fmtBRL(sidebarBaseTotal)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
+                            <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
                           </div>
                         )}
-                        {sidebarSavings > 0 && (
+                        {!temPixBlack && sidebarSavings > 0 && (
                           <div className="flex items-center justify-between text-emerald-600 font-semibold">
                             <span>Você economiza</span>
                             <span>− R$ {fmtBRL(sidebarSavings)}</span>
