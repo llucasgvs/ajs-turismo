@@ -15,6 +15,7 @@ import type { Trip } from "@/types/trip";
 export type CartaoViagem = Pick<
   Trip,
   "id" | "slug" | "title" | "image_url" | "destination" | "tag" | "price_per_person" | "departure_date"
+  | "template_id" | "original_price"
 >;
 
 export type OpcaoDestino = {
@@ -25,6 +26,7 @@ export type OpcaoDestino = {
   image_url: string | null;
   parent_id?: number | null;
   price_from: number;
+  original_price_from?: number | null;
 };
 
 /** Mesma lista que a página sempre usou (as 50 próximas saídas). */
@@ -54,8 +56,8 @@ export function escolherRelacionadas(
       return true;
     })
     .slice(0, 4)
-    .map(({ id, slug, title, image_url, destination, tag, price_per_person, departure_date }) => ({
-      id, slug, title, image_url, destination, tag, price_per_person, departure_date,
+    .map(({ id, slug, title, image_url, destination, tag, price_per_person, departure_date, template_id, original_price }) => ({
+      id, slug, title, image_url, destination, tag, price_per_person, departure_date, template_id, original_price,
     }));
 }
 
@@ -69,7 +71,7 @@ export function escolherOpcoes(
   if (!root) return [];
   return lista
     .filter((t) => t.id !== templateId && (t.id === root || t.parent_id === root))
-    .map(({ id, first_trip_id, slug, title, image_url, parent_id, price_from }) => ({
-      id, first_trip_id, slug, title, image_url, parent_id, price_from,
+    .map(({ id, first_trip_id, slug, title, image_url, parent_id, price_from, original_price_from }) => ({
+      id, first_trip_id, slug, title, image_url, parent_id, price_from, original_price_from,
     }));
 }

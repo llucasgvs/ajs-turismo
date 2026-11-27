@@ -7,7 +7,7 @@ import { Clock,
   X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp, Package,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { PrecoNoPix, SeloBlack } from "@/components/BlackBar";
+import { PrecoInline, PrecoNoPix, SeloBlack } from "@/components/BlackBar";
 import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim, imgSrcSet } from "@/lib/imagem";
@@ -1039,7 +1039,9 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
                       {isSoldOut ? (
                         <span className="text-red-400 font-bold text-[10px]">Esgotado</span>
                       ) : (
-                        <span className="font-bold text-gold-600">R$ {fmtBRL(d.price_per_person)}</span>
+                        <span className="font-bold text-gold-600 whitespace-nowrap">
+                          <PrecoInline templateId={tmpl.id} preco={d.price_per_person} precoDe={d.original_price}>R$ {fmtBRL(d.price_per_person)}</PrecoInline>
+                        </span>
                       )}
                     </div>
                   );

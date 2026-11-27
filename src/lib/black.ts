@@ -88,3 +88,10 @@ export function pixDaBlack(b: BlackAgora | null, preco?: number | null, precoDe?
   const noPix = Math.round(cheio * (100 - b.pix_percentual)) / 100;
   return noPix < preco - 0.004 ? noPix : null;
 }
+
+/** Preço no PIX de um roteiro agora, ou null (fora da sexta, roteiro fora da
+ *  Black, sem PIX no site, ou data que já tem 10% ou mais). */
+export function pixDoRoteiro(b: BlackAgora | null, templateId?: number | null, preco?: number | null, precoDe?: number | null): number | null {
+  if (!b || templateId == null || foraDaBlack(b, templateId) || !b.pix_ids.includes(templateId)) return null;
+  return pixDaBlack(b, preco, precoDe);
+}

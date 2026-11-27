@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { pixDoRoteiro, useBlack } from "@/lib/black";
 import { Calendar, Check, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { spDay, fmtBRL, precoDeTabela, spotsLabel, mesmoDia, poucasVagas, salesClosed } from "@/lib/format";
 
@@ -97,8 +98,10 @@ export const DATE_INITIAL = 4;
    nenhuma das duas precisa converter nada. */
 export function DateSelector<T extends DataSelecionavel>({
   trips, selected, onSelect, hasError, sidebar = false, forceExpanded = false,
-  titulo = "Escolha sua data", descontoPct = 0, semMoldura = false,
+  titulo = "Escolha sua data", descontoPct = 0, semMoldura = false, templateId,
 }: {
+  /** Roteiro das datas: liga o preço no PIX da Super Black (viagem avulsa). */
+  templateId?: number | null;
   trips: T[];
   selected: T | null;
   onSelect: (t: T) => void;
@@ -113,6 +116,12 @@ export function DateSelector<T extends DataSelecionavel>({
    *  criaria caixa dentro de caixa. */
   semMoldura?: boolean;
 }) {
+  // Super Black: preço no PIX da data (viagem avulsa; combo tem desconto próprio).
+  const black = useBlack();
+  const pixDe = (t: DataSelecionavel) => (descontoPct > 0 ? null : pixDoRoteiro(black, templateId, t.price_per_person, t.original_price));
+  const precoComPix = (t: DataSelecionavel) => pixDe(t) ?? precoDoCartao(t, descontoPct);
+  const riscoComPix = (t: DataSelecionavel) =>
+    pixDe(t) != null ? Math.max(t.price_per_person, Number(t.original_price ?? 0)) : riscadoDoCartao(t, descontoPct);
   const [expanded, setExpanded] = useState(false);
   if (trips.length === 0) return null;
 
@@ -198,9 +207,9 @@ export function DateSelector<T extends DataSelecionavel>({
               {/* Price row */}
               <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                  {riscadoDoCartao(t, descontoPct) && (
+                  {riscoComPix(t) && (
                     <p className="text-[10px] text-gray-400 line-through leading-none">
-                      R$ {fmtBRL(riscadoDoCartao(t, descontoPct) as number)}
+                      R$ {fmtBRL(riscoComPix(t) as number)}
                     </p>
                   )}
                   {isSold ? (
@@ -209,8 +218,10 @@ export function DateSelector<T extends DataSelecionavel>({
                     <span className="text-sm font-bold text-gray-400">Vendas encerradas</span>
                   ) : (
                     <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                      R$ {fmtBRL(precoDoCartao(t, descontoPct))}
-                      <span className="text-xs font-normal text-gray-400"> /pessoa</span>
+                      R$ {fmtBRL(precoComPix(t))}
+                      {pixDe(t) != null
+                        ? <span className="text-[10px] font-black text-gold-600"> no PIX</span>
+                        : <span className="text-xs font-normal text-gray-400"> /pessoa</span>}
                     </span>
                   )}
                 </div>
@@ -266,8 +277,10 @@ export const COMPACT_THRESHOLD = 20; // a partir daqui, modo compacto
 
 export function CompactDateSelector<T extends DataSelecionavel>({
   trips, selected, onSelect, hasError,
-  titulo = "Escolha sua data", descontoPct = 0, semMoldura = false,
+  titulo = "Escolha sua data", descontoPct = 0, semMoldura = false, templateId,
 }: {
+  /** Roteiro das datas: liga o preço no PIX da Super Black (viagem avulsa). */
+  templateId?: number | null;
   trips: T[];
   selected: T | null;
   onSelect: (t: T) => void;
@@ -278,6 +291,12 @@ export function CompactDateSelector<T extends DataSelecionavel>({
   /** No combo o cartão já vem dentro de um bloco branco. */
   semMoldura?: boolean;
 }) {
+  // Super Black: preço no PIX da data (viagem avulsa; combo tem desconto próprio).
+  const black = useBlack();
+  const pixDe = (t: DataSelecionavel) => (descontoPct > 0 ? null : pixDoRoteiro(black, templateId, t.price_per_person, t.original_price));
+  const precoComPix = (t: DataSelecionavel) => pixDe(t) ?? precoDoCartao(t, descontoPct);
+  const riscoComPix = (t: DataSelecionavel) =>
+    pixDe(t) != null ? Math.max(t.price_per_person, Number(t.original_price ?? 0)) : riscadoDoCartao(t, descontoPct);
   const MONTHS_INITIAL = 2;
   const [shownMonths, setShownMonths] = useState(MONTHS_INITIAL);
 
@@ -369,13 +388,14 @@ export function CompactDateSelector<T extends DataSelecionavel>({
                           <span className="min-w-0">
                             {/* Mesma regra do cartão grande: na avulsa, o "de"
                                 da promoção; no combo, a tabela. */}
-                            {riscadoDoCartao(t, descontoPct) && (
+                            {riscoComPix(t) && (
                               <span className="block text-[10px] text-gray-400 line-through leading-none">
-                                R$ {fmtBRL(riscadoDoCartao(t, descontoPct) as number)}
+                                R$ {fmtBRL(riscoComPix(t) as number)}
                               </span>
                             )}
                             <span className={`text-base font-black whitespace-nowrap ${isSelected ? "text-navy-700" : "text-navy-600"}`}>
-                              R$ {fmtBRL(precoDoCartao(t, descontoPct))}
+                              R$ {fmtBRL(precoComPix(t))}
+                              {pixDe(t) != null && <span className="text-[10px] font-black text-gold-600"> no PIX</span>}
                             </span>
                           </span>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap overflow-hidden text-ellipsis ${

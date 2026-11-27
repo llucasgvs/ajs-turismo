@@ -5,7 +5,7 @@
  * o menu fica exatamente como sempre. Azul-marinho e dourado da AJS. */
 
 import Link from "next/link";
-import { foraDaBlack, pixDaBlack, seloDaBlack, useBlack } from "@/lib/black";
+import { foraDaBlack, pixDaBlack, pixDoRoteiro, seloDaBlack, useBlack } from "@/lib/black";
 import { fmtBRL } from "@/lib/format";
 
 export default function BlackBar() {
@@ -89,5 +89,25 @@ export function PrecoNoPix({ templateId, preco, precoDe, tamanho = "xl", aPartir
         </span>
       </p>
     </div>
+  );
+}
+
+/**
+ * Preço "em linha" com a Black: onde houver PIX com desconto, troca o texto do
+ * preço (`children`) por "~~cheio~~ R$ X no PIX". `semRiscado` quando o lugar
+ * já risca o preço "de" (para não riscar duas vezes). Fora disso, `children`.
+ */
+export function PrecoInline({ templateId, preco, precoDe, semRiscado, children }: {
+  templateId?: number | null; preco?: number | null; precoDe?: number | null; semRiscado?: boolean; children: React.ReactNode;
+}) {
+  const b = useBlack();
+  const v = pixDoRoteiro(b, templateId, preco, precoDe);
+  if (v == null) return <>{children}</>;
+  return (
+    <>
+      {!semRiscado && <s className="font-normal text-gray-400 mr-1 text-[0.85em]">R$ {fmtBRL(Math.max(preco || 0, precoDe || 0))}</s>}
+      R$ {fmtBRL(v)}
+      <span className="ml-1 text-[0.75em] font-black text-gold-600 whitespace-nowrap">no PIX</span>
+    </>
   );
 }

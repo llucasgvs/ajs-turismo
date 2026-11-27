@@ -1,6 +1,7 @@
 "use client";
 
-import { PrecoNoPix } from "@/components/BlackBar";
+import { PrecoInline, PrecoNoPix } from "@/components/BlackBar";
+import { pixDoRoteiro, useBlack } from "@/lib/black";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -256,7 +257,9 @@ function RelatedCard({ trip }: { trip: CartaoViagem }) {
         <div className="mt-auto flex items-end justify-between">
           <div>
             <p className="text-[10px] text-gray-400">a partir de</p>
-            <p className="font-black text-base text-navy-700 leading-tight">R$ {fmtBRL(trip.price_per_person)}</p>
+            <p className="font-black text-base text-navy-700 leading-tight">
+              <PrecoInline templateId={trip.template_id} preco={trip.price_per_person} precoDe={trip.original_price}>R$ {fmtBRL(trip.price_per_person)}</PrecoInline>
+            </p>
           </div>
           <span className="text-[10px] text-navy-500 font-medium">
             {depDate.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short" })}
@@ -320,7 +323,9 @@ function DestinationOptions({ templateId, parentId, inicial }: { templateId: num
             </div>
             <div className="p-3">
               <p className="font-bold text-navy-800 text-sm leading-tight line-clamp-2">{t.title}</p>
-              <p className="text-xs text-gray-400 mt-1">a partir de <span className="font-bold text-navy-700">R$ {fmtBRL(t.price_from)}</span></p>
+              <p className="text-xs text-gray-400 mt-1">a partir de <span className="font-bold text-navy-700">
+                <PrecoInline templateId={t.id} preco={t.price_from} precoDe={t.original_price_from}>R$ {fmtBRL(t.price_from)}</PrecoInline>
+              </span></p>
             </div>
           </Link>
         ))}
@@ -457,10 +462,12 @@ function DescriptionBlock({ description }: { description: string }) {
 const WEEK_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 function OpenDateCalendar({
-  trips, selected, onSelect, hasError, minAdvance, maxAdvance,
+  trips, selected, onSelect, hasError, minAdvance, maxAdvance, templateId,
 }: {
   trips: Trip[]; selected: Trip | null; onSelect: (t: Trip) => void;
   hasError: boolean; minAdvance: number; maxAdvance: number;
+  /** Roteiro: liga o preço no PIX da Super Black. */
+  templateId?: number | null;
 }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const minDate = new Date(today); minDate.setDate(today.getDate() + minAdvance);
@@ -572,7 +579,7 @@ function OpenDateCalendar({
       {/* Price hint */}
       {trips.length > 0 && (
         <div className="px-5 pb-4 text-center text-xs text-gray-400">
-          R$ {fmtBRL(trips[0].price_per_person)} por pessoa · Bate e volta
+          <PrecoInline templateId={templateId} preco={trips[0].price_per_person} precoDe={trips[0].original_price}>R$ {fmtBRL(trips[0].price_per_person)}</PrecoInline> por pessoa · Bate e volta
         </div>
       )}
     </div>
@@ -607,6 +614,8 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   const router = useRouter();
   const { show: showLoading } = useLoading();
   const dica = dicaDoRoteiro(trip.slug);
+  // Super Black: o total do resumo também mostra quanto fica no PIX.
+  const black = useBlack();
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryStart, setGalleryStart] = useState(0);
@@ -713,6 +722,13 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   const sidebarBaseTotal = activeHasTiers
     ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * priceForLabel(label), 0)
     : sidebarPeople * activeTrip.price_per_person;
+  // Só os passageiros entram nos 10% do PIX (opcionais nunca), igual à cobrança.
+  const pixPorPessoa = (preco: number, de?: number | null) =>
+    pixDoRoteiro(black, activeTrip.template_id, preco, de && de > 0 ? de : null) ?? preco;
+  const sidebarPixTotal = activeHasTiers
+    ? Object.entries(sidebarTiers).reduce((s, [label, qty]) => s + qty * pixPorPessoa(priceForLabel(label), deForLabel(label)), 0)
+    : sidebarPeople * pixPorPessoa(activeTrip.price_per_person, activeTrip.original_price);
+  const temPixBlack = sidebarPixTotal < sidebarBaseTotal - 0.004;
 
   // Sem data aberta não é "esgotado": não há vaga porque não há saída publicada.
   const sold = !semDatas && (activeTrip.available_spots === 0 || activeTrip.status === "sold_out");
@@ -897,6 +913,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                   selected={selectedTrip}
                   onSelect={handleSelectDate}
                   hasError={dateError}
+                  templateId={trip.template_id}
                   minAdvance={trip.open_date_min_advance}
                   maxAdvance={trip.open_date_max_advance}
                 />
@@ -906,6 +923,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                   selected={selectedTrip}
                   onSelect={handleSelectDate}
                   hasError={dateError}
+                  templateId={trip.template_id}
                 />
               ) : (
                 <DateSelector
@@ -913,6 +931,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                   selected={selectedTrip}
                   onSelect={handleSelectDate}
                   hasError={dateError}
+                  templateId={trip.template_id}
                 />
               )}
             </div>
@@ -1438,6 +1457,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                                 selected={selectedTrip}
                                 onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
                                 hasError={dateError}
+                  templateId={trip.template_id}
                                 minAdvance={trip.open_date_min_advance}
                                 maxAdvance={trip.open_date_max_advance}
                               />
@@ -1447,6 +1467,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                                 selected={selectedTrip}
                                 onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
                                 hasError={dateError}
+                  templateId={trip.template_id}
                               />
                             ) : (
                               <DateSelector
@@ -1454,6 +1475,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                                 selected={selectedTrip}
                                 onSelect={(t) => { handleSelectDate(t); setShowDatePicker(false); }}
                                 hasError={dateError}
+                  templateId={trip.template_id}
                                 sidebar
                                 forceExpanded
                               />
@@ -1477,7 +1499,12 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                                     {deForLabel(label) > 0 && (
                                       <s className="text-gray-300 mr-1">R$ {fmtBRL(deForLabel(label))}</s>
                                     )}
-                                    {tierPriceLabel(priceForLabel(label), fmtBRL)}
+                                    {priceForLabel(label) > 0 ? (
+                                      <PrecoInline templateId={activeTrip.template_id} preco={priceForLabel(label)}
+                                        precoDe={deForLabel(label) || null} semRiscado={deForLabel(label) > 0}>
+                                        {tierPriceLabel(priceForLabel(label), fmtBRL)}
+                                      </PrecoInline>
+                                    ) : tierPriceLabel(priceForLabel(label), fmtBRL)}
                                     {!ocupaPoltrona(label) && " · não ocupa poltrona"}
                                   </p>
                                 </div>
@@ -1523,6 +1550,12 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                           <span className="text-gray-600 font-semibold">Total ({sidebarTotalPeople})</span>
                           <span className="font-black text-navy-700">R$ {fmtBRL(sidebarBaseTotal)}</span>
                         </div>
+                        {temPixBlack && (
+                          <div className="flex items-center justify-between font-bold text-gold-700">
+                            <span>No PIX hoje (Black)</span>
+                            <span>R$ {fmtBRL(sidebarPixTotal)}</span>
+                          </div>
+                        )}
                         {sidebarSavings > 0 && (
                           <div className="flex items-center justify-between text-emerald-600 font-semibold">
                             <span>Você economiza</span>
@@ -1536,6 +1569,12 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                           <span className="text-gray-500">{sidebarPeople} × R$ {fmtBRL(activeTrip.price_per_person)}</span>
                           <span className="font-black text-navy-700">R$ {fmtBRL(sidebarPeople * activeTrip.price_per_person)}</span>
                         </div>
+                        {temPixBlack && (
+                          <div className="flex items-center justify-between font-bold text-gold-700">
+                            <span>No PIX hoje (Black)</span>
+                            <span>R$ {fmtBRL(sidebarPixTotal)}</span>
+                          </div>
+                        )}
                         {sidebarSavings > 0 && (
                           <div className="flex items-center justify-between text-emerald-600 font-semibold">
                             <span>Você economiza</span>
