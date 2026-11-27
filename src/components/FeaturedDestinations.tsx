@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MapPin, ArrowRight } from "lucide-react";
 import { fmtBRL } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
-import { SeloBlack } from "@/components/BlackBar";
+import { PrecoNoPix, SeloBlack } from "@/components/BlackBar";
 
 interface PublicTemplate {
   id: number;
@@ -110,6 +110,7 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                       <>
                         {/* O "de" riscado é o que dá tamanho ao desconto: o selo
                             diz o percentual, esta linha mostra quanto economiza. */}
+                        <PrecoNoPix aPartirDe templateId={tmpl.id} preco={tmpl.price_from} precoDe={tmpl.original_price_from}>
                         {desconto > 0 && (
                           <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
                             R$ {fmtBRL(tmpl.original_price_from as number)}
@@ -120,6 +121,7 @@ export default function FeaturedDestinations({ templates: raw }: { templates: Pu
                           R$ {fmtBRL(tmpl.price_from)}
                           <span className="text-gray-400 font-normal text-xs">/pessoa</span>
                         </p>
+                        </PrecoNoPix>
                       </>
                     )}
                   </div>

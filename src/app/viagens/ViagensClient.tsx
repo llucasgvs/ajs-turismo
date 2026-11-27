@@ -7,7 +7,7 @@ import { Clock,
   X, Star, Calendar, ChevronDown, ChevronLeft, ChevronRight, Plane, Check, ArrowUp, Package,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { SeloBlack } from "@/components/BlackBar";
+import { PrecoNoPix, SeloBlack } from "@/components/BlackBar";
 import Footer from "@/components/Footer";
 import { spDay, fmtBRL, fmtInstallment, mesmoDia, relevanciaDaBusca } from "@/lib/format";
 import { imgOtim, imgSrcSet } from "@/lib/imagem";
@@ -1065,6 +1065,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
               </>
             ) : (
               <>
+                <PrecoNoPix aPartirDe templateId={tmpl.id} preco={tmpl.price_from} precoDe={tmpl.original_price_from}>
                 {tmpl.original_price_from && (
                   <p className="text-xs text-gray-400 line-through leading-none mb-0.5">
                     R$ {fmtBRL(tmpl.original_price_from)}
@@ -1074,6 +1075,7 @@ function TemplateCard({ tmpl, highlightDate, highlightMonth }: {
                 <p className="font-display font-black text-xl text-navy-700 leading-tight">
                   R$ {fmtBRL(tmpl.price_from)}
                 </p>
+                </PrecoNoPix>
                 <p className="text-[10px] text-emerald-600 font-semibold">
                   {tmpl.max_installments}x de R${" "}
                   {fmtInstallment(tmpl.price_from, tmpl.max_installments)} s/ juros

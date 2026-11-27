@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SeloBlack } from "@/components/BlackBar";
+import { PrecoNoPix, SeloBlack } from "@/components/BlackBar";
 import { MapPin, Star, ArrowRight, Check, Calendar } from "lucide-react";
 import { fmtBRL, fmtInstallment } from "@/lib/format";
 import { imgOtim } from "@/lib/imagem";
@@ -151,6 +151,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                           </>
                         ) : (
                           <>
+                            <PrecoNoPix aPartirDe tamanho="2xl" templateId={pkg.id} preco={pkg.price_from} precoDe={pkg.original_price_from}>
                             {pkg.original_price_from && (
                               <p className="text-xs text-gray-400 line-through">
                                 R$ {fmtBRL(pkg.original_price_from)}
@@ -162,6 +163,7 @@ export default function FeaturedPackages({ templates: raw }: { templates: Public
                                 R$ {fmtBRL(pkg.price_from)}
                               </span>
                             </div>
+                            </PrecoNoPix>
                             <p className="text-xs text-emerald-600 font-medium">
                               ou {pkg.max_installments}x de R${" "}
                               {fmtInstallment(pkg.price_from, pkg.max_installments)} sem juros

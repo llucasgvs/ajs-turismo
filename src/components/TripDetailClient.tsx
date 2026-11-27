@@ -1,6 +1,6 @@
 "use client";
 
-import { PixDaBlack } from "@/components/BlackBar";
+import { PrecoNoPix } from "@/components/BlackBar";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -369,6 +369,7 @@ function StickyMobileCTA({
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-4 shadow-2xl">
       <div className="flex-1 min-w-0">
+        <PrecoNoPix templateId={trip.template_id} preco={trip.price_per_person} precoDe={trip.original_price}>
         {trip.original_price && (
           <p className="text-xs text-gray-400 line-through leading-none">
             R$ {fmtBRL(trip.original_price)}
@@ -377,10 +378,10 @@ function StickyMobileCTA({
         <p className="font-display font-black text-xl text-navy-700 leading-tight">
           R$ {fmtBRL(trip.price_per_person)}
         </p>
+        </PrecoNoPix>
         <p className="text-[11px] text-emerald-600 font-medium">
           {trip.max_installments}x de R$ {fmtInstallment(trip.price_per_person, trip.max_installments)} s/juros
         </p>
-        <PixDaBlack compacto templateId={trip.template_id} preco={trip.price_per_person} precoDe={trip.original_price} />
       </div>
       {sold ? (
         <a href={whatsappFallback} target="_blank" rel="noopener noreferrer"
@@ -1350,6 +1351,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                   {/* Price header */}
                   <div className="p-5 pb-4">
                     <p className="text-xs text-gray-400 mb-0.5">{selectedTrip ? "Preço por pessoa" : "A partir de"}</p>
+                    <PrecoNoPix tamanho="4xl" templateId={activeTrip.template_id} preco={activeTrip.price_per_person} precoDe={activeTrip.original_price}>
                     <div className="flex items-end gap-2 mb-0.5">
                       {activeTrip.original_price && (
                         <span className="text-sm text-gray-400 line-through leading-none mb-0.5">R$ {fmtBRL(activeTrip.original_price)}</span>
@@ -1358,12 +1360,12 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
                         R$ {fmtBRL(activeTrip.price_per_person)}
                       </span>
                     </div>
+                    </PrecoNoPix>
                     {activeTrip.max_installments > 1 && (
                       <p className="text-xs text-emerald-600 font-semibold">
                         {activeTrip.max_installments}x de R$ {fmtInstallment(activeTrip.price_per_person, activeTrip.max_installments)} sem juros
                       </p>
                     )}
-                    <PixDaBlack templateId={activeTrip.template_id} preco={activeTrip.price_per_person} precoDe={activeTrip.original_price} />
                     {activeTrip.original_price && discount && discount > 0 && (
                       <div className="mt-2 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg text-center border border-emerald-100">
                         Economia de {discount}%

@@ -59,3 +59,35 @@ export function PixDaBlack({ templateId, preco, precoDe, compacto }: {
     </div>
   );
 }
+
+/**
+ * Preço do cartão/página com a Black: na sexta, onde o PIX baixa o preço, mostra
+ * o preço cheio riscado e o do PIX em destaque. Em qualquer outro caso mostra
+ * `children`, que é exatamente o bloco de preço de sempre. Pedido do dono no
+ * dia: só o selo "10% no PIX" fazia o cliente achar que o preço cheio era o
+ * promocional.
+ */
+export function PrecoNoPix({ templateId, preco, precoDe, tamanho = "xl", aPartirDe, children }: {
+  templateId?: number | null; preco?: number | null; precoDe?: number | null;
+  tamanho?: "xl" | "2xl" | "4xl"; aPartirDe?: boolean; children: React.ReactNode;
+}) {
+  const b = useBlack();
+  if (!b || templateId == null || foraDaBlack(b, templateId) || !b.pix_ids.includes(templateId)) return <>{children}</>;
+  const v = pixDaBlack(b, preco, precoDe);
+  if (v == null) return <>{children}</>;
+  const cheio = Math.max(preco || 0, precoDe || 0);
+  const tam = tamanho === "4xl" ? "text-4xl" : tamanho === "2xl" ? "text-2xl" : "text-xl";
+  return (
+    <div>
+      <p className="text-xs text-gray-400 leading-none mb-1">
+        {aPartirDe ? "a partir de " : ""}<span className="line-through">R$ {fmtBRL(cheio)}</span>
+      </p>
+      <p className={`font-display font-black ${tam} text-navy-700 leading-tight`}>
+        R$ {fmtBRL(v)}
+        <span className="ml-1.5 align-middle inline-block rounded-full bg-navy-900 text-gold-400 text-[10px] font-black tracking-wide px-2 py-0.5">
+          NO PIX HOJE
+        </span>
+      </p>
+    </div>
+  );
+}
