@@ -86,7 +86,6 @@ export default function BlackBar({ semLink }: { semLink?: boolean } = {}) {
       {semLink ? <div className={classe}>{conteudo}</div> : (
         <Link href="/viagens" className={classe}>
           {conteudo}
-          <span className="hidden md:inline text-gold-400 font-bold underline underline-offset-2 whitespace-nowrap">Ver viagens</span>
         </Link>
       )}
     </div>
