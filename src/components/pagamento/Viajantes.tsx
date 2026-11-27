@@ -14,6 +14,7 @@
 
 import { Loader2, Minus, Plus, Users } from "lucide-react";
 import { fmtBRL } from "@/lib/format";
+import { PrecoInline } from "@/components/BlackBar";
 import { tierPriceLabel } from "@/lib/tiers";
 
 export const ADULTO = "Adulto";
@@ -69,8 +70,12 @@ export function contagemApos(
 
 export function SeletorDeViajantes({
   faixas, contagem, pessoas, vagas, editavel, ocupado, semPreco, precoPorPessoa,
-  onFaixa, onPessoas,
+  onFaixa, onPessoas, templateId, precoDePorPessoa,
 }: {
+  /** Roteiro (viagem avulsa): liga o preço no PIX da Super Black. Combo não passa. */
+  templateId?: number | null;
+  /** Preço "de" por pessoa, quando a data tem desconto próprio. */
+  precoDePorPessoa?: number | null;
   /** Vazio = a viagem não tem faixas, e o bloco vira um contador de pessoas. */
   faixas: FaixaDoSeletor[];
   contagem: Record<string, number>;
@@ -110,7 +115,12 @@ export function SeletorDeViajantes({
                   {(f.original_price ?? 0) > f.price && (
                     <s className="text-gray-300 mr-1">R$ {fmtBRL(f.original_price as number)}</s>
                   )}
-                  {tierPriceLabel(f.price, fmtBRL)}
+                  {f.price > 0 ? (
+                    <PrecoInline templateId={templateId} preco={f.price} precoDe={f.original_price ?? null}
+                      semRiscado={(f.original_price ?? 0) > f.price}>
+                      {tierPriceLabel(f.price, fmtBRL)}
+                    </PrecoInline>
+                  ) : tierPriceLabel(f.price, fmtBRL)}
                   {!f.occupies_seat && " · não ocupa poltrona"}
                 </p>
               </div>
@@ -126,7 +136,13 @@ export function SeletorDeViajantes({
       ) : (
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-gray-400">
-            {semPreco ? "Valor sob consulta" : `R$ ${fmtBRL(precoPorPessoa ?? 0)} / pessoa`}
+            {semPreco ? "Valor sob consulta" : (
+              <>
+                <PrecoInline templateId={templateId} preco={precoPorPessoa ?? 0} precoDe={precoDePorPessoa ?? null}>
+                  R$ {fmtBRL(precoPorPessoa ?? 0)}
+                </PrecoInline>{" / pessoa"}
+              </>
+            )}
           </p>
           <Counter
             value={pessoas}

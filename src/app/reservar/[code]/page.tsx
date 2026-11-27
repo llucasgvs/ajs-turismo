@@ -19,6 +19,7 @@ import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga, pra
 import { trackPurchaseOnce, trackBeginCheckout, dadosDaVisita } from "@/lib/analytics";
 import { origemDaVisita } from "@/lib/origem";
 import { BrandedLoader } from "@/components/BrandedLoader";
+import { pixDoRoteiro, useBlack } from "@/lib/black";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -874,6 +875,10 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             ocupado={busy}
             semPreco={booking.trip_quote_only}
             precoPorPessoa={trip?.price_per_person ?? booking.total_amount / booking.num_travelers}
+            // Preço no PIX da Black só com o PIX escolhido: no cartão ou no
+            // WhatsApp o cliente paga o cheio, e mostrar os 10% enganaria.
+            templateId={method === "pix" ? trip?.template_id : null}
+            precoDePorPessoa={trip?.original_price}
             onFaixa={changeTier}
             onPessoas={changePeople}
           />
@@ -1028,22 +1033,46 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                 return s + (de > t.price ? (de - t.price) * t.qty : 0);
               }, 0)
             : (orig > 0 ? (orig - price) * booking.num_travelers : 0);
+          // Super Black no PIX: cada linha de passageiro já mostra o valor no PIX
+          // (o desconto é só sobre os passageiros, nunca sobre opcionais). A
+          // diferença de centavos do arredondamento fica na última linha, para a
+          // soma fechar com o que o servidor cobra.
+          const descPix = method === "pix" && !ehCombo(booking) ? Math.max(0, booking.final_amount - valorNoPix(booking)) : 0;
+          const fatorPix = descPix > 0 && booking.total_amount > 0 ? 1 - descPix / booking.total_amount : 1;
+          const linhas = booking.tier_breakdown?.length ? booking.tier_breakdown.map(t => t.qty * t.price) : [booking.total_amount];
+          const linhasPix = linhas.map(v => Math.round(v * fatorPix * 100) / 100);
+          if (descPix > 0) {
+            const ultima = linhasPix.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0).pop();
+            if (ultima != null) {
+              const soma = linhasPix.reduce((a, b) => a + b, 0);
+              linhasPix[ultima] = Math.round((linhasPix[ultima] + (booking.total_amount - descPix - soma)) * 100) / 100;
+            }
+          }
           return (
             <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
-              {booking.tier_breakdown?.length > 0 ? booking.tier_breakdown.map(t => {
+              {booking.tier_breakdown?.length > 0 ? booking.tier_breakdown.map((t, i) => {
                 const isAdult = t.label.startsWith(ADULT);
                 // Cada faixa tem o seu próprio "de"; o do adulto vem da viagem.
                 const deUnit = isAdult ? orig : deForLabel(t.label);
+                const cheioLinha = Math.max(deUnit * t.qty, t.qty * t.price);
                 return (
                   <div key={t.label} className="flex justify-between gap-2 text-gray-600">
                     <span className="min-w-0 truncate">{t.qty}× {t.label}</span>
-                    <span className="shrink-0 whitespace-nowrap">{deUnit > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(deUnit * t.qty)}</s>}{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
+                    {descPix > 0 && t.price > 0 ? (
+                      <span className="shrink-0 whitespace-nowrap"><s className="text-gray-300 mr-1">R$ {fmtBRL(cheioLinha)}</s>R$ {fmtBRL(linhasPix[i])}</span>
+                    ) : (
+                      <span className="shrink-0 whitespace-nowrap">{deUnit > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(deUnit * t.qty)}</s>}{tierPriceLabel(t.qty * t.price, fmtBRL)}</span>
+                    )}
                   </div>
                 );
               }) : (
                 <div className="flex justify-between gap-2 text-gray-600">
                   <span className="min-w-0 truncate">{booking.num_travelers}× Viagem</span>
-                  <span className="shrink-0 whitespace-nowrap">{orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * booking.num_travelers)}</s>}R$ {fmtBRL(booking.total_amount)}</span>
+                  {descPix > 0 ? (
+                    <span className="shrink-0 whitespace-nowrap"><s className="text-gray-300 mr-1">R$ {fmtBRL(Math.max(orig * booking.num_travelers, booking.total_amount))}</s>R$ {fmtBRL(linhasPix[0])}</span>
+                  ) : (
+                    <span className="shrink-0 whitespace-nowrap">{orig > 0 && <s className="text-gray-300 mr-1">R$ {fmtBRL(orig * booking.num_travelers)}</s>}R$ {fmtBRL(booking.total_amount)}</span>
+                  )}
                 </div>
               )}
               {/* Uma linha POR opcional, no mesmo padrão das faixas ("1× Adulto").
@@ -1081,8 +1110,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
             <div className="border-t border-gray-100 pt-3">
               {pixBlack && (
                 <div className="flex justify-between text-sm text-emerald-600 font-semibold mb-1">
-                  <span>Super Black: 10% no PIX</span>
-                  <span>− R$ {fmtBRL(booking.final_amount - valorNoPix(booking))}</span>
+                  <span>Economia no PIX (Black)</span>
+                  <span className="whitespace-nowrap">R$ {fmtBRL(booking.final_amount - valorNoPix(booking))}</span>
                 </div>
               )}
               <div className="flex items-end justify-between">
@@ -1648,6 +1677,7 @@ function StepBadge({ n, done, active }: { n: number; done: boolean; active: bool
 /* Checkout ANTES da reserva existir: resumo (client-side) + login como passo 1. */
 function PreCheckout() {
   const router = useRouter();
+  const black = useBlack();
   const sp = useSearchParams();
   const tripId = sp.get("trip");
   /* Combo: o pacote já foi montado na página dele (datas, pessoas e opcionais de
@@ -1773,7 +1803,16 @@ function PreCheckout() {
       ? [...selOptionals, quartoDoRoteiro]
       : selOptionals;
     const optionals_amount = totalOpcionais(opcionaisEfetivos, people, adultosDoResumo);
+    // Super Black: o PIX da sexta desconta só a parte dos passageiros (nunca
+    // opcionais), igual ao servidor. Mostrar aqui evita o cliente ver o cheio
+    // antes de entrar na conta.
+    const deForLabel = (label: string) => label === ADULT ? trip.original_price : trip.price_tiers.find(t => tierLabel(t) === label)?.original_price;
+    const noPix = hasTiers
+      ? tier_breakdown.reduce((s, t) => s + t.qty * (pixDoRoteiro(black, trip.template_id, t.price, deForLabel(t.label)) ?? t.price), 0)
+      : people * (pixDoRoteiro(black, trip.template_id, trip.price_per_person, trip.original_price) ?? trip.price_per_person);
+    const descontoPix = Math.max(0, Math.round((base - noPix) * 100) / 100);
     return {
+      ...(descontoPix > 0 ? { desconto_pix: descontoPix, preco_pix: Math.round((base + optionals_amount - descontoPix) * 100) / 100 } : {}),
       booking_code: "", trip_id: trip.id, final_amount: base + optionals_amount, total_amount: base,
       optionals_amount, num_travelers: people, status: "pending",
       selected_optionals: opcionaisEfetivos, tier_breakdown,
@@ -1783,7 +1822,7 @@ function PreCheckout() {
       trip_quote_only: trip.quote_only || undefined,
       trip_max_installments: trip.max_installments, installments_max: trip.max_installments, installment_options: [],
     };
-  }, [trip, hasTiers, people, selOptionals, selTiers]);
+  }, [trip, hasTiers, people, selOptionals, selTiers, black]);
   /* O pacote no formato de reserva, para o card da direita ser o mesmo. Vem da
      página do combo pela URL: aqui não há o que recalcular, só mostrar o que o
      cliente acabou de escolher. */
