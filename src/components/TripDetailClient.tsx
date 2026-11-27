@@ -847,7 +847,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip">
 
-      <TopoDaPagina usuario={navUser} />
+      <TopoDaPagina usuario={navUser} faixa />
 
       {/* Gallery Modal */}
       {galleryOpen && allImages.length > 0 && (
@@ -858,10 +858,9 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
       {/* Sticky Mobile CTA */}
       <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} isQuote={isQuote} onQuote={handleQuote} semDatas={semDatas} waDatas={waDatas} />
 
-      <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
-        {/* Faixa da Black Friday: no computador logo abaixo do topo fixo; no
-            celular dentro da barra de "Voltar", que acompanha a rolagem. */}
-        <div className="hidden lg:block"><BlackBar semLink /></div>
+      <div className="flex-1 pt-0 lg:pt-[calc(4rem+var(--faixa-black,0px))] pb-24 lg:pb-0">
+        {/* Faixa da Black Friday: no computador fica dentro do topo fixo
+            (TopoDaPagina); no celular, dentro da barra de "Voltar". */}
         {/* ── Mobile top bar: back + share only ── */}
         <div className="lg:hidden bg-white border-b border-gray-100 sticky top-0 z-20">
           <BlackBar semLink />
@@ -1344,7 +1343,7 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
 
             {/* ── Right sidebar (desktop only) ── */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="sticky top-20 space-y-3">
+              <div className="sticky top-[calc(5rem+var(--faixa-black,0px))] space-y-3">
 
                 {/* Main booking card */}
                 <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">

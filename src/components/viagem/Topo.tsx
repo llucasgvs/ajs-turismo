@@ -15,20 +15,26 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import BlackBar from "@/components/BlackBar";
 
 /* O tipo é o mínimo que o topo usa, e não o StoredUser da api: a página de
    viagem tem a sua própria versão desse tipo, e exigir a de lá obrigaria as
    duas a andarem juntas por causa de um nome e um avatar. */
 type UsuarioDoTopo = { full_name?: string | null; is_admin?: boolean } | null;
 
-export function TopoDaPagina({ usuario, voltarPara = "/viagens" }: {
+export function TopoDaPagina({ usuario, voltarPara = "/viagens", faixa }: {
   usuario: UsuarioDoTopo;
   voltarPara?: string;
+  /** Faixa da Black Friday em cima do topo, presa junto. A altura dela vai
+   *  para a variável CSS --faixa-black, que a página soma ao espaço do topo. */
+  faixa?: boolean;
 }) {
   const router = useRouter();
   const navUser = usuario;
   return (
-      <header className="hidden lg:flex fixed top-0 left-0 right-0 z-50 h-16 bg-white border-b border-gray-100 shadow-sm items-center px-6">
+    <div className="hidden lg:block fixed top-0 left-0 right-0 z-50">
+      {faixa && <BlackBar semLink medir />}
+      <header className="flex h-16 bg-white border-b border-gray-100 shadow-sm items-center px-6">
         {/* Left: Logo + Back */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
@@ -70,5 +76,6 @@ export function TopoDaPagina({ usuario, voltarPara = "/viagens" }: {
           )}
         </div>
       </header>
+    </div>
   );
 }

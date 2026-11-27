@@ -5,6 +5,7 @@
  * o menu fica exatamente como sempre. Azul-marinho e dourado da AJS. */
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { foraDaBlack, pixDaBlack, pixDoRoteiro, seloDaBlack, useBlack, useFaltam } from "@/lib/black";
 import { fmtBRL } from "@/lib/format";
 
@@ -46,8 +47,20 @@ function AoVivo() {
  * Fora da Black, não existe. No celular são duas linhas curtas, para não
  * espremer. `semLink` na página da viagem: o cliente já está onde ela levaria.
  */
-export default function BlackBar({ semLink }: { semLink?: boolean } = {}) {
+export default function BlackBar({ semLink, medir }: { semLink?: boolean; medir?: boolean } = {}) {
   const b = useBlack();
+  const ref = useRef<HTMLDivElement>(null);
+  // `medir`: publica a altura em --faixa-black para quem fica embaixo de um
+  // topo fixo (página da viagem). Sem faixa, 0.
+  useEffect(() => {
+    if (!medir) return;
+    const raiz = document.documentElement;
+    const el = ref.current;
+    if (!el) { raiz.style.setProperty("--faixa-black", "0px"); return; }
+    const ro = new ResizeObserver(() => raiz.style.setProperty("--faixa-black", `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => { ro.disconnect(); raiz.style.setProperty("--faixa-black", "0px"); };
+  }, [medir, b]);
   const faltam = useFaltam(b?.pix_hoje ? b.pix_termina_em : null);
   if (!b) return null;
   const contando = b.pix_hoje && faltam != null && faltam > 0;
@@ -82,7 +95,7 @@ export default function BlackBar({ semLink }: { semLink?: boolean } = {}) {
   );
   const classe = "container-custom flex items-center justify-center gap-2.5 py-1.5 lg:py-2 text-[11px] sm:text-xs lg:text-[13px] leading-tight";
   return (
-    <div className={`text-center border-b bg-navy-900 border-gold-500/40 bg-[linear-gradient(90deg,transparent,rgba(247,168,0,0.12),transparent)]`}>
+    <div ref={ref} className={`text-center border-b bg-navy-900 border-gold-500/40 bg-[linear-gradient(90deg,transparent,rgba(247,168,0,0.12),transparent)]`}>
       {semLink ? <div className={classe}>{conteudo}</div> : (
         <Link href="/viagens" className={classe}>
           {conteudo}
