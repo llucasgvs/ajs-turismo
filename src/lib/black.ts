@@ -11,7 +11,7 @@
  * Uma pergunta por página: a primeira chamada é guardada e reaproveitada por
  * todos os componentes. Falhou a chamada? A tela fica como sempre foi. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -44,15 +44,60 @@ function perguntar(): Promise<BlackAgora | null> {
   return pedido;
 }
 
-/** A Black de agora, ou null fora dela (e enquanto a resposta não chega). */
-export function useBlack(): BlackAgora | null {
-  const [b, setB] = useState<BlackAgora | null>(null);
+/** Aplica o relógio: depois do fim do PIX, `pix_hoje` cai; depois do fim da
+ *  Black, nada. Sem isto a tela aberta às 23h50 continuaria mostrando o preço
+ *  do PIX depois da meia-noite, e o servidor (que decide) cobraria o cheio. */
+function noRelogio(d: BlackAgora | null, agora: number): BlackAgora | null {
+  if (!d) return null;
+  if (agora >= Date.parse(d.termina_em)) return null;
+  if (d.pix_hoje && agora >= Date.parse(d.pix_termina_em)) return { ...d, pix_hoje: false };
+  return d;
+}
+
+/** A Black de agora, ou null fora dela (e enquanto a resposta não chega).
+ *  Vira sozinha no fim do PIX e no fim da Black, sem recarregar a página. */
+function useBlackDoServidor(): { cru: BlackAgora | null; agora: number } {
+  const [cru, setCru] = useState<BlackAgora | null>(null);
+  const [agora, setAgora] = useState(() => Date.now());
   useEffect(() => {
     let vivo = true;
-    perguntar().then((d) => { if (vivo) setB(d); });
+    perguntar().then((d) => { if (vivo) { setCru(d); setAgora(Date.now()); } });
     return () => { vivo = false; };
   }, []);
-  return b;
+  useEffect(() => {
+    if (!cru) return;
+    const proximos = [cru.pix_termina_em, cru.termina_em].map(Date.parse).filter((t) => t > agora);
+    if (!proximos.length) return;
+    const espera = Math.min(...proximos) - agora + 300;
+    if (espera > 2_000_000_000) return; // setTimeout não aceita mais que ~24 dias
+    const id = setTimeout(() => setAgora(Date.now()), espera);
+    return () => clearTimeout(id);
+  }, [cru, agora]);
+  return { cru, agora };
+}
+
+export function useBlack(): BlackAgora | null {
+  const { cru, agora } = useBlackDoServidor();
+  return useMemo(() => noRelogio(cru, agora), [cru, agora]);
+}
+
+/** true depois que o PIX da Black acabou com a página aberta. O preço do PIX
+ *  que o servidor mandou antes da meia-noite deixa de valer na tela. */
+export function usePixAcabou(): boolean {
+  const { cru, agora } = useBlackDoServidor();
+  return !!cru && cru.pix_hoje && agora >= Date.parse(cru.pix_termina_em);
+}
+
+/** Tempo que falta até `alvo` (ISO), atualizado a cada segundo. */
+export function useFaltam(alvo?: string | null): number | null {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    if (!alvo) return;
+    const id = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [alvo]);
+  if (!alvo) return null;
+  return Math.max(0, Date.parse(alvo) - agora);
 }
 
 export function foraDaBlack(b: BlackAgora, templateId?: number | null): boolean {

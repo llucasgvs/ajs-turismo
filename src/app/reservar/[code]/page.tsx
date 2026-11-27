@@ -19,7 +19,7 @@ import { nomeCurtoDaViagem, spDay, fmtBRL, spotsLabel, salesClosed, temVaga, pra
 import { trackPurchaseOnce, trackBeginCheckout, dadosDaVisita } from "@/lib/analytics";
 import { origemDaVisita } from "@/lib/origem";
 import { BrandedLoader } from "@/components/BrandedLoader";
-import { pixDoRoteiro, useBlack } from "@/lib/black";
+import { pixDoRoteiro, useBlack, usePixAcabou } from "@/lib/black";
 import { tierLabel, tierOccupiesSeat, tierPriceLabel } from "@/lib/tiers";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -541,6 +541,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
   /** Combo: o servidor devolve o grupo depois de refazer o carrinho. */
   onComboSalvo?: (grupo: string) => void;
 }) {
+  const pixAcabou = usePixAcabou();
   const hasTiers = (trip?.price_tiers ?? []).length > 0;
   const priceForLabel = (label: string) =>
     label === ADULT ? (trip?.price_per_person ?? 0) : (trip?.price_tiers.find(t => tierLabel(t) === label)?.price ?? trip?.price_per_person ?? 0);
@@ -1041,7 +1042,7 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
           // (o desconto é só sobre os passageiros, nunca sobre opcionais). A
           // diferença de centavos do arredondamento fica na última linha, para a
           // soma fechar com o que o servidor cobra.
-          const descPix = method === "pix" && !ehCombo(booking) ? Math.max(0, booking.final_amount - valorNoPix(booking)) : 0;
+          const descPix = method === "pix" && !ehCombo(booking) ? Math.max(0, booking.final_amount - valorNoPix(booking, pixAcabou)) : 0;
           const fatorPix = descPix > 0 && booking.total_amount > 0 ? 1 - descPix / booking.total_amount : 1;
           const linhas = booking.tier_breakdown?.length ? booking.tier_breakdown.map(t => t.qty * t.price) : [booking.total_amount];
           const linhasPix = linhas.map(v => Math.round(v * fatorPix * 100) / 100);
@@ -1107,15 +1108,15 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
         {(() => {
           const opt = booking.installment_options?.find(o => o.n === installments);
           const isCard = method === "card";
-          const pixBlack = method === "pix" && valorNoPix(booking) < booking.final_amount;
-          const chargeTotal = isCard && opt ? opt.total : (method === "pix" ? valorNoPix(booking) : booking.final_amount);
+          const pixBlack = method === "pix" && valorNoPix(booking, pixAcabou) < booking.final_amount;
+          const chargeTotal = isCard && opt ? opt.total : (method === "pix" ? valorNoPix(booking, pixAcabou) : booking.final_amount);
           const hasInterest = isCard && opt && !opt.interest_free;
           return (
             <div className="border-t border-gray-100 pt-3">
               {pixBlack && (
                 <div className="flex justify-between text-sm text-emerald-600 font-semibold mb-1">
                   <span>Economia no PIX (Black)</span>
-                  <span className="whitespace-nowrap">R$ {fmtBRL(booking.final_amount - valorNoPix(booking))}</span>
+                  <span className="whitespace-nowrap">R$ {fmtBRL(booking.final_amount - valorNoPix(booking, pixAcabou))}</span>
                 </div>
               )}
               <div className="flex items-end justify-between">
@@ -1128,8 +1129,8 @@ function ReservationCard({ booking, trip, code, onUpdate, editable, method, inst
                   <span className={hasInterest ? "text-gray-400" : "text-emerald-600 font-semibold"}> {hasInterest ? "com juros" : "sem juros"}</span>
                 </p>
               )}
-              {hasInterest && (valorNoPix(booking) < booking.final_amount
-                ? <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista: R$ {fmtBRL(booking.final_amount)} · no PIX: R$ {fmtBRL(valorNoPix(booking))}</p>
+              {hasInterest && (valorNoPix(booking, pixAcabou) < booking.final_amount
+                ? <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista: R$ {fmtBRL(booking.final_amount)} · no PIX: R$ {fmtBRL(valorNoPix(booking, pixAcabou))}</p>
                 : <p className="text-[11px] text-gray-400 text-right mt-0.5">À vista ou no PIX: R$ {fmtBRL(booking.final_amount)}</p>)}
             </div>
           );
@@ -1327,7 +1328,8 @@ function StepTravelers({ booking, done, active, onEdit, onDone, code }: {
 
 /* ── Passo 2: Pagamento ──────────────────────────────────────────────── */
 /** Valor do PIX: com o desconto da Black quando houver, senão o total. */
-function valorNoPix(b: Booking): number {
+function valorNoPix(b: Booking, pixAcabou = false): number {
+  if (pixAcabou) return b.final_amount;
   return b.preco_pix != null && (b.desconto_pix || 0) > 0 ? b.preco_pix : b.final_amount;
 }
 
@@ -1336,6 +1338,15 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
   method: Method; setMethod: (m: Method) => void; installments: number; setInstallments: (n: number) => void;
   onConfirmed: () => void; pollStatus: () => Promise<string | null>; sincronizando: boolean;
 }) {
+  const pixAcabou = usePixAcabou();
+  const black = useBlack();
+  // Só o horário, sem contador correndo: quem está pagando não precisa de pressa na tela.
+  const ateQuando = black?.pix_hoje
+    ? new Date(black.pix_termina_em).getTime() - 60_000
+    : null;
+  const ateTexto = ateQuando != null
+    ? new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(ateQuando)
+    : "";
   return (
     <section id="step-2" className={`bg-white rounded-2xl shadow-sm scroll-mt-20 ${!active ? "opacity-50 pointer-events-none" : ""}`}>
       <header className="flex items-center gap-3 px-5 py-4"><StepBadge n={2} done={false} active={active} /><h2 className="font-bold text-navy-800">Forma de pagamento</h2></header>
@@ -1346,7 +1357,7 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
                 PIX custa R$ 1,89 fixo, cartão custa percentual. Quem quer parcelar
                 continua indo ao WhatsApp. */}
             {(!booking.trip_whatsapp_only || booking.trip_allow_pix) && (
-              <MethodRadio icon={<QrCode size={18} />} label="PIX" hint={valorNoPix(booking) < booking.final_amount ? `R$ ${fmtBRL(valorNoPix(booking))} com 10% off (Super Black)` : "Aprovação na hora"} selected={method === "pix"} onClick={() => setMethod("pix")} />
+              <MethodRadio icon={<QrCode size={18} />} label="PIX" hint={valorNoPix(booking, pixAcabou) < booking.final_amount ? `R$ ${fmtBRL(valorNoPix(booking, pixAcabou))} ${ateTexto ? `· 10% OFF até ${ateTexto} de hoje` : "com 10% OFF"}` : "Aprovação na hora"} selected={method === "pix"} onClick={() => setMethod("pix")} />
             )}
             {!booking.trip_whatsapp_only && (
               <MethodRadio icon={<CreditCard size={18} />} label="Cartão de crédito" hint={(() => {
@@ -1364,7 +1375,7 @@ function StepPayment({ booking, active, code, method, setMethod, installments, s
             )}
           </div>
           <div key={method} className="mt-5 animate-pop">
-            {method === "pix" && <PixPanel code={code} amount={valorNoPix(booking)} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
+            {method === "pix" && <PixPanel code={code} amount={valorNoPix(booking, pixAcabou)} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
             {method === "card" && <CardPanel code={code} amount={booking.final_amount} options={booking.installment_options || []} installments={installments} setInstallments={setInstallments} onConfirmed={onConfirmed} pollStatus={pollStatus} sincronizando={sincronizando} />}
             {method === "whatsapp" && <WhatsappPanel code={code} booking={booking} />}
           </div>

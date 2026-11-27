@@ -5,23 +5,90 @@
  * o menu fica exatamente como sempre. Azul-marinho e dourado da AJS. */
 
 import Link from "next/link";
-import { foraDaBlack, pixDaBlack, pixDoRoteiro, seloDaBlack, useBlack } from "@/lib/black";
+import { foraDaBlack, pixDaBlack, pixDoRoteiro, seloDaBlack, useBlack, useFaltam } from "@/lib/black";
 import { fmtBRL } from "@/lib/format";
 
-export default function BlackBar() {
-  const b = useBlack();
-  if (!b) return null;
-  const texto = b.pix_hoje
-    ? `Hoje: ${b.pix_percentual}% de desconto no PIX e até ${b.parcelas_minimo}x sem juros`
-    : `Até ${b.parcelas_minimo}x sem juros e aéreos em até ${b.parcelas_aereo}x. Só até domingo`;
+function Relogio({ ms }: { ms: number }) {
+  const t = Math.floor(ms / 1000);
+  const partes: [number, string][] = [[Math.floor(t / 3600), "h"], [Math.floor((t % 3600) / 60), "m"], [t % 60, "s"]];
   return (
-    <div className="bg-navy-900 border-b border-gold-500/30 text-center">
-      <Link href="/viagens" className="container-custom flex items-center justify-center gap-2 py-1.5 text-[11px] sm:text-xs leading-tight">
-        <span className="font-black tracking-wide text-gold-400 uppercase whitespace-nowrap">{b.nome}</span>
-        <span className="hidden sm:inline text-gold-500/60">·</span>
-        <span className="text-white/90 font-medium">{texto}</span>
-        <span className="hidden md:inline text-gold-400 font-bold underline underline-offset-2 whitespace-nowrap">Ver viagens</span>
-      </Link>
+    <span className="inline-flex items-center gap-1 tabular-nums" role="timer"
+      aria-label={`Faltam ${partes[0][0]} horas, ${partes[1][0]} minutos e ${partes[2][0]} segundos`}>
+      {partes.map(([n, u], i) => (
+        <span key={u} className="inline-flex items-baseline gap-px">
+          {/* key = o número: cada segundo novo monta a caixa de novo e o
+              "tique" roda junto com a troca, não num ritmo próprio. */}
+          <span key={i === 2 ? n : u}
+            className={`rounded-md px-1.5 py-0.5 font-black leading-none shadow-sm bg-gold-500 text-navy-900 ${i === 2 ? "animate-[tique_0.45s_ease-out]" : ""}`}>
+            {String(n).padStart(2, "0")}
+          </span>
+          <span className="text-[0.85em] font-bold text-gold-400/90">{u}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Ponto vermelho "ao vivo". */
+function AoVivo() {
+  return (
+    <span className="relative inline-flex h-2 w-2 shrink-0" aria-hidden>
+      <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+    </span>
+  );
+}
+
+/**
+ * Faixa da Black Friday. Na sexta: "SÓ HOJE 10% OFF no PIX, acaba em 00h 00m 00s",
+ * pelo relógio do servidor (o mesmo que decide o desconto); na última hora a
+ * frase vira "Última hora". Depois da meia-noite, só a parcela, até domingo.
+ * Fora da Black, não existe. No celular são duas linhas curtas, para não
+ * espremer. `semLink` na página da viagem: o cliente já está onde ela levaria.
+ */
+export default function BlackBar({ semLink }: { semLink?: boolean } = {}) {
+  const b = useBlack();
+  const faltam = useFaltam(b?.pix_hoje ? b.pix_termina_em : null);
+  if (!b) return null;
+  const contando = b.pix_hoje && faltam != null && faltam > 0;
+  const urgente = contando && faltam! < 60 * 60 * 1000;
+  const marca = (
+    <span className="font-display font-black tracking-wider text-gold-400 uppercase whitespace-nowrap">
+      Black Friday<span className="hidden lg:inline text-white/80 font-bold normal-case tracking-normal"> AJS</span>
+    </span>
+  );
+  const conteudo = contando ? (
+    <span className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5">
+      <span className="flex items-center gap-2 whitespace-nowrap">
+        {marca}
+        <span className="text-gold-500/60">·</span>
+        <AoVivo />
+        <span className="font-black uppercase tracking-wide text-white">
+          {urgente ? "Última hora" : "Só hoje"}: <span className="text-gold-400">{b.pix_percentual}% OFF</span> no PIX
+        </span>
+      </span>
+      <span className="flex items-center gap-1.5 whitespace-nowrap text-white/90 font-semibold">
+        Acaba em <Relogio ms={faltam!} />
+      </span>
+    </span>
+  ) : (
+    <span className="flex items-center gap-2">
+      {marca}
+      <span className="text-gold-500/60">·</span>
+      <span className="text-white/90 font-medium">
+        Até <b className="text-gold-400">{b.parcelas_minimo}x sem juros</b><span className="hidden sm:inline"> e aéreos em até {b.parcelas_aereo}x</span>. Só até domingo
+      </span>
+    </span>
+  );
+  const classe = "container-custom flex items-center justify-center gap-2.5 py-1.5 lg:py-2 text-[11px] sm:text-xs lg:text-[13px] leading-tight";
+  return (
+    <div className={`text-center border-b bg-navy-900 border-gold-500/40 bg-[linear-gradient(90deg,transparent,rgba(247,168,0,0.12),transparent)]`}>
+      {semLink ? <div className={classe}>{conteudo}</div> : (
+        <Link href="/viagens" className={classe}>
+          {conteudo}
+          <span className="hidden md:inline text-gold-400 font-bold underline underline-offset-2 whitespace-nowrap">Ver viagens</span>
+        </Link>
+      )}
     </div>
   );
 }

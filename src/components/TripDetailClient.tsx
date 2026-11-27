@@ -1,6 +1,6 @@
 "use client";
 
-import { PrecoInline, PrecoNoPix } from "@/components/BlackBar";
+import BlackBar, { PrecoInline, PrecoNoPix } from "@/components/BlackBar";
 import { pixDoRoteiro, useBlack } from "@/lib/black";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -859,9 +859,13 @@ export default function TripDetailClient({ trip, semDatas = false, relacionadas,
       <StickyMobileCTA trip={activeTrip} sold={sold} onBook={handleOpenBooking} whatsappFallback={whatsappFallback} isQuote={isQuote} onQuote={handleQuote} semDatas={semDatas} waDatas={waDatas} />
 
       <div className="flex-1 pt-0 lg:pt-16 pb-24 lg:pb-0">
+        {/* Faixa da Black Friday: no computador logo abaixo do topo fixo; no
+            celular dentro da barra de "Voltar", que acompanha a rolagem. */}
+        <div className="hidden lg:block"><BlackBar semLink /></div>
         {/* ── Mobile top bar: back + share only ── */}
-        <div className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-20">
-          <div className="flex items-center justify-between">
+        <div className="lg:hidden bg-white border-b border-gray-100 sticky top-0 z-20">
+          <BlackBar semLink />
+          <div className="flex items-center justify-between px-4 py-3">
             <button onClick={() => router.push("/viagens")}
               className="flex items-center gap-1.5 text-gray-600 hover:text-navy-700 text-sm font-medium transition-colors">
               <ArrowLeft size={16} /> Voltar

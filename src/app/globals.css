@@ -375,3 +375,12 @@ button:not(:disabled):not(.no-press):active {
   .stagger-in > * { opacity: 1; }
   .img-fade { opacity: 1; }
 }
+
+/* Contador da Black Friday: "tique" dos segundos, disparado a cada troca. */
+@keyframes tique {
+  0% { transform: scale(1.22); filter: brightness(1.25); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[tique"] { animation: none !important; }
+}
