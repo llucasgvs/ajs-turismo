@@ -488,8 +488,12 @@ function BookingCheckout({ code }: { code: string }) {
       });
     }
   }, [confirmed, booking, code]);
-  // Roteiro só por WhatsApp: já abre o passo de pagamento nessa opção.
-  useEffect(() => { if (booking?.trip_whatsapp_only) setMethod("whatsapp"); }, [booking?.trip_whatsapp_only]);
+  // Roteiro só por WhatsApp: abre nessa opção. Se ele libera o PIX, abre no
+  // PIX (decisão do dono, 27/11/2026): é o que o site vende sozinho, e com o
+  // WhatsApp marcado o cliente via o preço cheio e nem notava o PIX.
+  useEffect(() => {
+    if (booking?.trip_whatsapp_only) setMethod(booking?.trip_allow_pix ? "pix" : "whatsapp");
+  }, [booking?.trip_whatsapp_only, booking?.trip_allow_pix]);
 
   if (loading) return <BrandedLoader label="Abrindo sua reserva..." />;
   if (confirmed || booking?.status === "confirmed")
