@@ -65,9 +65,15 @@ export default function BlackBar({ semLink, medir }: { semLink?: boolean; medir?
   if (!b) return null;
   const contando = b.pix_hoje && faltam != null && faltam > 0;
   const urgente = contando && faltam! < 60 * 60 * 1000;
-  const marca = (
+  // Sexta é "Black Friday"; sábado e domingo já não são sexta, então a faixa
+  // volta ao nome da campanha (pedido do dono em 28/11).
+  const marca = contando ? (
     <span className="font-display font-black tracking-wider text-gold-400 uppercase whitespace-nowrap">
       Black Friday<span className="hidden lg:inline text-white/80 font-bold normal-case tracking-normal"> AJS</span>
+    </span>
+  ) : (
+    <span className="font-display font-black tracking-wider text-gold-400 uppercase whitespace-nowrap">
+      Super Black <span className="text-white/90">AJS</span>
     </span>
   );
   const conteudo = contando ? (
